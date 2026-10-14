@@ -1,0 +1,153 @@
+import { spawn, type ChildProcess } from "node:child_process";
+import { unlink } from "node:fs/promises";
+import net from "node:net";
+import os from "node:os";
+import path from "node:path";
+
+type MpvEvent = {
+  event?: string;
+  reason?: string;
+  error?: string;
+  request_id?: number;
+};
+
+type Pending = {
+  resolve: (value: unknown) => void;
+  reject: (err: Error) => void;
+};
+
+function waitForSocket(sockPath: string, timeoutMs = 8000): Promise<void> {
+  const start = Date.now();
+  return new Promise((resolve, reject) => {
+    const tick = () => {
+      const sock = net.connect(sockPath);
+      sock.once("connect", () => {
+        sock.destroy();
+        resolve();
+      });
+      sock.once("error", () => {
+        sock.destroy();
+        if (Date.now() - start > timeoutMs) {
+          reject(new Error("mpv IPC socket did not appear"));
+          return;
+        }
+        setTimeout(tick, 80);
+      });
+    };
+    tick();
+  });
+}
+
+export class Mpv {
+  private proc: ChildProcess | null = null;
+  private sock: net.Socket | null = null;
+  private buf = "";
+  private nextId = 1;
+  private pending = new Map<number, Pending>();
+  private sockPath = path.join(os.tmpdir(), `monjtv-${process.pid}.sock`);
+  onEndFile: ((reason: string) => void) | null = null;
+  onExit: (() => void) | null = null;
+
+  get running(): boolean {
+    return this.proc !== null && this.proc.exitCode === null;
+  }
+
+  async start(): Promise<void> {
+    if (this.running) return;
+    await unlink(this.sockPath).catch(() => undefined);
+    this.proc = spawn(
+      "mpv",
+      [
+        "--idle=yes",
+        "--fs",
+        "--hwdec=auto",
+        `--input-ipc-server=${this.sockPath}`,
+        "--force-window=yes",
+        "--keep-open=no",
+        "--no-terminal",
+      ],
+      { stdio: ["ignore", "ignore", "pipe"] },
+    );
+    this.proc.once("exit", () => {
+      this.cleanup();
+      this.onExit?.();
+    });
+    await waitForSocket(this.sockPath);
+    this.sock = net.createConnection(this.sockPath);
+    this.sock.setEncoding("utf8");
+    this.sock.on("data", (chunk: string) => this.onData(chunk));
+    this.sock.on("error", () => undefined);
+  }
+
+  async loadFile(filePath: string): Promise<void> {
+    await this.command(["loadfile", filePath, "replace"]);
+  }
+
+  async stopPlayback(): Promise<void> {
+    if (!this.running) return;
+    await this.command(["stop"]).catch(() => undefined);
+  }
+
+  async quit(): Promise<void> {
+    if (!this.running) return;
+    await this.command(["quit"]).catch(() => undefined);
+    this.proc?.kill();
+    this.cleanup();
+  }
+
+  private async command(args: unknown[]): Promise<unknown> {
+    if (!this.sock) throw new Error("mpv is not running");
+    const request_id = this.nextId++;
+    const payload = JSON.stringify({ command: args, request_id }) + "\n";
+    return new Promise((resolve, reject) => {
+      this.pending.set(request_id, { resolve, reject });
+      this.sock!.write(payload, (err) => {
+        if (err) {
+          this.pending.delete(request_id);
+          reject(err);
+        }
+      });
+      setTimeout(() => {
+        if (this.pending.has(request_id)) {
+          this.pending.delete(request_id);
+          reject(new Error("mpv command timed out"));
+        }
+      }, 5000);
+    });
+  }
+
+  private onData(chunk: string): void {
+    this.buf += chunk;
+    const lines = this.buf.split("\n");
+    this.buf = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      let msg: MpvEvent;
+      try {
+        msg = JSON.parse(line) as MpvEvent;
+      } catch {
+        continue;
+      }
+      if (msg.event === "end-file") {
+        this.onEndFile?.(msg.reason ?? "unknown");
+      }
+      if (msg.request_id !== undefined && this.pending.has(msg.request_id)) {
+        const pending = this.pending.get(msg.request_id)!;
+        this.pending.delete(msg.request_id);
+        if (msg.error && msg.error !== "success") {
+          pending.reject(new Error(msg.error));
+        } else {
+          pending.resolve(msg);
+        }
+      }
+    }
+  }
+
+  private cleanup(): void {
+    this.sock?.destroy();
+    this.sock = null;
+    this.proc = null;
+    this.pending.clear();
+    unlink(this.sockPath).catch(() => undefined);
+  }
+}
