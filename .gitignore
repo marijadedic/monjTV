@@ -153,3 +153,9 @@ data/
 
 # Lavish
 .lavish/
+
+# Local agent decisions
+AGENTS.md
+
+# Cursor
+.cursor/

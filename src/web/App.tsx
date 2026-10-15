@@ -1,4 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
+import { GroveFrame } from "./Grove.tsx";
 import { Today } from "./pages/Today.tsx";
 import { Admin } from "./pages/Admin.tsx";
 import { useI18n, type Lang } from "./i18n.tsx";
@@ -46,12 +47,56 @@ export function App() {
   }, []);
 
   return (
-    <div class="shell">
-      <header class="top">
-        <a class="brand" href="/">
-          monjTV
-        </a>
-        <nav class="seg" aria-label={t.sections}>
+    <>
+      {theme === "dusk" && <GroveFrame />}
+      <div class="shell">
+        <header class="top">
+          <a class="brand" href="/">
+            monjTV
+          </a>
+          <time class="clock" dateTime={clock}>
+            {clock}
+          </time>
+          <details class="prefs">
+            <summary>{t.options}</summary>
+            <div class="prefs-body">
+              <span class="prefs-label">{t.language}</span>
+              <div class="seg lang" role="radiogroup" aria-label={t.language}>
+                {LANGS.map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="radio"
+                    aria-checked={lang === id}
+                    aria-label={langName[id]}
+                    class={lang === id ? "on" : ""}
+                    onClick={() => setLang(id)}
+                  >
+                    {langLabel[id]}
+                  </button>
+                ))}
+              </div>
+              <span class="prefs-label">{t.theme}</span>
+              <div class="themes" role="radiogroup" aria-label={t.theme}>
+                {THEMES.map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="radio"
+                    aria-checked={theme === id}
+                    data-choice={id}
+                    class={theme === id ? "on" : ""}
+                    onClick={() => setTheme(id)}
+                  >
+                    <span class="swatch" aria-hidden="true" />
+                    {themeLabel[id]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </details>
+        </header>
+        <nav class="folders" aria-label={t.sections}>
           <a href="/" class={admin ? "" : "on"} aria-current={admin ? undefined : "page"}>
             {t.today}
           </a>
@@ -59,44 +104,8 @@ export function App() {
             {t.admin}
           </a>
         </nav>
-        <div class="top-end">
-          <div class="seg lang" role="radiogroup" aria-label={t.language}>
-            {LANGS.map((id) => (
-              <button
-                key={id}
-                type="button"
-                role="radio"
-                aria-checked={lang === id}
-                aria-label={langName[id]}
-                class={lang === id ? "on" : ""}
-                onClick={() => setLang(id)}
-              >
-                {langLabel[id]}
-              </button>
-            ))}
-          </div>
-          <div class="themes" role="radiogroup" aria-label={t.theme}>
-            {THEMES.map((id) => (
-              <button
-                key={id}
-                type="button"
-                role="radio"
-                aria-checked={theme === id}
-                data-choice={id}
-                class={theme === id ? "on" : ""}
-                onClick={() => setTheme(id)}
-              >
-                <span class="swatch" aria-hidden="true" />
-                {themeLabel[id]}
-              </button>
-            ))}
-          </div>
-        </div>
-        <time class="clock" dateTime={clock}>
-          {clock}
-        </time>
-      </header>
-      <main>{admin ? <Admin /> : <Today />}</main>
-    </div>
+        <main>{admin ? <Admin /> : <Today />}</main>
+      </div>
+    </>
   );
 }

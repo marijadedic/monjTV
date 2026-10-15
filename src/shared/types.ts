@@ -15,6 +15,7 @@ export interface ScheduleBlock {
 
 export interface Schedule {
   blocks: ScheduleBlock[];
+  fallbackFolder: string;
 }
 
 export interface Progress {
@@ -44,6 +45,7 @@ export interface PlayerStatus {
   waitingUntil: string | null;
   error: string | null;
   currentItemId: string | null;
+  fallbackTitle: string | null;
 }
 
 export interface BrowseResult {

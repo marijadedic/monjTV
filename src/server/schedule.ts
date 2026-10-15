@@ -5,12 +5,15 @@ import { isDir } from "./files.ts";
 import { schedulePath } from "./paths.ts";
 import { readJson, writeJson } from "./store.ts";
 
-const empty: Schedule = { blocks: [] };
+const empty: Schedule = { blocks: [], fallbackFolder: "" };
 
 // Read the weekly schedule from disk.
 export async function loadSchedule(): Promise<Schedule> {
   const data = await readJson<Schedule>(schedulePath, empty);
-  return { blocks: Array.isArray(data.blocks) ? data.blocks : [] };
+  return {
+    blocks: Array.isArray(data.blocks) ? data.blocks : [],
+    fallbackFolder: fallbackFolderOf(data.fallbackFolder),
+  };
 }
 
 // Validate the schedule and write it to disk.
@@ -47,7 +50,12 @@ export function validateSchedule(input: Schedule): Schedule {
       }
     }
   }
-  return { blocks };
+  return { blocks, fallbackFolder: fallbackFolderOf(input.fallbackFolder) };
+}
+
+// A folder path, or empty when no default is set.
+function fallbackFolderOf(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
 }
 
 // Fill defaults and reject an invalid block.

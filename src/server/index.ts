@@ -30,6 +30,7 @@ app.put("/api/schedule", async (c) => {
     for (const block of body.blocks ?? []) {
       await assertFolder(block.folder);
     }
+    if (body.fallbackFolder?.trim()) await assertFolder(body.fallbackFolder.trim());
     const saved = await saveSchedule(body);
     const today = await rebuildTodayPreservingPlayback();
     return c.json({ schedule: saved, today });

@@ -25,7 +25,6 @@ type Copy = {
   nextAt: (time: string) => string;
   nothingOn: string;
   progress: string;
-  minLeft: (n: number) => string;
   nextEpisode: string;
   random: string;
   planned: string;
@@ -35,9 +34,21 @@ type Copy = {
   shuffle: string;
   playNow: string;
   startTv: string;
-  weekly: string;
-  addBlock: string;
+  options: string;
+  week: string;
+  add: string;
   save: string;
+  cancel: string;
+  moreDays: string;
+  hideDays: string;
+  length: string;
+  lengthOf: (mins: number) => string;
+  until: (time: string) => string;
+  ifEmpty: string;
+  change: string;
+  clickFirst: string;
+  dayWord: string;
+  dayName: Record<Day, string>;
   saved: string;
   start: string;
   end: string;
@@ -70,7 +81,6 @@ const en: Copy = {
   nextAt: (time) => `Next block at ${time}`,
   nothingOn: "Nothing is on right now.",
   progress: "Time through the current show",
-  minLeft: (n) => `${n} min left`,
   nextEpisode: "Next episode",
   random: "Random",
   planned: "Planned",
@@ -80,9 +90,35 @@ const en: Copy = {
   shuffle: "Shuffle",
   playNow: "Play now",
   startTv: "Start TV",
-  weekly: "Weekly grid",
-  addBlock: "Add block",
+  options: "Options",
+  week: "Week",
+  add: "Add",
   save: "Save",
+  cancel: "Cancel",
+  moreDays: "More days",
+  hideDays: "Hide days",
+  length: "Length",
+  lengthOf: (mins) => {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h && m) return `${h}h ${m}m`;
+    if (h) return `${h}h`;
+    return `${m}m`;
+  },
+  until: (time) => `until ${time}`,
+  ifEmpty: "If nothing is scheduled",
+  change: "Change",
+  clickFirst: "Click to add the first slot",
+  dayWord: "Day",
+  dayName: {
+    mon: "Monday",
+    tue: "Tuesday",
+    wed: "Wednesday",
+    thu: "Thursday",
+    fri: "Friday",
+    sat: "Saturday",
+    sun: "Sunday",
+  },
   saved: "Saved. Today’s rundown rebuilt.",
   start: "Start",
   end: "End",
@@ -168,7 +204,6 @@ const hr: Copy = {
   nextAt: (time) => `Sljedeći blok u ${time}`,
   nothingOn: "Trenutno se ništa ne emitira.",
   progress: "Proteklo vrijeme trenutne emisije",
-  minLeft: (n) => `još ${n} min`,
   nextEpisode: "Sljedeća epizoda",
   random: "Nasumično",
   planned: "Planirano",
@@ -178,9 +213,35 @@ const hr: Copy = {
   shuffle: "Promiješaj",
   playNow: "Pusti sada",
   startTv: "Pokreni TV",
-  weekly: "Tjedni raspored",
-  addBlock: "Dodaj blok",
+  options: "Opcije",
+  week: "Tjedan",
+  add: "Dodaj",
   save: "Spremi",
+  cancel: "Odustani",
+  moreDays: "Više dana",
+  hideDays: "Sakrij dane",
+  length: "Trajanje",
+  lengthOf: (mins) => {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h && m) return `${h} h ${m} min`;
+    if (h) return `${h} h`;
+    return `${m} min`;
+  },
+  until: (time) => `do ${time}`,
+  ifEmpty: "Ako ništa nije zakazano",
+  change: "Promijeni",
+  clickFirst: "Klikni za prvi termin",
+  dayWord: "Dan",
+  dayName: {
+    mon: "Ponedjeljak",
+    tue: "Utorak",
+    wed: "Srijeda",
+    thu: "Četvrtak",
+    fri: "Petak",
+    sat: "Subota",
+    sun: "Nedjelja",
+  },
   saved: "Spremljeno. Današnji raspored je obnovljen.",
   start: "Početak",
   end: "Kraj",

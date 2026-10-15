@@ -28,12 +28,6 @@ function progressOf(item: RundownItem, sec: number): number {
   return Math.min(1, Math.max(0, (sec - start) / (end - start)));
 }
 
-function minutesLeft(item: RundownItem, sec: number): number {
-  const end = hmToSec(item.end);
-  if (end == null) return 0;
-  return Math.max(0, Math.ceil((end - sec) / 60));
-}
-
 export function Today() {
   const { t } = useI18n();
   const pill: Record<ItemStatus, string> = {
@@ -49,9 +43,9 @@ export function Today() {
   const [now, setNow] = useState(() => new Date());
 
   async function refresh() {
-    const [t, s] = await Promise.all([api.today(), api.status()]);
-    setToday(t);
-    setStatus(s);
+    const [nextToday, nextStatus] = await Promise.all([api.today(), api.status()]);
+    setToday(nextToday);
+    setStatus(nextStatus);
   }
 
   useEffect(() => {
@@ -103,13 +97,13 @@ export function Today() {
       <h1>{t.todayTitle(today?.date ?? "")}</h1>
       {status?.error && <p class="error">{t.error(status.error)}</p>}
       {error && <p class="error">{t.error(error)}</p>}
-      {today && today.items.length === 0 && (
+      {today && today.items.length === 0 && !status?.fallbackTitle && (
         <div class="empty">
           <p>{t.noBlocks}</p>
           <a href="/admin">{t.addInAdmin}</a>
         </div>
       )}
-      {today && today.items.length > 0 && (
+      {today && (today.items.length > 0 || status?.fallbackTitle) && (
         <>
           <div class="now-strip">
             <div>
@@ -130,7 +124,15 @@ export function Today() {
                   >
                     <i style={{ width: `${fraction * 100}%` }} />
                   </div>
-                  <div class="muted">{t.minLeft(minutesLeft(current, sec))}</div>
+                </>
+              ) : status?.fallbackTitle ? (
+                <>
+                  <span class="pill playing">{t.onAir}</span>
+                  <h2 class="strip-title">{status.fallbackTitle}</h2>
+                  <div class="muted">
+                    {t.ifEmpty}
+                    {status.waitingUntil ? ` · ${t.nextAt(status.waitingUntil)}` : ""}
+                  </div>
                 </>
               ) : status?.waitingUntil ? (
                 <>
@@ -149,33 +151,38 @@ export function Today() {
               {status?.running ? t.playNow : t.startTv}
             </button>
           </div>
-          <div class="list">
-            {today.items.map((item) => (
-              <article key={item.id} class={`card ${item.status}`}>
-                <div class="time">
-                  {item.start}–{item.end}
+          {today.items.length > 0 && (
+            <div class="rail">
+              {today.items.map((item) => (
+                <div key={item.id} class={`rail-item ${item.status}`}>
+                  <i class="dot" />
+                  <article class={`card ${item.status}`}>
+                    <div class="time">
+                      {item.start}–{item.end}
+                    </div>
+                    <div>
+                      <div class="title-row">
+                        <div class="title">{item.title}</div>
+                        <span class={`pill ${item.status}`}>{pill[item.status]}</span>
+                      </div>
+                      <div class="muted" title={item.path}>
+                        {modeLabel(item.mode)} · {folderName(item.path)}
+                      </div>
+                    </div>
+                    <div>
+                      {item.mode === "random-file" &&
+                        item.status !== "playing" &&
+                        item.status !== "done" && (
+                          <button onClick={() => shuffle(item)} disabled={busy === item.id}>
+                            {t.shuffle}
+                          </button>
+                        )}
+                    </div>
+                  </article>
                 </div>
-                <div>
-                  <div class="title-row">
-                    <div class="title">{item.title}</div>
-                    <span class={`pill ${item.status}`}>{pill[item.status]}</span>
-                  </div>
-                  <div class="muted" title={item.path}>
-                    {modeLabel(item.mode)} · {folderName(item.path)}
-                  </div>
-                </div>
-                <div>
-                  {item.mode === "random-file" &&
-                    item.status !== "playing" &&
-                    item.status !== "done" && (
-                      <button onClick={() => shuffle(item)} disabled={busy === item.id}>
-                        {t.shuffle}
-                      </button>
-                    )}
-                </div>
-              </article>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </>
       )}
     </section>

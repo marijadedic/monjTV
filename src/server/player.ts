@@ -1,7 +1,9 @@
 import type { PlayerStatus, RundownItem, ScheduleBlock, TodayRundown } from "../shared/types.ts";
 import { msUntil, nowSec, parseHm, weekday } from "./clock.ts";
+import { titleFromPath } from "./files.ts";
 import { Mpv } from "./mpv.ts";
-import { markEpisodeDone, markRandomPlayed } from "./progress.ts";
+import { randomFile, videosIn } from "./picker.ts";
+import { loadProgress, markEpisodeDone, markRandomPlayed } from "./progress.ts";
 import { ensureToday, itemFits, loadToday, saveToday } from "./rundown.ts";
 import { blocksForDay, loadSchedule } from "./schedule.ts";
 
@@ -11,12 +13,14 @@ let waitTimer: ReturnType<typeof setTimeout> | null = null;
 let lastError: string | null = null;
 let handlingEnd = false;
 let replacing = false;
+let fallbackPath: string | null = null;
 
 mpv.onEndFile = (reason) => {
   void onEndFile(reason);
 };
 mpv.onExit = () => {
   waitingUntil = null;
+  fallbackPath = null;
   clearWait();
   void markPlayingAsPlanned();
 };
@@ -30,6 +34,7 @@ export async function getStatus(): Promise<PlayerStatus> {
     waitingUntil,
     error: lastError,
     currentItemId: current?.id ?? null,
+    fallbackTitle: current || !fallbackPath ? null : titleFromPath(fallbackPath),
   };
 }
 
@@ -111,6 +116,7 @@ async function playNow(): Promise<void> {
     (b) => parseHm(b.start) <= now && now < parseHm(b.end),
   );
   if (currentBlock) {
+    fallbackPath = null;
     const picked = await firstFitting(today, currentBlock, now);
     if (picked) {
       await playItem(picked);
@@ -128,11 +134,32 @@ async function playNow(): Promise<void> {
   }
 
   const next = dayBlocks.find((b) => parseHm(b.start) > now);
-  if (!next) return;
-  waitingUntil = next.start;
-  waitTimer = setTimeout(() => {
-    void playNow();
-  }, msUntil(parseHm(next.start)));
+  if (next) {
+    waitingUntil = next.start;
+    waitTimer = setTimeout(() => {
+      void playNow();
+    }, msUntil(parseHm(next.start)));
+  }
+  if (schedule.fallbackFolder) await playFallback(schedule.fallbackFolder);
+}
+
+// Play a random file from the default folder until the next block.
+async function playFallback(folder: string): Promise<void> {
+  try {
+    const files = await videosIn(folder);
+    const progress = await loadProgress();
+    const file = randomFile(files, progress.recentRandom[folder] ?? []);
+    if (!file) return;
+    fallbackPath = file;
+    replacing = true;
+    await mpv.loadFile(file);
+    await markRandomPlayed(folder, file);
+  } catch (err) {
+    lastError = err instanceof Error ? err.message : String(err);
+    fallbackPath = null;
+  } finally {
+    replacing = false;
+  }
 }
 
 // First planned item in the block that still fits the remaining time.
