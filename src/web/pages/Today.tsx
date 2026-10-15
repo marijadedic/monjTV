@@ -93,7 +93,7 @@ export function Today() {
     mode === "next-episode" ? t.nextEpisode : t.random;
 
   return (
-    <section>
+    <section class="today">
       <h1>{t.todayTitle(today?.date ?? "")}</h1>
       {status?.error && <p class="error">{t.error(status.error)}</p>}
       {error && <p class="error">{t.error(error)}</p>}
@@ -141,7 +141,6 @@ export function Today() {
                 </>
               ) : (
                 <>
-                  <span class="pill">{t.today}</span>
                   <h2 class="strip-title">{today.items[0] ? today.items[0].title : t.today}</h2>
                   <div class="muted">{t.nothingOn}</div>
                 </>
@@ -163,7 +162,9 @@ export function Today() {
                     <div>
                       <div class="title-row">
                         <div class="title">{item.title}</div>
-                        <span class={`pill ${item.status}`}>{pill[item.status]}</span>
+                        {item.status !== "planned" && (
+                          <span class={`pill ${item.status}`}>{pill[item.status]}</span>
+                        )}
                       </div>
                       <div class="muted" title={item.path}>
                         {modeLabel(item.mode)} · {folderName(item.path)}

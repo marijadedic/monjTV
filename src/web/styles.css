@@ -257,20 +257,22 @@ button:disabled {
 
 .now-strip {
   background: var(--panel);
-  border: 2px solid var(--accent);
-  border-radius: 14px;
-  padding: 18px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 18px 18px 16px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
+  gap: 18px;
   align-items: end;
-  margin: 4px 0 36px;
+  margin: 0 0 18px;
 }
 
 .strip-title {
-  margin: 8px 0 2px;
-  font-size: 1.25rem;
-  font-weight: 650;
+  margin: 4px 0 2px;
+  font-size: 1.55rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
   overflow-wrap: anywhere;
 }
 
@@ -307,26 +309,24 @@ button:disabled {
 }
 
 .card.playing {
-  border: 2px solid var(--accent);
-  padding: 16px;
-  box-shadow: inset 4px 0 0 var(--accent);
+  border: 1px solid var(--line);
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
-.card.playing .title {
-  font-size: 1.12rem;
+html[data-theme="dusk"] .card.playing {
+  box-shadow: inset 3px 0 0 #8ea384;
 }
 
 .card.playing .time {
   color: var(--text);
-  font-size: 1.02rem;
 }
 
 .card.done {
   opacity: 0.72;
 }
 
-.card.skipped {
-  opacity: 0.62;
+.card.skipped .title {
+  color: var(--skip);
 }
 
 .time {
@@ -349,24 +349,38 @@ button:disabled {
 .pill {
   display: inline-flex;
   align-items: center;
-  font-size: 0.72rem;
-  font-weight: 650;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  padding: 2px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 1px 7px;
   border-radius: 999px;
   color: var(--muted);
   background: var(--pill-wait);
 }
 
 .pill.playing {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 28%, var(--panel));
+}
+
+html[data-theme="dusk"] .pill.playing {
+  background: color-mix(in srgb, #8ea384 28%, var(--panel));
+}
+
+.now-strip .pill.playing {
   color: var(--ok);
   background: var(--pill-air);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 2px 8px;
 }
 
 .pill.done {
   color: var(--warn);
   background: var(--pill-done);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .pill.skipped {
@@ -549,9 +563,9 @@ button:disabled {
 .rail {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin: 0 0 8px 6px;
-  border-left: 2px solid var(--line);
+  gap: 10px;
+  margin: 0 0 8px 4px;
+  border-left: 1px solid var(--line);
 }
 
 .rail-item {
@@ -562,19 +576,59 @@ button:disabled {
 }
 
 .dot {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 99px;
-  background: var(--muted);
-  margin: 18px 0 0 -6px;
+  background: var(--panel);
+  box-shadow: inset 0 0 0 1.5px var(--line);
+  margin: 20px 0 0 -4px;
 }
 
 .rail-item.playing .dot {
   background: var(--accent);
+  box-shadow: none;
+}
+
+html[data-theme="dusk"] .rail-item.playing .dot {
+  background: #8ea384;
 }
 
 .rail-item.done .dot {
   background: var(--warn);
+  box-shadow: none;
+}
+
+.rail-item.skipped .dot {
+  background: var(--skip);
+  box-shadow: none;
+}
+
+.now-strip .track {
+  height: 3px;
+  margin-top: 12px;
+  background: color-mix(in srgb, var(--line) 70%, transparent);
+}
+
+html[data-theme="dusk"] .now-strip .track > i {
+  background: #8ea384;
+}
+
+.today button {
+  appearance: none;
+  box-shadow: none;
+}
+
+html[data-theme="dusk"] .today .time,
+html[data-theme="dusk"] .today .pill,
+html[data-theme="dusk"] .today button,
+html[data-theme="dusk"] .today .muted {
+  font-family: system-ui, sans-serif;
+}
+
+html[data-theme="dusk"] .today button.primary {
+  background: #5a6e4a;
+  border-color: #5a6e4a;
+  color: #fff;
 }
 
 .week-scale {
