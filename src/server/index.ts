@@ -9,7 +9,8 @@ import { PORT } from "../shared/constants.ts";
 import { browse } from "./files.ts";
 import { clientDir } from "./paths.ts";
 import { getStatus, startPlayer } from "./player.ts";
-import { ensureToday, rebuildTodayPreservingPlayback, shuffleItem } from "./rundown.ts";
+import { loadProgress } from "./progress.ts";
+import { ensureToday, loadToday, rebuildTodayPreservingPlayback, shuffleItem } from "./rundown.ts";
 import { assertFolder, loadSchedule, saveSchedule } from "./schedule.ts";
 
 const app = new Hono();
@@ -89,9 +90,19 @@ if (existsSync(clientIndex)) {
   });
 }
 
-serve({ fetch: app.fetch, port: PORT, hostname: "0.0.0.0" }, (info) => {
-  console.log(`monjTV on http://0.0.0.0:${info.port}`);
-  if (!existsSync(clientIndex)) {
-    console.log("UI dev server: http://127.0.0.1:5173 (npm run dev)");
-  }
-});
+// Create the local data files, then start the server.
+async function main(): Promise<void> {
+  await loadSchedule();
+  await loadProgress();
+  const today = await loadToday();
+  if (!today.date) await ensureToday();
+
+  serve({ fetch: app.fetch, port: PORT, hostname: "0.0.0.0" }, (info) => {
+    console.log(`monjTV on http://0.0.0.0:${info.port}`);
+    if (!existsSync(clientIndex)) {
+      console.log("UI dev server: http://127.0.0.1:5173 (npm run dev)");
+    }
+  });
+}
+
+void main();
