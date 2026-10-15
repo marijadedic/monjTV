@@ -15,16 +15,20 @@ import { loadProgress } from "./progress.ts";
 import { blocksForDay, loadSchedule } from "./schedule.ts";
 import { readJson, writeJson } from "./store.ts";
 
+// Empty rundown used when today's file is missing.
 const empty = (): TodayRundown => ({ date: "", items: [] });
 
+// Read today's rundown from disk.
 export async function loadToday(): Promise<TodayRundown> {
   return readJson<TodayRundown>(todayPath, empty());
 }
 
+// Write today's rundown to disk.
 export async function saveToday(rundown: TodayRundown): Promise<void> {
   await writeJson(todayPath, rundown);
 }
 
+// Return today's rundown, rebuilding it when the date has changed.
 export async function ensureToday(): Promise<TodayRundown> {
   const today = dateKey();
   const current = await loadToday();
@@ -34,6 +38,7 @@ export async function ensureToday(): Promise<TodayRundown> {
   return built;
 }
 
+// Rebuild today while keeping items that are already playing or finished.
 export async function rebuildTodayPreservingPlayback(): Promise<TodayRundown> {
   const today = dateKey();
   const current = await loadToday();
@@ -71,6 +76,7 @@ export async function rebuildTodayPreservingPlayback(): Promise<TodayRundown> {
   return result;
 }
 
+// Fill today's items from the schedule and each video's length.
 export async function buildRundown(date = dateKey()): Promise<TodayRundown> {
   const schedule = await loadSchedule();
   const progress = await loadProgress();
@@ -112,6 +118,7 @@ export async function buildRundown(date = dateKey()): Promise<TodayRundown> {
   return { date, items };
 }
 
+// Next file after the last completed one, wrapping to the start.
 function nextFrom(files: string[], lastCompleted?: string): string | null {
   if (files.length === 0) return null;
   if (!lastCompleted) return files[0]!;
@@ -120,6 +127,7 @@ function nextFrom(files: string[], lastCompleted?: string): string | null {
   return files[(idx + 1) % files.length]!;
 }
 
+// A planned rundown row for one file.
 function makeItem(
   block: ScheduleBlock,
   file: string,
@@ -139,11 +147,13 @@ function makeItem(
   };
 }
 
+// True when the file can still start in the time left in the block.
 export function itemFits(durationSec: number, remainingSec: number): boolean {
   if (remainingSec < MIN_REMAINING_SEC) return false;
   return durationSec <= remainingSec + GRACE_SEC;
 }
 
+// Replace a random item with another file and retime its block.
 export async function shuffleItem(itemId: string): Promise<TodayRundown> {
   const rundown = await ensureToday();
   const item = rundown.items.find((i) => i.id === itemId);
@@ -175,6 +185,7 @@ export async function shuffleItem(itemId: string): Promise<TodayRundown> {
   return rundown;
 }
 
+// Recalculate start and end times for every item in a block.
 function recomputeBlockTimes(rundown: TodayRundown, block: ScheduleBlock): void {
   let cursor = parseHm(block.start);
   for (const item of rundown.items.filter((i) => i.blockId === block.id)) {
@@ -184,6 +195,7 @@ function recomputeBlockTimes(rundown: TodayRundown, block: ScheduleBlock): void 
   }
 }
 
+// Schedule block with the given id.
 export function findBlock(schedule: Schedule, blockId: string): ScheduleBlock | undefined {
   return schedule.blocks.find((b) => b.id === blockId);
 }

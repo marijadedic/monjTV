@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+// Parse a JSON file, or return the fallback if it is missing or invalid.
 export async function readJson<T>(file: string, fallback: T): Promise<T> {
   try {
     const raw = await readFile(file, "utf8");
@@ -10,6 +11,7 @@ export async function readJson<T>(file: string, fallback: T): Promise<T> {
   }
 }
 
+// Write JSON atomically via a temporary file.
 export async function writeJson(file: string, value: unknown): Promise<void> {
   await mkdir(path.dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;

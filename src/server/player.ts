@@ -21,6 +21,7 @@ mpv.onExit = () => {
   void markPlayingAsPlanned();
 };
 
+// Current player state for the API.
 export async function getStatus(): Promise<PlayerStatus> {
   const today = await loadToday();
   const current = today.items.find((i) => i.status === "playing");
@@ -32,6 +33,7 @@ export async function getStatus(): Promise<PlayerStatus> {
   };
 }
 
+// Start mpv and begin today's rundown.
 export async function startPlayer(): Promise<PlayerStatus> {
   lastError = null;
   await ensureToday();
@@ -48,6 +50,7 @@ export async function startPlayer(): Promise<PlayerStatus> {
   return getStatus();
 }
 
+// Put a playing item back to planned when mpv exits.
 async function markPlayingAsPlanned(): Promise<void> {
   const today = await loadToday();
   let changed = false;
@@ -60,6 +63,7 @@ async function markPlayingAsPlanned(): Promise<void> {
   if (changed) await saveToday(today);
 }
 
+// Mark the finished item done and start the next one.
 async function onEndFile(reason: string): Promise<void> {
   if (replacing || handlingEnd) return;
   if (reason !== "eof") return;
@@ -86,6 +90,7 @@ async function onEndFile(reason: string): Promise<void> {
   }
 }
 
+// Play the next item that fits, or wait for the next block.
 async function playNow(): Promise<void> {
   clearWait();
   waitingUntil = null;
@@ -130,6 +135,7 @@ async function playNow(): Promise<void> {
   }, msUntil(parseHm(next.start)));
 }
 
+// First planned item in the block that still fits the remaining time.
 async function firstFitting(
   today: TodayRundown,
   block: ScheduleBlock,
@@ -153,6 +159,7 @@ async function firstFitting(
   return picked;
 }
 
+// Load an item in mpv and mark it playing.
 async function playItem(item: RundownItem): Promise<void> {
   const today = await loadToday();
   for (const row of today.items) {
@@ -176,6 +183,7 @@ async function playItem(item: RundownItem): Promise<void> {
   replacing = false;
 }
 
+// Cancel the timer waiting for the next block.
 function clearWait(): void {
   if (waitTimer) {
     clearTimeout(waitTimer);

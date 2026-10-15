@@ -7,23 +7,27 @@ import { readJson, writeJson } from "./store.ts";
 
 const empty: Schedule = { blocks: [] };
 
+// Read the weekly schedule from disk.
 export async function loadSchedule(): Promise<Schedule> {
   const data = await readJson<Schedule>(schedulePath, empty);
   return { blocks: Array.isArray(data.blocks) ? data.blocks : [] };
 }
 
+// Validate the schedule and write it to disk.
 export async function saveSchedule(schedule: Schedule): Promise<Schedule> {
   const normalized = validateSchedule(schedule);
   await writeJson(schedulePath, normalized);
   return normalized;
 }
 
+// Blocks that air on a day, ordered by start time.
 export function blocksForDay(schedule: Schedule, day: Day): ScheduleBlock[] {
   return schedule.blocks
     .filter((b) => b.days.includes(day))
     .sort((a, b) => parseHm(a.start) - parseHm(b.start));
 }
 
+// Normalize blocks and reject same-day overlaps.
 export function validateSchedule(input: Schedule): Schedule {
   if (!input || !Array.isArray(input.blocks)) {
     throw new Error("Schedule must have a blocks array");
@@ -46,6 +50,7 @@ export function validateSchedule(input: Schedule): Schedule {
   return { blocks };
 }
 
+// Fill defaults and reject an invalid block.
 function normalizeBlock(raw: ScheduleBlock): ScheduleBlock {
   if (!raw || typeof raw !== "object") throw new Error("Invalid block");
   const id = raw.id?.trim() || randomUUID();
@@ -63,6 +68,7 @@ function normalizeBlock(raw: ScheduleBlock): ScheduleBlock {
   return { id, days, start: raw.start, end: raw.end, folder, mode: raw.mode };
 }
 
+// Throw if the path is not a directory.
 export async function assertFolder(folder: string): Promise<void> {
   if (!(await isDir(folder))) {
     throw new Error(`Folder does not exist: ${folder}`);

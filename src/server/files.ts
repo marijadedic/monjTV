@@ -7,10 +7,12 @@ import type { BrowseResult } from "../shared/types.ts";
 const MAX_DEPTH = 5;
 const MAX_VIDEOS = 2000;
 
+// Filename without its extension.
 export function titleFromPath(filePath: string): string {
   return path.basename(filePath, path.extname(filePath));
 }
 
+// Video files under a folder, sorted by path.
 export async function listVideos(folder: string): Promise<string[]> {
   const out: string[] = [];
   await walk(folder, 0, out);
@@ -18,6 +20,7 @@ export async function listVideos(folder: string): Promise<string[]> {
   return out;
 }
 
+// Collect videos, stopping at the depth and count limits.
 async function walk(dir: string, depth: number, out: string[]): Promise<void> {
   if (depth > MAX_DEPTH || out.length >= MAX_VIDEOS) return;
   let entries;
@@ -39,6 +42,7 @@ async function walk(dir: string, depth: number, out: string[]): Promise<void> {
   }
 }
 
+// Folders and videos in one directory, for the folder picker.
 export async function browse(rawPath?: string): Promise<BrowseResult> {
   const resolved = path.resolve(rawPath && rawPath.length > 0 ? rawPath : os.homedir());
   let entries;
@@ -71,6 +75,7 @@ export async function browse(rawPath?: string): Promise<BrowseResult> {
   };
 }
 
+// True when the path is a directory.
 export async function isDir(p: string): Promise<boolean> {
   try {
     return (await stat(p)).isDirectory();

@@ -16,9 +16,11 @@ type Pending = {
   reject: (err: Error) => void;
 };
 
+// Poll until the mpv IPC socket accepts a connection.
 function waitForSocket(sockPath: string, timeoutMs = 8000): Promise<void> {
   const start = Date.now();
   return new Promise((resolve, reject) => {
+    // Try the socket, then retry until it appears or the timeout hits.
     const tick = () => {
       const sock = net.connect(sockPath);
       sock.once("connect", () => {
@@ -48,10 +50,12 @@ export class Mpv {
   onEndFile: ((reason: string) => void) | null = null;
   onExit: (() => void) | null = null;
 
+  // True while the mpv process is still alive.
   get running(): boolean {
     return this.proc !== null && this.proc.exitCode === null;
   }
 
+  // Spawn mpv and connect to its IPC socket.
   async start(): Promise<void> {
     if (this.running) return;
     await unlink(this.sockPath).catch(() => undefined);
@@ -79,15 +83,18 @@ export class Mpv {
     this.sock.on("error", () => undefined);
   }
 
+  // Replace the current file and start playback.
   async loadFile(filePath: string): Promise<void> {
     await this.command(["loadfile", filePath, "replace"]);
   }
 
+  // Stop the current file without quitting mpv.
   async stopPlayback(): Promise<void> {
     if (!this.running) return;
     await this.command(["stop"]).catch(() => undefined);
   }
 
+  // Quit mpv and tear down the IPC connection.
   async quit(): Promise<void> {
     if (!this.running) return;
     await this.command(["quit"]).catch(() => undefined);
@@ -95,6 +102,7 @@ export class Mpv {
     this.cleanup();
   }
 
+  // Send an IPC command and wait for its reply.
   private async command(args: unknown[]): Promise<unknown> {
     if (!this.sock) throw new Error("mpv is not running");
     const request_id = this.nextId++;
@@ -116,6 +124,7 @@ export class Mpv {
     });
   }
 
+  // Parse IPC lines, emit events, and settle pending commands.
   private onData(chunk: string): void {
     this.buf += chunk;
     const lines = this.buf.split("\n");
@@ -143,6 +152,7 @@ export class Mpv {
     }
   }
 
+  // Close the socket and drop process state.
   private cleanup(): void {
     this.sock?.destroy();
     this.sock = null;

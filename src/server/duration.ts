@@ -4,6 +4,7 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 const cache = new Map<string, number>();
 
+// Video length in seconds, cached, with a fallback when probing fails.
 export async function probeDuration(file: string): Promise<number> {
   const hit = cache.get(file);
   if (hit) return hit;

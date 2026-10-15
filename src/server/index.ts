@@ -14,12 +14,15 @@ import { assertFolder, loadSchedule, saveSchedule } from "./schedule.ts";
 
 const app = new Hono();
 
+// Liveness check.
 app.get("/api/health", (c) => c.json({ ok: true }));
 
+// Return the saved weekly schedule.
 app.get("/api/schedule", async (c) => {
   return c.json(await loadSchedule());
 });
 
+// Save the schedule and rebuild today around current playback.
 app.put("/api/schedule", async (c) => {
   const body = (await c.req.json()) as Schedule;
   try {
@@ -34,10 +37,12 @@ app.put("/api/schedule", async (c) => {
   }
 });
 
+// Return today's rundown, building it if the date changed.
 app.get("/api/today", async (c) => {
   return c.json(await ensureToday());
 });
 
+// Swap one random rundown item for another file.
 app.post("/api/today/items/:id/shuffle", async (c) => {
   try {
     return c.json(await shuffleItem(c.req.param("id")));
@@ -46,6 +51,7 @@ app.post("/api/today/items/:id/shuffle", async (c) => {
   }
 });
 
+// List folders and videos for the folder picker.
 app.get("/api/browse", async (c) => {
   try {
     return c.json(await browse(c.req.query("path")));
@@ -54,6 +60,7 @@ app.get("/api/browse", async (c) => {
   }
 });
 
+// Start mpv and begin playback.
 app.post("/api/player/start", async (c) => {
   try {
     return c.json(await startPlayer());
@@ -62,6 +69,7 @@ app.post("/api/player/start", async (c) => {
   }
 });
 
+// Current playback status.
 app.get("/api/player/status", async (c) => {
   return c.json(await getStatus());
 });
@@ -74,6 +82,7 @@ if (existsSync(clientIndex)) {
       root: path.relative(process.cwd(), clientDir) || ".",
     }),
   );
+  // Serve the client app for non-API routes.
   app.get("*", async (c) => {
     if (c.req.path.startsWith("/api")) return c.notFound();
     return c.html(await readFile(clientIndex, "utf8"));
