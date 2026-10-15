@@ -43,7 +43,14 @@ type Copy = {
   hideDays: string;
   length: string;
   lengthOf: (mins: number) => string;
-  until: (time: string) => string;
+  endsAt: (time: string) => string;
+  newSlot: (day: string) => string;
+  editSlot: (day: string) => string;
+  folder: string;
+  chooseFolder: string;
+  randomHint: string;
+  nextHint: string;
+  alsoOn: string;
   ifEmpty: string;
   change: string;
   clickFirst: string;
@@ -105,7 +112,14 @@ const en: Copy = {
     if (h) return `${h}h`;
     return `${m}m`;
   },
-  until: (time) => `until ${time}`,
+  endsAt: (time) => `Ends at ${time}`,
+  newSlot: (day) => `New slot · ${day}`,
+  editSlot: (day) => `Edit slot · ${day}`,
+  folder: "Folder",
+  chooseFolder: "Choose a folder",
+  randomHint: "Skips files played recently.",
+  nextHint: "Walks the folder in order.",
+  alsoOn: "Also on",
   ifEmpty: "If nothing is scheduled",
   change: "Change",
   clickFirst: "Click to add the first slot",
@@ -228,7 +242,14 @@ const hr: Copy = {
     if (h) return `${h} h`;
     return `${m} min`;
   },
-  until: (time) => `do ${time}`,
+  endsAt: (time) => `Završava u ${time}`,
+  newSlot: (day) => `Novi termin · ${day}`,
+  editSlot: (day) => `Uredi termin · ${day}`,
+  folder: "Mapa",
+  chooseFolder: "Odaberi mapu",
+  randomHint: "Preskače nedavno puštene datoteke.",
+  nextHint: "Ide redom kroz mapu.",
+  alsoOn: "Također",
   ifEmpty: "Ako ništa nije zakazano",
   change: "Promijeni",
   clickFirst: "Klikni za prvi termin",

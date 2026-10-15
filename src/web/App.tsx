@@ -49,7 +49,7 @@ export function App() {
   return (
     <>
       {theme === "dusk" && <GroveFrame />}
-      <div class="shell">
+      <div class={admin ? "shell wide" : "shell"}>
         <header class="top">
           <a class="brand" href="/">
             monjTV

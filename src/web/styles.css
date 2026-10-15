@@ -80,7 +80,7 @@ body {
 
 html[data-theme="dusk"] body {
   font-family: Palatino, "Palatino Linotype", "Iowan Old Style", Georgia, serif;
-  background: #d5e6b4;
+  background: #e4edf2;
 }
 
 html[data-theme="dusk"] .card,
@@ -101,6 +101,12 @@ a {
   max-width: 1280px;
   margin: 0 auto;
   padding: 20px 16px 48px;
+}
+
+.shell.wide {
+  max-width: none;
+  padding-left: 32px;
+  padding-right: 32px;
 }
 
 .top {
@@ -462,20 +468,12 @@ button:disabled {
   background: var(--browse-hover);
 }
 
-.grove-sprite {
-  position: absolute;
-  width: 0;
-  height: 0;
-  overflow: hidden;
-}
-
 .grove-scene {
   position: fixed;
   inset: 0;
-  width: 100%;
-  height: 100%;
   z-index: 0;
   pointer-events: none;
+  background: #e4edf2 url("/sunrise.jpg") center 68% / cover no-repeat;
 }
 
 .prefs {
@@ -583,8 +581,17 @@ button:disabled {
   --day-h: 576px;
   display: grid;
   grid-template-columns: 32px repeat(7, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
   margin-bottom: 16px;
+}
+
+.day {
+  position: relative;
+  min-width: 0;
+}
+
+.day.editing {
+  z-index: 2;
 }
 
 .hours {
@@ -613,6 +620,7 @@ button:disabled {
 }
 
 .week-scale .track {
+  position: relative;
   height: var(--day-h);
   display: flex;
   flex-direction: column;
@@ -620,6 +628,14 @@ button:disabled {
   border-radius: 10px;
   overflow: hidden;
   background: var(--browse);
+}
+
+html[data-theme="dusk"] .week-scale .track {
+  background: var(--panel);
+}
+
+html[data-theme="dusk"] .week-scale button.gap:hover {
+  background: rgba(196, 180, 138, 0.28);
 }
 
 .day.on .track {
@@ -707,15 +723,95 @@ button:disabled {
   box-shadow: inset 0 0 0 1.5px var(--accent);
 }
 
+html[data-theme="dusk"] .week-scale button.slot {
+  border-radius: 3px;
+  background: linear-gradient(180deg, #c5d3b6 0%, #8ea384 100%);
+  color: #243024;
+  box-shadow:
+    0 1px 3px rgba(70, 82, 55, 0.06),
+    inset 0 1px 0 rgba(255, 252, 245, 0.4);
+}
+
+html[data-theme="dusk"] .week-scale button.slot i {
+  color: #3e4c34;
+}
+
+html[data-theme="dusk"] .week-scale button.slot.pick {
+  box-shadow:
+    inset 0 0 0 1.5px #6d845f,
+    0 1px 3px rgba(70, 82, 55, 0.06);
+}
+
+.shell.wide .week-scale button.slot b {
+  font-size: 0.95rem;
+}
+
+.week-scale .ghost {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 0 8px;
+  overflow: hidden;
+  border-radius: 3px;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--primary) 72%, transparent);
+  color: var(--on-primary);
+  box-shadow: inset 0 0 0 1.5px var(--primary-line);
+}
+
+html[data-theme="dusk"] .week-scale .ghost {
+  background: rgba(142, 163, 132, 0.72);
+  color: #243024;
+  box-shadow: inset 0 0 0 1.5px #6d845f;
+}
+
+.week-scale .ghost b {
+  font-size: 0.8rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
 .add-form {
+  position: absolute;
+  z-index: 4;
   display: grid;
-  gap: 22px;
-  width: min(640px, 100%);
-  margin: 0 0 16px;
-  padding: 16px 18px;
+  gap: 10px;
+  width: min(340px, 42vw);
+  max-width: calc(2 * (100vw - 120px) / 7);
+  padding: 12px 14px;
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 14px;
+  box-shadow: 0 6px 16px rgba(60, 70, 40, 0.1);
+}
+
+.add-form.to-right {
+  left: calc(100% + 8px);
+}
+
+.add-form.to-left {
+  right: calc(100% + 8px);
+}
+
+.add-form header b {
+  display: block;
+  font-size: 1.05rem;
+}
+
+.add-form header p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.field-error {
+  margin: 0;
+  color: #c45c5c;
+  font-size: 0.85rem;
 }
 
 .add-form .k,
@@ -729,20 +825,20 @@ button:disabled {
 .add-when {
   display: flex;
   flex-wrap: wrap;
-  gap: 22px;
+  gap: 8px 10px;
   align-items: end;
 }
 
+.add-form label,
 .add-when > div,
-.days-wrap,
-.add-form label {
+.folder-block,
+.also {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
 .add-form label input,
-.add-form label select,
 .add-when b {
   font-size: 0.95rem;
   font-weight: 650;
@@ -751,10 +847,9 @@ button:disabled {
   color: var(--text);
 }
 
-.add-form input,
-.add-form select {
+.add-form input {
   font-family: inherit;
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   font-weight: 650;
   letter-spacing: 0;
   text-transform: none;
@@ -765,62 +860,90 @@ button:disabled {
   padding: 6px 8px;
 }
 
-.len {
-  min-width: 4.5em;
-  text-align: center;
-}
-
-.until {
-  align-self: end;
-  padding-bottom: 6px;
-  color: var(--muted);
-  font-size: 0.95rem;
-  font-style: italic;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.day-pick {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
-.add-form:not(.show-days) .chip.extra {
-  display: none;
-}
-
-.add-form .chip {
-  text-transform: capitalize;
-}
-
-.add-tail {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 18px 12px;
-  align-items: end;
-}
-
-.add-tail .field {
-  grid-column: 1 / -1;
+.add-form .field {
   width: 100%;
   min-width: 0;
 }
 
-.add-tail label {
-  grid-column: 1;
+.add-form .field input {
+  border: 0;
+  border-radius: 0;
+  font-weight: 500;
 }
 
-.add-tail .btn {
-  grid-column: 2;
+.folder-name {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
 }
 
-.add-go {
-  grid-column: 3;
-  justify-self: end;
-  align-self: end;
-  padding: 6px 12px;
+.folder-name.empty {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.add-form .mode {
+  display: block;
+  width: 100%;
+  padding: 7px 8px;
+  text-align: left;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.add-form .mode.on {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 14%, var(--panel));
+}
+
+.add-form .mode b {
+  display: block;
+  font-size: 0.92rem;
+}
+
+.add-form .mode span {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 450;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.add-form .days {
+  gap: 4px;
+}
+
+.add-form .chip {
+  padding: 3px 8px;
+  text-transform: capitalize;
+  font-size: 0.85rem;
+}
+
+.len {
+  min-width: 3.2em;
+  text-align: center;
+}
+
+.add-form .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.add-form .actions .quiet {
+  margin-right: auto;
+  padding: 6px 4px;
 }
 
 .default-play {
