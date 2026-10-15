@@ -12,7 +12,7 @@ type Copy = {
   admin: string;
   theme: string;
   dark: string;
-  grove: string;
+  meadow: string;
   light: string;
   language: string;
   english: string;
@@ -43,11 +43,9 @@ type Copy = {
   hideDays: string;
   length: string;
   lengthOf: (mins: number) => string;
-  endsAt: (time: string) => string;
   newSlot: (day: string) => string;
   editSlot: (day: string) => string;
   folder: string;
-  chooseFolder: string;
   randomHint: string;
   nextHint: string;
   alsoOn: string;
@@ -75,7 +73,7 @@ const en: Copy = {
   admin: "Admin",
   theme: "Theme",
   dark: "Dark",
-  grove: "Grove",
+  meadow: "Meadow",
   light: "Light",
   language: "Language",
   english: "English",
@@ -112,11 +110,9 @@ const en: Copy = {
     if (h) return `${h}h`;
     return `${m}m`;
   },
-  endsAt: (time) => `Ends at ${time}`,
   newSlot: (day) => `New slot · ${day}`,
   editSlot: (day) => `Edit slot · ${day}`,
   folder: "Folder",
-  chooseFolder: "Choose a folder",
   randomHint: "Skips files played recently.",
   nextHint: "Walks the folder in order.",
   alsoOn: "Also on",
@@ -205,7 +201,7 @@ const hr: Copy = {
   admin: "Admin",
   theme: "Tema",
   dark: "Tamno",
-  grove: "Gaj",
+  meadow: "Livada",
   light: "Svijetlo",
   language: "Jezik",
   english: "English",
@@ -242,11 +238,9 @@ const hr: Copy = {
     if (h) return `${h} h`;
     return `${m} min`;
   },
-  endsAt: (time) => `Završava u ${time}`,
   newSlot: (day) => `Novi termin · ${day}`,
   editSlot: (day) => `Uredi termin · ${day}`,
   folder: "Mapa",
-  chooseFolder: "Odaberi mapu",
   randomHint: "Preskače nedavno puštene datoteke.",
   nextHint: "Ide redom kroz mapu.",
   alsoOn: "Također",

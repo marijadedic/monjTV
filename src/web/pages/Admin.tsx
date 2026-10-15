@@ -286,14 +286,12 @@ export function Admin() {
   const fallbackName = schedule.fallbackFolder ? folderLabel(schedule.fallbackFolder) : "";
   const lengthMins = draft ? Math.max(0, toMin(draft.end) - toMin(draft.start)) : 0;
   const ghost = draft ? ghostRange(draft, schedule.blocks) : null;
-  const panelTop = draft
-    ? 26 + (Math.max(0, Math.min(toMin(draft.start), DAY_MINUTES)) / DAY_MINUTES) * HOUR_PX * 24
-    : 26;
 
   return (
     <section>
       <h1>{t.week}</h1>
       {error && <p class="error">{t.error(error)}</p>}
+      <div class={draft ? "week-wrap drafting" : "week-wrap"}>
       <div class="week-scale">
         <div class="hours" aria-hidden="true">
           {["00", "04", "08", "12", "16", "20", "24"].map((hour) => (
@@ -366,135 +364,132 @@ export function Admin() {
                   </span>
                 )}
               </div>
-              {editing && draft && (
-                <form
-                  class={`add-form ${DAYS.indexOf(day) >= 5 ? "to-left" : "to-right"}`}
-                  style={{ top: `${panelTop}px` }}
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    void commit();
-                  }}
-                >
-                  <header>
-                    <b>{draft.id ? t.editSlot(t.dayName[draft.origin]) : t.newSlot(t.dayName[draft.origin])}</b>
-                    <p>{t.endsAt(clockFace(draft.freeEnd))}</p>
-                  </header>
-                  {fieldError.form && <p class="field-error">{t.error(fieldError.form)}</p>}
-                  <div class="add-when">
-                    <label>
-                      {t.start}
-                      <input
-                        ref={startRef}
-                        type="time"
-                        value={draft.start}
-                        onInput={(event) => {
-                          setDraft({ ...draft, start: (event.target as HTMLInputElement).value });
-                          setFieldError((current) => ({ ...current, time: undefined }));
-                        }}
-                      />
-                    </label>
-                    <label>
-                      {t.end}
-                      <input
-                        type="time"
-                        value={draft.end}
-                        onInput={(event) => {
-                          setDraft({ ...draft, end: (event.target as HTMLInputElement).value });
-                          setFieldError((current) => ({ ...current, time: undefined }));
-                        }}
-                      />
-                    </label>
-                    <div class="len">
-                      <span class="k">{t.length}</span>
-                      <b>{t.lengthOf(lengthMins)}</b>
-                    </div>
-                  </div>
-                  {fieldError.time && <p class="field-error">{t.error(fieldError.time)}</p>}
-                  <div class="folder-block">
-                    <span class="k">{t.folder}</span>
-                    <p class={draft.folder ? "folder-name" : "folder-name empty"}>
-                      {draft.folder ? folderLabel(draft.folder) : t.chooseFolder}
-                    </p>
-                    <div class="field">
-                      <input
-                        value={draft.folder}
-                        placeholder={t.folderPlaceholder}
-                        aria-invalid={fieldError.folder ? "true" : undefined}
-                        onInput={(event) => {
-                          setDraft({ ...draft, folder: (event.target as HTMLInputElement).value });
-                          setFieldError((current) => ({ ...current, folder: undefined }));
-                        }}
-                      />
-                      <button type="button" onClick={() => void chooseFolder()} disabled={picking === "draft"}>
-                        {picking === "draft" ? t.choosing : t.browse}
-                      </button>
-                    </div>
-                    {fieldError.folder && <p class="field-error">{t.error(fieldError.folder)}</p>}
-                  </div>
-                  <div class="modes" role="radiogroup" aria-label={t.mode}>
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={draft.mode === "random-file"}
-                      class={draft.mode === "random-file" ? "mode on" : "mode"}
-                      onClick={() => setDraft({ ...draft, mode: "random-file" })}
-                    >
-                      <b>{t.randomFile}</b>
-                      <span>{t.randomHint}</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={draft.mode === "next-episode"}
-                      class={draft.mode === "next-episode" ? "mode on" : "mode"}
-                      onClick={() => setDraft({ ...draft, mode: "next-episode" })}
-                    >
-                      <b>{t.nextEpisode}</b>
-                      <span>{t.nextHint}</span>
-                    </button>
-                  </div>
-                  <div class="also">
-                    <span class="k">{t.alsoOn}</span>
-                    <div class="days">
-                      {DAYS.map((item) => (
-                        <button
-                          key={item}
-                          type="button"
-                          class={`chip${draft.days.includes(item) ? " on" : ""}`}
-                          aria-pressed={draft.days.includes(item)}
-                          aria-disabled={item === draft.origin}
-                          onClick={() => toggleDay(item)}
-                        >
-                          {t.day[item]}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div class="actions">
-                    {draft.id && (
-                      <button type="button" class="quiet" onClick={() => void removeDraft()}>
-                        {t.remove}
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      class="btn"
-                      onClick={() => {
-                        setDraft(null);
-                        setFieldError({});
-                      }}
-                    >
-                      {t.cancel}
-                    </button>
-                    <button type="submit" class="primary">
-                      {draft.id ? t.save : t.add}
-                    </button>
-                  </div>
-                </form>
-              )}
             </div>
           );
         })}
+      </div>
+      {draft && <div class="scrim" />}
+      {draft && (
+        <form
+          class="add-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void commit();
+          }}
+        >
+          <header>
+            <b>{draft.id ? t.editSlot(t.dayName[draft.origin]) : t.newSlot(t.dayName[draft.origin])}</b>
+          </header>
+          {fieldError.form && <p class="field-error">{t.error(fieldError.form)}</p>}
+          <div class="add-when">
+            <label>
+              {t.start}
+              <input
+                ref={startRef}
+                type="time"
+                value={draft.start}
+                onInput={(event) => {
+                  setDraft({ ...draft, start: (event.target as HTMLInputElement).value });
+                  setFieldError((current) => ({ ...current, time: undefined }));
+                }}
+              />
+            </label>
+            <label>
+              {t.end}
+              <input
+                type="time"
+                value={draft.end}
+                onInput={(event) => {
+                  setDraft({ ...draft, end: (event.target as HTMLInputElement).value });
+                  setFieldError((current) => ({ ...current, time: undefined }));
+                }}
+              />
+            </label>
+            <div class="len">
+              <span class="k">{t.length}</span>
+              <b>{t.lengthOf(lengthMins)}</b>
+            </div>
+          </div>
+          {fieldError.time && <p class="field-error">{t.error(fieldError.time)}</p>}
+          <div class="folder-block">
+            <span class="k">{t.folder}</span>
+            {draft.folder && <p class="folder-name">{folderLabel(draft.folder)}</p>}
+            <div class="field">
+              <input
+                value={draft.folder}
+                placeholder={t.folderPlaceholder}
+                aria-invalid={fieldError.folder ? "true" : undefined}
+                onInput={(event) => {
+                  setDraft({ ...draft, folder: (event.target as HTMLInputElement).value });
+                  setFieldError((current) => ({ ...current, folder: undefined }));
+                }}
+              />
+              <button type="button" onClick={() => void chooseFolder()} disabled={picking === "draft"}>
+                {picking === "draft" ? t.choosing : t.browse}
+              </button>
+            </div>
+            {fieldError.folder && <p class="field-error">{t.error(fieldError.folder)}</p>}
+          </div>
+          <div class="modes" role="radiogroup" aria-label={t.mode}>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={draft.mode === "random-file"}
+              class={draft.mode === "random-file" ? "mode on" : "mode"}
+              onClick={() => setDraft({ ...draft, mode: "random-file" })}
+            >
+              <b>{t.randomFile}</b>
+              <span>{t.randomHint}</span>
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={draft.mode === "next-episode"}
+              class={draft.mode === "next-episode" ? "mode on" : "mode"}
+              onClick={() => setDraft({ ...draft, mode: "next-episode" })}
+            >
+              <b>{t.nextEpisode}</b>
+              <span>{t.nextHint}</span>
+            </button>
+          </div>
+          <div class="also">
+            <span class="k">{t.alsoOn}</span>
+            <div class="days">
+              {DAYS.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  class={`chip${draft.days.includes(item) ? " on" : ""}`}
+                  aria-pressed={draft.days.includes(item)}
+                  aria-disabled={item === draft.origin}
+                  onClick={() => toggleDay(item)}
+                >
+                  {t.day[item]}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div class="actions">
+            {draft.id && (
+              <button type="button" class="quiet" onClick={() => void removeDraft()}>
+                {t.remove}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setDraft(null);
+                setFieldError({});
+              }}
+            >
+              {t.cancel}
+            </button>
+            <button type="submit" class="primary">
+              {draft.id ? t.save : t.add}
+            </button>
+          </div>
+        </form>
+      )}
       </div>
       {saved && !draft && <p class="muted">{t.saved}</p>}
       {!draft && (

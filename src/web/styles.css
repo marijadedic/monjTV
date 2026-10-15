@@ -775,26 +775,44 @@ html[data-theme="dusk"] .week-scale .ghost {
   white-space: nowrap;
 }
 
+.week-wrap {
+  position: relative;
+}
+
+.week-wrap.drafting .week-scale {
+  pointer-events: none;
+}
+
+.week-wrap .scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgba(10, 12, 16, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+html[data-theme="dusk"] .week-wrap .scrim {
+  background: rgba(36, 42, 28, 0.38);
+}
+
+html[data-theme="light"] .week-wrap .scrim {
+  background: rgba(243, 239, 231, 0.62);
+}
+
 .add-form {
-  position: absolute;
-  z-index: 4;
+  position: fixed;
+  z-index: 21;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   display: grid;
-  gap: 10px;
-  width: min(340px, 42vw);
-  max-width: calc(2 * (100vw - 120px) / 7);
+  gap: 22px;
+  width: min(460px, calc(100% - 48px));
   padding: 12px 14px;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 14px;
   box-shadow: 0 6px 16px rgba(60, 70, 40, 0.1);
-}
-
-.add-form.to-right {
-  left: calc(100% + 8px);
-}
-
-.add-form.to-left {
-  right: calc(100% + 8px);
 }
 
 .add-form header b {
@@ -823,9 +841,9 @@ html[data-theme="dusk"] .week-scale .ghost {
 }
 
 .add-when {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.7fr);
+  gap: 16px;
   align-items: end;
 }
 
@@ -858,6 +876,16 @@ html[data-theme="dusk"] .week-scale .ghost {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 6px 8px;
+  min-height: 34px;
+}
+
+.len b {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
 }
 
 .add-form .field {
@@ -877,10 +905,6 @@ html[data-theme="dusk"] .week-scale .ghost {
   font-weight: 650;
 }
 
-.folder-name.empty {
-  color: var(--muted);
-  font-weight: 500;
-}
 
 .modes {
   display: grid;
@@ -919,18 +943,35 @@ html[data-theme="dusk"] .week-scale .ghost {
 }
 
 .add-form .days {
+  flex-wrap: nowrap;
   gap: 4px;
 }
 
 .add-form .chip {
+  flex: 0 0 auto;
   padding: 3px 8px;
   text-transform: capitalize;
   font-size: 0.85rem;
 }
 
+html[data-theme="dusk"] .add-form .chip.on,
+html[data-theme="dusk"] .add-form button.primary {
+  background: linear-gradient(180deg, #c5d3b6 0%, #8ea384 100%);
+  border-color: #8ea384;
+  color: #243024;
+  box-shadow: none;
+}
+
+html[data-theme="light"] .add-form .chip.on {
+  background: color-mix(in srgb, var(--primary) 72%, transparent);
+  border: 1px solid var(--primary);
+  color: var(--on-primary);
+  box-shadow: none;
+}
+
 .len {
-  min-width: 3.2em;
-  text-align: center;
+  min-width: 0;
+  text-align: left;
 }
 
 .add-form .actions {

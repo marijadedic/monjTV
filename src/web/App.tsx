@@ -28,7 +28,7 @@ export function App() {
   const admin = location.pathname.startsWith("/admin");
   const [theme, setTheme] = useState<Theme>(readTheme);
   const [clock, setClock] = useState(formatClock);
-  const themeLabel: Record<Theme, string> = { dark: t.dark, dusk: t.grove, light: t.light };
+  const themeLabel: Record<Theme, string> = { dark: t.dark, dusk: t.meadow, light: t.light };
   const langLabel: Record<Lang, string> = { en: "EN", hr: "HR" };
   const langName: Record<Lang, string> = { en: t.english, hr: t.croatian };
 
