@@ -6,7 +6,7 @@ import path from "node:path";
 import { Hono } from "hono";
 import type { Schedule } from "../shared/types.ts";
 import { PORT } from "../shared/constants.ts";
-import { browse } from "./files.ts";
+import { browse, pickFolder } from "./files.ts";
 import { clientDir } from "./paths.ts";
 import { getStatus, startPlayer } from "./player.ts";
 import { loadProgress } from "./progress.ts";
@@ -47,6 +47,15 @@ app.get("/api/today", async (c) => {
 app.post("/api/today/items/:id/shuffle", async (c) => {
   try {
     return c.json(await shuffleItem(c.req.param("id")));
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+  }
+});
+
+// Open the macOS folder picker and return the chosen path.
+app.post("/api/browse/pick", async (c) => {
+  try {
+    return c.json({ path: await pickFolder() });
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
   }

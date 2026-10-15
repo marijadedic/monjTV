@@ -4,6 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>monjTV</title>
+    <script>
+      try {
+        var theme = localStorage.getItem("monjtv-theme");
+        if (theme === "dusk" || theme === "light" || theme === "dark") {
+          document.documentElement.dataset.theme = theme;
+        }
+        var lang = localStorage.getItem("monjtv-lang");
+        if (lang !== "en" && lang !== "hr") {
+          lang = (navigator.language || "").toLowerCase().indexOf("hr") === 0 ? "hr" : "en";
+        }
+        document.documentElement.lang = lang;
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="app"></div>

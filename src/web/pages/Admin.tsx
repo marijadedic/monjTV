@@ -1,6 +1,7 @@
 import { useEffect, useState } from "preact/hooks";
-import { DAYS, type BrowseResult, type Day, type Schedule, type ScheduleBlock } from "../../shared/types.ts";
+import { DAYS, type Day, type Schedule, type ScheduleBlock } from "../../shared/types.ts";
 import { api } from "../api.ts";
+import { useI18n } from "../i18n.tsx";
 
 function emptyBlock(): ScheduleBlock {
   return {
@@ -14,11 +15,11 @@ function emptyBlock(): ScheduleBlock {
 }
 
 export function Admin() {
+  const { t } = useI18n();
   const [schedule, setSchedule] = useState<Schedule>({ blocks: [] });
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const [browseFor, setBrowseFor] = useState<string | null>(null);
-  const [browse, setBrowse] = useState<BrowseResult | null>(null);
+  const [picking, setPicking] = useState<string | null>(null);
 
   useEffect(() => {
     api.schedule().then(setSchedule).catch((e: Error) => setError(e.message));
@@ -38,9 +39,17 @@ export function Admin() {
     update(block.id, { days });
   }
 
-  async function openBrowse(block: ScheduleBlock) {
-    setBrowseFor(block.id);
-    setBrowse(await api.browse(block.folder || undefined));
+  async function chooseFolder(block: ScheduleBlock) {
+    setPicking(block.id);
+    setError(null);
+    try {
+      const picked = await api.pickFolder();
+      if (picked.path) update(block.id, { folder: picked.path });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPicking(null);
+    }
   }
 
   async function save() {
@@ -57,38 +66,39 @@ export function Admin() {
   return (
     <section>
       <div class="row">
-        <h1>Weekly grid</h1>
+        <h1>{t.weekly}</h1>
         <button
           onClick={() => {
             setSchedule((s) => ({ blocks: [...s.blocks, emptyBlock()] }));
             setSaved(false);
           }}
         >
-          Add block
+          {t.addBlock}
         </button>
         <button class="primary" onClick={save}>
-          Save
+          {t.save}
         </button>
-        {saved && <span class="muted">Saved. Today’s rundown rebuilt.</span>}
+        {saved && <span class="muted">{t.saved}</span>}
       </div>
-      {error && <p class="error">{error}</p>}
+      {error && <p class="error">{t.error(error)}</p>}
       {schedule.blocks.map((block) => (
         <div key={block.id} class="block-form">
           <div class="days">
             {DAYS.map((day) => (
-              <label key={day}>
-                <input
-                  type="checkbox"
-                  checked={block.days.includes(day)}
-                  onChange={() => toggleDay(block, day)}
-                />
-                {day}
-              </label>
+              <button
+                key={day}
+                type="button"
+                class={block.days.includes(day) ? "chip on" : "chip"}
+                aria-pressed={block.days.includes(day)}
+                onClick={() => toggleDay(block, day)}
+              >
+                {t.day[day]}
+              </button>
             ))}
           </div>
           <div class="row">
             <label>
-              Start{" "}
+              {t.start}{" "}
               <input
                 type="time"
                 value={block.start}
@@ -96,7 +106,7 @@ export function Admin() {
               />
             </label>
             <label>
-              End{" "}
+              {t.end}{" "}
               <input
                 type="time"
                 value={block.end}
@@ -104,7 +114,7 @@ export function Admin() {
               />
             </label>
             <label>
-              Mode{" "}
+              {t.mode}{" "}
               <select
                 value={block.mode}
                 onChange={(e) =>
@@ -113,50 +123,35 @@ export function Admin() {
                   })
                 }
               >
-                <option value="next-episode">Next episode</option>
-                <option value="random-file">Random file</option>
+                <option value="next-episode">{t.nextEpisode}</option>
+                <option value="random-file">{t.randomFile}</option>
               </select>
             </label>
           </div>
           <div class="row">
-            <input
-              style={{ flex: 1, minWidth: "200px" }}
-              value={block.folder}
-              placeholder="/path/to/folder"
-              onInput={(e) => update(block.id, { folder: (e.target as HTMLInputElement).value })}
-            />
-            <button onClick={() => openBrowse(block)}>Browse</button>
+            <div class="field">
+              <input
+                value={block.folder}
+                placeholder={t.folderPlaceholder}
+                onInput={(e) => update(block.id, { folder: (e.target as HTMLInputElement).value })}
+              />
+              <button type="button" onClick={() => chooseFolder(block)} disabled={picking === block.id}>
+                {picking === block.id ? t.choosing : t.browse}
+              </button>
+            </div>
+          </div>
+          <div class="block-foot">
             <button
-              onClick={() =>
-                setSchedule((s) => ({ blocks: s.blocks.filter((b) => b.id !== block.id) }))
-              }
+              type="button"
+              class="quiet"
+              onClick={() => {
+                setSchedule((s) => ({ blocks: s.blocks.filter((b) => b.id !== block.id) }));
+                setSaved(false);
+              }}
             >
-              Remove
+              {t.remove}
             </button>
           </div>
-          {browseFor === block.id && browse && (
-            <div class="browse">
-              <button
-                disabled={!browse.parent}
-                onClick={async () => {
-                  if (browse.parent) setBrowse(await api.browse(browse.parent));
-                }}
-              >
-                ..
-              </button>
-              {browse.dirs.map((dir) => (
-                <button
-                  key={dir.path}
-                  onClick={async () => {
-                    update(block.id, { folder: dir.path });
-                    setBrowse(await api.browse(dir.path));
-                  }}
-                >
-                  {dir.name}/
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       ))}
     </section>

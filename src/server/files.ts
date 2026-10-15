@@ -1,4 +1,6 @@
+import { execFile } from "node:child_process";
 import { readdir, stat } from "node:fs/promises";
+import { promisify } from "node:util";
 import os from "node:os";
 import path from "node:path";
 import { VIDEO_EXT } from "../shared/constants.ts";
@@ -6,6 +8,7 @@ import type { BrowseResult } from "../shared/types.ts";
 
 const MAX_DEPTH = 5;
 const MAX_VIDEOS = 2000;
+const execFileAsync = promisify(execFile);
 
 // Filename without its extension.
 export function titleFromPath(filePath: string): string {
@@ -73,6 +76,28 @@ export async function browse(rawPath?: string): Promise<BrowseResult> {
     dirs,
     videos,
   };
+}
+
+// Open the system folder picker and return the chosen path. Null when canceled.
+export async function pickFolder(): Promise<string | null> {
+  if (process.platform !== "darwin") {
+    throw new Error("The folder picker is only available on macOS.");
+  }
+  try {
+    const { stdout } = await execFileAsync("osascript", [
+      "-e",
+      'POSIX path of (choose folder with prompt "Choose a folder for this block")',
+    ]);
+    const picked = stdout.trim().replace(/\/$/, "");
+    if (!picked || !(await isDir(picked))) return null;
+    return picked;
+  } catch (err) {
+    const stderr =
+      err && typeof err === "object" && "stderr" in err ? String(err.stderr ?? "") : "";
+    const message = `${err instanceof Error ? err.message : String(err)} ${stderr}`;
+    if (/user canceled|-128/i.test(message)) return null;
+    throw err instanceof Error ? err : new Error(message);
+  }
 }
 
 // True when the path is a directory.
