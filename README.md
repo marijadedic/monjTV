@@ -178,7 +178,7 @@ Linux and the Pi use the same `.desktop` file. The icon runs `scripts/start.sh` 
 
 Blocks on the same day cannot overlap, and a block ends the same day it starts (`18:00`–`19:30` is valid; `22:00`–`01:00` is not). Saving the schedule rebuilds today and keeps items that are already playing or finished.
 
-**Options** in the header holds language (English or Croatian), theme (Dark, Meadow, Light), and **Shut down**. Language and theme stay in the browser. **Shut down** quits mpv, closes the monjTV browser tab on this machine, and exits the server.
+**Options** in the header holds language (English or Croatian), theme (Dark, Meadow, Light), and **Shut down**. Language and theme stay in the browser. **Shut down** is a filled red stop. In Croatian the label is **Ugasi monjTV**. It quits mpv, closes the monjTV browser tab on this machine, and exits the server.
 
 ## How a day plays
 

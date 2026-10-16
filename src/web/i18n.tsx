@@ -234,7 +234,7 @@ const hr: Copy = {
   playNow: "Pusti sada",
   startTv: "Pokreni TV",
   options: "Opcije",
-  shutDown: "Ugasi",
+  shutDown: "Ugasi monjTV",
   off: "monjTV je ugašen",
   week: "Tjedan",
   add: "Dodaj",

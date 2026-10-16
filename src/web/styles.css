@@ -575,17 +575,30 @@ html[data-theme="dusk"] .prefs .themes button.on {
 .prefs-quit {
   width: 100%;
   margin-top: 2px;
-  font: 0.92rem/1.45 system-ui, sans-serif;
+  font: 650 0.92rem/1.45 system-ui, sans-serif;
   text-align: center;
   padding: 4px 12px;
   border-radius: 999px;
-  border: 1px solid var(--line);
-  background: transparent;
-  color: var(--text);
+  border: 1px solid #c23b32;
+  background: #c23b32;
+  color: #fff;
 }
 
 .prefs-quit:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--line) 45%, transparent);
+  background: #a8322a;
+  border-color: #a8322a;
+}
+
+html[data-theme="dusk"] .prefs-quit,
+html[data-theme="light"] .prefs-quit {
+  border-color: #b3261e;
+  background: #b3261e;
+}
+
+html[data-theme="dusk"] .prefs-quit:hover:not(:disabled),
+html[data-theme="light"] .prefs-quit:hover:not(:disabled) {
+  background: #8c1e18;
+  border-color: #8c1e18;
 }
 
 .prefs[open] .prefs-body {
