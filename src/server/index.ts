@@ -12,7 +12,7 @@ import { getStatus, shutdownPlayer, startPlayer } from "./player.ts";
 import { loadProgress } from "./progress.ts";
 import { ensureToday, loadToday, rebuildTodayPreservingPlayback, shuffleItem } from "./rundown.ts";
 import { assertFolder, loadSchedule, saveSchedule } from "./schedule.ts";
-import { frameOf, isMoviesFile } from "./still.ts";
+import { frameOf } from "./still.ts";
 import { closeAppTabs, portsFrom } from "./tabs.ts";
 
 const app = new Hono();
@@ -49,11 +49,11 @@ app.get("/api/today", async (c) => {
   return c.json(await ensureToday());
 });
 
-// Serve one cached frame for a movies rundown item.
+// Serve one cached frame for a random-file rundown item.
 app.get("/api/today/items/:id/still", async (c) => {
   const today = await ensureToday();
   const item = today.items.find((entry) => entry.id === c.req.param("id"));
-  if (!item || !isMoviesFile(item.path)) return c.notFound();
+  if (!item || item.mode !== "random-file") return c.notFound();
   const file = await frameOf(item.path);
   if (!file) return c.notFound();
   const bytes = await readFile(file);

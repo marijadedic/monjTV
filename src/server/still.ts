@@ -22,13 +22,6 @@ function stampOf(seconds: number): string {
   return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-// True when the file sits in a folder named movies.
-export function isMoviesFile(file: string): boolean {
-  const parts = file.split(/[/\\]/).filter(Boolean);
-  const folder = parts.length >= 2 ? parts[parts.length - 2]! : "";
-  return folder.toLowerCase() === "movies";
-}
-
 async function writeFrame(file: string, dest: string): Promise<string | null> {
   const duration = await probeDuration(file);
   const scene = duration > 20 * 60 ? 18 * 60 + 40 : Math.max(8, Math.floor(duration * 0.2));

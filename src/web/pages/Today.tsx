@@ -9,10 +9,6 @@ function folderName(filePath: string): string {
   return parts[parts.length - 2]!;
 }
 
-function isMovies(filePath: string): boolean {
-  return folderName(filePath).toLowerCase() === "movies";
-}
-
 function hmToSec(hm: string): number | null {
   const [hRaw, mRaw] = hm.split(":");
   const h = Number(hRaw);
@@ -95,7 +91,8 @@ export function Today() {
   const idleItem =
     current || status?.fallbackTitle || status?.waitingUntil ? null : (today?.items[0] ?? null);
   const stripItem = current ?? idleItem;
-  const stripStill = stripItem && isMovies(stripItem.path) && !missed[stripItem.id] ? stripItem : null;
+  const stripStill =
+    stripItem && stripItem.mode === "random-file" && !missed[stripItem.id] ? stripItem : null;
 
   function hideStill(id: string) {
     setMissed((currentMissed) => ({ ...currentMissed, [id]: true }));
@@ -174,7 +171,7 @@ export function Today() {
           {today.items.length > 0 && (
             <div class="rail">
               {today.items.map((item) => {
-                const cardStill = isMovies(item.path) && !missed[item.id];
+                const cardStill = item.mode === "random-file" && !missed[item.id];
                 return (
                 <div key={item.id} class={`rail-item ${item.status}`}>
                   <i class="dot" />
