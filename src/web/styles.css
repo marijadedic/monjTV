@@ -1145,11 +1145,6 @@ html[data-theme="light"] .week-wrap .scrim {
   grid-template-columns: auto;
 }
 
-.picked.dash {
-  margin: 18px 0 0;
-  color: var(--muted);
-}
-
 .picked div {
   display: flex;
   flex-direction: column;
@@ -1164,6 +1159,10 @@ html[data-theme="light"] .week-wrap .scrim {
   letter-spacing: 0;
   text-transform: none;
   overflow-wrap: anywhere;
+}
+
+.picked .value.dash {
+  margin-left: 0.35rem;
 }
 
 .day-times {

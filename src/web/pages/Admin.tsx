@@ -878,9 +878,7 @@ export function Admin() {
               onAction={() => void choosePath()}
             />
             {fieldError.folder && <p class="field-error">{t.error(fieldError.folder)}</p>}
-            {!pathChosen || (!measuring && !length) ? (
-              <p class="picked dash">—</p>
-            ) : draft.mode === "random-file" && length ? (
+            {draft.mode === "random-file" && length ? (
               <div class="picked">
                 <div>
                   <span class="k">{t.slotDuration}</span>
@@ -895,7 +893,9 @@ export function Admin() {
               <div class="picked one">
                 <div>
                   <span class="k">{t.slotDuration}</span>
-                  <span class="value">{measuring || !length ? t.measuring : t.slotDurationOf(lengthMins)}</span>
+                  <span class={length || (measuring && pathChosen) ? "value" : "value dash"}>
+                    {length ? t.slotDurationOf(lengthMins) : measuring && pathChosen ? t.measuring : "—"}
+                  </span>
                 </div>
               </div>
             )}
