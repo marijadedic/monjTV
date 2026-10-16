@@ -78,6 +78,10 @@ type Copy = {
   remove: string;
   day: Record<Day, string>;
   error: (message: string) => string;
+  runLength: (sec: number) => string;
+  wontFitVideo: (title: string, length: string, limit: string) => string;
+  wontFitEpisode: (title: string, length: string, limit: string) => string;
+  wontFitFolder: (title: string, length: string, limit: string) => string;
 };
 
 const en: Copy = {
@@ -166,7 +170,27 @@ const en: Copy = {
   remove: "Remove",
   day: { mon: "mon", tue: "tue", wed: "wed", thu: "thu", fri: "fri", sat: "sat", sun: "sun" },
   error: (message) => message,
+  runLength: (sec) => runLength(sec, false),
+  wontFitVideo: (title, length, limit) =>
+    `${title} is ${length}. This slot can play up to ${limit}, so it will not play.`,
+  wontFitEpisode: (title, length, limit) =>
+    `The next episode, ${title}, is ${length}. This slot can play up to ${limit}, so it will not play.`,
+  wontFitFolder: (title, length, limit) =>
+    `The shortest video, ${title}, is ${length}. This slot can play up to ${limit}, so nothing will play.`,
 };
+
+function runLength(sec: number, hr: boolean): string {
+  const safe = Math.max(0, Math.round(sec));
+  const h = Math.floor(safe / 3600);
+  const m = Math.floor((safe % 3600) / 60);
+  const s = safe % 60;
+  const parts: string[] = [];
+  if (h) parts.push(hr ? `${h} h` : `${h}h`);
+  if (m) parts.push(hr ? `${m} min` : `${m}m`);
+  if (s) parts.push(hr ? `${s} s` : `${s}s`);
+  if (parts.length === 0) return hr ? "0 min" : "0m";
+  return parts.join(" ");
+}
 
 const hrDay: Record<Day, string> = {
   mon: "pon",
@@ -325,6 +349,13 @@ const hr: Copy = {
   remove: "Ukloni",
   day: hrDay,
   error: hrError,
+  runLength: (sec) => runLength(sec, true),
+  wontFitVideo: (title, length, limit) =>
+    `${title} traje ${length}. U ovaj termin stane najviše ${limit}, pa se neće pustiti.`,
+  wontFitEpisode: (title, length, limit) =>
+    `Sljedeća epizoda, ${title}, traje ${length}. U ovaj termin stane najviše ${limit}, pa se neće pustiti.`,
+  wontFitFolder: (title, length, limit) =>
+    `Najkraći video, ${title}, traje ${length}. U ovaj termin stane najviše ${limit}, pa se ništa neće pustiti.`,
 };
 
 const copy: Record<Lang, Copy> = { en, hr };

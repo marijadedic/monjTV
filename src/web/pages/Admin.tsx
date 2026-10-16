@@ -5,6 +5,7 @@ import {
   type Day,
   type Schedule,
   type ScheduleBlock,
+  type SlotMiss,
 } from "../../shared/types.ts";
 import { api } from "../api.ts";
 import { useI18n } from "../i18n.tsx";
@@ -262,6 +263,7 @@ export function Admin() {
   const [error, setError] = useState<string | null>(null);
   const [fieldError, setFieldError] = useState<FieldError>({});
   const [saved, setSaved] = useState(false);
+  const [fitMiss, setFitMiss] = useState<SlotMiss | null>(null);
   const [picking, setPicking] = useState<"draft" | "fallback" | null>(null);
   const [intermissionOpen, setIntermissionOpen] = useState(false);
   const [panelToken, setPanelToken] = useState(0);
@@ -320,6 +322,7 @@ export function Admin() {
   function openPanel() {
     setPanelToken((token) => token + 1);
     setSaved(false);
+    setFitMiss(null);
     setError(null);
     setFieldError({});
   }
@@ -330,6 +333,7 @@ export function Admin() {
     savedFallback.current = res.schedule.fallbackFolder;
     setSchedule(res.schedule);
     setSaved(true);
+    return res;
   }
 
   function openGap(day: Day, startMin: number, endMin: number, at: number) {
@@ -481,7 +485,8 @@ export function Admin() {
       ? schedule.blocks.map((item) => (item.id === draft.id ? block : item))
       : [...schedule.blocks, block];
     try {
-      await persist({ ...schedule, blocks });
+      const res = await persist({ ...schedule, blocks });
+      setFitMiss(res.misses.find((miss) => miss.blockId === block.id) ?? null);
       setDraft(null);
       setFieldError({});
     } catch (e) {
@@ -525,6 +530,15 @@ export function Admin() {
         )}
       </div>
       {error && <p class="error">{t.error(error)}</p>}
+      {fitMiss && !draft && (
+        <p class="fit-warn" role="status">
+          {fitMiss.kind === "episode"
+            ? t.wontFitEpisode(fitMiss.title, t.runLength(fitMiss.durationSec), t.runLength(fitMiss.limitSec))
+            : fitMiss.kind === "folder"
+              ? t.wontFitFolder(fitMiss.title, t.runLength(fitMiss.durationSec), t.runLength(fitMiss.limitSec))
+              : t.wontFitVideo(fitMiss.title, t.runLength(fitMiss.durationSec), t.runLength(fitMiss.limitSec))}
+        </p>
+      )}
       <div class={draft ? "week-wrap drafting" : "week-wrap"}>
       {!draft && intermissionOpen && (
         <div class="intermission-open" ref={intermissionPanelRef}>

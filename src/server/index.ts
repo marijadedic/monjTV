@@ -10,8 +10,14 @@ import { assertVideo, browse, pickFile, pickFolder, suggestPaths } from "./files
 import { clientDir } from "./paths.ts";
 import { getStatus, shutdownPlayer, startPlayer } from "./player.ts";
 import { loadProgress } from "./progress.ts";
-import { ensureToday, loadToday, rebuildTodayPreservingPlayback, shuffleItem } from "./rundown.ts";
-import { assertFolder, loadSchedule, saveSchedule } from "./schedule.ts";
+import {
+  ensureToday,
+  loadToday,
+  missesForBlocks,
+  rebuildTodayPreservingPlayback,
+  shuffleItem,
+} from "./rundown.ts";
+import { assertFolder, changedBlocks, loadSchedule, saveSchedule } from "./schedule.ts";
 import { frameOf } from "./still.ts";
 import { closeAppTabs, portsFrom } from "./tabs.ts";
 
@@ -37,9 +43,11 @@ app.put("/api/schedule", async (c) => {
       else await assertFolder(block.folder);
     }
     if (body.fallbackFolder?.trim()) await assertFolder(body.fallbackFolder.trim());
+    const previous = await loadSchedule();
     const saved = await saveSchedule(body);
     const today = await rebuildTodayPreservingPlayback();
-    return c.json({ schedule: saved, today });
+    const misses = await missesForBlocks(changedBlocks(previous.blocks, saved.blocks));
+    return c.json({ schedule: saved, today, misses });
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
   }

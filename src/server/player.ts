@@ -1,10 +1,10 @@
 import type { PlayerStatus, RundownItem, ScheduleBlock, TodayRundown } from "../shared/types.ts";
-import { msUntil, nowSec, parseHm, weekday } from "./clock.ts";
+import { formatHm, msUntil, nowSec, parseHm, weekday } from "./clock.ts";
 import { titleFromPath } from "./files.ts";
 import { Mpv } from "./mpv.ts";
 import { pick } from "./picker.ts";
 import { markEpisodeDone, markRandomPlayed } from "./progress.ts";
-import { ensureToday, itemFits, loadToday, saveToday } from "./rundown.ts";
+import { ensureToday, joinOffset, loadToday, onAirItem, saveToday } from "./rundown.ts";
 import { blocksForDay, loadSchedule } from "./schedule.ts";
 
 const mpv = new Mpv();
@@ -33,11 +33,7 @@ export async function getStatus(): Promise<PlayerStatus> {
   const today = await loadToday();
   const current = today.items.find((i) => i.status === "playing");
   let willStartItemId: string | null = null;
-  if (!current && !fallbackPlay) {
-    const schedule = await loadSchedule();
-    const blocks = blocksForDay(schedule, weekday());
-    willStartItemId = previewStart(today, blocks, nowSec())?.id ?? null;
-  }
+  if (!current && !fallbackPlay) willStartItemId = onAirItem(today.items, nowSec())?.id ?? null;
   return {
     running: mpv.running,
     waitingUntil,
@@ -146,7 +142,7 @@ async function onEndFile(reason: string): Promise<void> {
   }
 }
 
-// Play the next item that fits, or wait for the next block.
+// Join the file the clock is inside, or wait for the next one.
 async function playNow(): Promise<void> {
   clearWait();
   waitingUntil = null;
@@ -154,41 +150,35 @@ async function playNow(): Promise<void> {
   const schedule = await loadSchedule();
   const dayBlocks = blocksForDay(schedule, weekday());
   const now = nowSec();
+  const air = onAirItem(today.items, now);
 
+  let changed = false;
   for (const item of today.items) {
-    if (item.status !== "planned") continue;
-    const block = dayBlocks.find((b) => b.id === item.blockId);
-    if (!block) continue;
-    if (now >= parseHm(block.end)) {
-      item.status = "skipped";
-      provisionalSkips.push(item.id);
+    if (item.status !== "planned" || item.id === air?.id) continue;
+    if (now < parseHm(item.start)) continue;
+    item.status = "skipped";
+    provisionalSkips.push(item.id);
+    changed = true;
+  }
+  if (changed) await saveToday(today);
+
+  if (air) {
+    const offset = joinOffset(air, nowSec());
+    if (offset < air.durationSec) {
+      await playItem(air, offset);
+      return;
     }
   }
-  await saveToday(today);
 
-  const currentBlock = dayBlocks.find(
-    (b) => parseHm(b.start) <= now && now < parseHm(b.end),
-  );
+  const currentBlock = dayBlocks.find((b) => parseHm(b.start) <= now && now < parseHm(b.end));
   if (currentBlock) {
-    const picked = await firstFitting(today, currentBlock, now);
-    if (picked) {
-      await playItem(picked);
-      return;
-    }
-    if (holdsFinishedVideo(today, currentBlock)) {
-      await stopIntermission();
-      armWaitForNext(dayBlocks, currentBlock.end);
-      return;
-    }
-    const later = dayBlocks.filter((b) => parseHm(b.start) >= parseHm(currentBlock.end));
-    for (const block of later) {
-      const item = await firstFitting(today, block, now);
-      if (item) {
-        await playItem(item);
-        return;
-      }
-    }
     await stopIntermission();
+    const wake = nextPlannedStart(today, now);
+    const blockEnd = parseHm(currentBlock.end);
+    if (wake != null && wake < blockEnd) {
+      armWaitUntil(wake);
+      return;
+    }
     armWaitForNext(dayBlocks, currentBlock.end);
     return;
   }
@@ -231,56 +221,20 @@ async function playFallback(folder: string): Promise<void> {
   }
 }
 
-// Mark earlier planned items that do not fit as skipped, then return the one that does.
-async function firstFitting(
-  today: TodayRundown,
-  block: ScheduleBlock,
-  now: number,
-): Promise<RundownItem | null> {
-  const remaining = parseHm(block.end) - now;
-  let changed = false;
+// Clock time of the next planned file that has not started.
+function nextPlannedStart(today: TodayRundown, now: number): number | null {
+  let wake: number | null = null;
   for (const item of today.items) {
-    if (item.blockId !== block.id || item.status !== "planned") continue;
-    if (!itemFits(item.durationSec, remaining)) {
-      item.status = "skipped";
-      provisionalSkips.push(item.id);
-      changed = true;
-      continue;
-    }
-    break;
+    if (item.status !== "planned") continue;
+    const start = parseHm(item.start);
+    if (start <= now) continue;
+    if (wake == null || start < wake) wake = start;
   }
-  if (changed) await saveToday(today);
-  return nextStartable(today, block, now);
+  return wake;
 }
 
-// Same file playNow would start, without marking anything skipped.
-function previewStart(today: TodayRundown, blocks: ScheduleBlock[], now: number): RundownItem | null {
-  const currentBlock = blocks.find((b) => parseHm(b.start) <= now && now < parseHm(b.end));
-  if (!currentBlock) return null;
-  const picked = nextStartable(today, currentBlock, now);
-  if (picked) return picked;
-  if (holdsFinishedVideo(today, currentBlock)) return null;
-  const later = blocks.filter((b) => parseHm(b.start) >= parseHm(currentBlock.end));
-  for (const block of later) {
-    const item = nextStartable(today, block, now);
-    if (item) return item;
-  }
-  return null;
-}
-
-// First planned item in the block that still fits the remaining time.
-function nextStartable(today: TodayRundown, block: ScheduleBlock, now: number): RundownItem | null {
-  const remaining = parseHm(block.end) - now;
-  for (const item of today.items) {
-    if (item.blockId !== block.id || item.status !== "planned") continue;
-    if (!itemFits(item.durationSec, remaining)) continue;
-    return item;
-  }
-  return null;
-}
-
-// Load an item in mpv and mark it playing. This replaces an intermission file mid-play.
-async function playItem(item: RundownItem): Promise<void> {
+// Load an item in mpv at the clock offset and mark it playing.
+async function playItem(item: RundownItem, offsetSec: number): Promise<void> {
   fallbackPlay = null;
   const today = await loadToday();
   for (const row of today.items) {
@@ -290,7 +244,7 @@ async function playItem(item: RundownItem): Promise<void> {
   await saveToday(today);
   replacing = true;
   try {
-    await mpv.loadFile(item.path);
+    await mpv.loadFile(item.path, offsetSec);
   } catch (err) {
     lastError = err instanceof Error ? err.message : String(err);
     replacing = false;
@@ -310,14 +264,13 @@ async function playItem(item: RundownItem): Promise<void> {
   replacing = false;
 }
 
-// True when this block's chosen video has already finished and nothing else is queued.
-function holdsFinishedVideo(today: TodayRundown, block: ScheduleBlock): boolean {
-  if (block.mode !== "specific-file") return false;
-  const owned = today.items.filter((item) => item.blockId === block.id);
-  return (
-    owned.some((item) => item.status === "done") &&
-    !owned.some((item) => item.status === "planned" || item.status === "playing")
-  );
+// Wake at a clock time inside the current block, such as the next episode.
+function armWaitUntil(atSec: number): void {
+  if (atSec <= nowSec()) return;
+  waitingUntil = formatHm(atSec);
+  waitTimer = setTimeout(() => {
+    void playNow();
+  }, msUntil(atSec));
 }
 
 // Wake when this block ends. The label names the next block, which still waits for its start.

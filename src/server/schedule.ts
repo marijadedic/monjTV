@@ -24,6 +24,21 @@ export async function saveSchedule(schedule: Schedule): Promise<Schedule> {
   return normalized;
 }
 
+// Blocks that were added or whose window, folder, file, or mode changed.
+export function changedBlocks(before: ScheduleBlock[], after: ScheduleBlock[]): ScheduleBlock[] {
+  return after.filter((block) => {
+    const old = before.find((item) => item.id === block.id);
+    if (!old) return true;
+    return (
+      old.start !== block.start ||
+      old.end !== block.end ||
+      old.folder !== block.folder ||
+      (old.file ?? "") !== (block.file ?? "") ||
+      old.mode !== block.mode
+    );
+  });
+}
+
 // Blocks that air on a day, ordered by start time.
 export function blocksForDay(schedule: Schedule, day: Day): ScheduleBlock[] {
   return schedule.blocks

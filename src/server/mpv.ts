@@ -106,8 +106,13 @@ export class Mpv {
     this.sock.on("error", () => undefined);
   }
 
-  // Replace the current file and start playback.
-  async loadFile(filePath: string): Promise<void> {
+  // Replace the current file. A positive start seeks that many seconds in.
+  async loadFile(filePath: string, startSec = 0): Promise<void> {
+    const start = Math.floor(startSec);
+    if (start > 0) {
+      await this.command(["loadfile", filePath, "replace", -1, { start: String(start) }]);
+      return;
+    }
     await this.command(["loadfile", filePath, "replace"]);
   }
 

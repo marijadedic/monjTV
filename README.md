@@ -174,7 +174,7 @@ Linux and the Pi use the same `.desktop` file. The icon runs `scripts/start.sh` 
 3. Open **Admin**.
 4. Click an empty stretch of a day column. A ghost of that slice stays on the hour, and the form opens over the week.
 5. Set the days, start, end, folder, and mode, then commit the form. **Browse** opens a folder dialog on the machine running the server, which is the machine with the screen. macOS uses the system picker. On Linux, Browse opens `zenity`, `kdialog`, `qarma`, or `yad` when one of those is already installed, on the machine running the server. Otherwise type an absolute path (`/home/you/videos/cartoons`). Existing folders on the server are listed under the field as you type. The folder must already exist. **One video** uses a file dialog instead, and a typed path lists videos. The file must already exist.
-6. Open **Today** and press **Start TV**. mpv goes fullscreen and loads whatever fits right now.
+6. Open **Today** and press **Start TV**. mpv goes fullscreen and joins whatever is on at that minute.
 
 Blocks on the same day cannot overlap, and a block ends the same day it starts (`18:00`–`19:30` is valid; `22:00`–`01:00` is not). Saving the schedule rebuilds today and keeps items that are already playing or finished.
 
@@ -190,9 +190,9 @@ Blocks on the same day cannot overlap, and a block ends the same day it starts (
 
 `today.json` is that date's rundown: concrete files, planned times, and a status of `planned`, `playing`, `done`, or `skipped`. The UI shows this list. mpv plays one file at a time from it. It is not an mpv playlist.
 
-The wall clock picks the block. Every file starts at `00:00`. Starting the app halfway through a slot does not seek into the episode.
+The wall clock is the timeline. Turning the TV on during a file seeks to that time. A file planned from 17:00 opens at 00:12 when the TV comes on at 17:12. A file that is already playing stays where mpv has it, so rewinding it plays through to the end of the file. When the file ends, playback joins whatever is on then, and seeks into it when that episode is already underway. A file that has already started plays out, even if its block ends. The next block does not start early.
 
-A file that has already started plays out, even if its block ends. Before a file starts, it has to fit in the time left in the block plus 8 minutes. With under 3 minutes left, it does not start. A file that does not fit is marked `skipped`, progress stays where it was, and the server moves on to the next block that does fit.
+A file is placed on the rundown only when it fits the block. It can end by the block end, including in a slot under 3 minutes. With at least 3 minutes in the block, it can also run up to 8 minutes past the end. A file that does not fit is left off the rundown. Random file skips a video that does not fit and places another that does. Saving a slot warns when that video, the next episode, or every file in the folder is too long for the slot. A planned file whose window has already passed is marked `skipped` when the TV joins, and progress stays where it was.
 
 Progress updates when a file reaches the end (`eof`). Stopping mpv puts a `playing` item back to `planned`, and puts back to `planned` any item that this start marked `skipped`.
 
@@ -202,7 +202,7 @@ If `ffprobe` is missing or cannot read a file, that file is treated as 45 minute
 
 ## Pages
 
-**Today** (`/`) is a time rail with no page title. The date sits to the right of the clock as `DD.MM.YYYY`. The current show is in the on-air strip and again on the rail. **Start TV** starts mpv if it is not running and plays what fits now. **Shuffle** replaces one planned random-file item. A random-file item and a one-video item show a cached frame from the file.
+**Today** (`/`) is a time rail with no page title. The date sits to the right of the clock as `DD.MM.YYYY`. The current show is in the on-air strip and again on the rail. **Start TV** starts mpv if it is not running and joins the show at the current minute. **Shuffle** replaces one planned random-file item. A random-file item and a one-video item show a cached frame from the file.
 
 **Admin** (`/admin`) is a clock of day columns under a quiet Weekly schedule heading. A next-episode block is rose, a random-file block is blue, and a one-video block is clay, or copper in Meadow. Each fades from a light top. A new slot is a click on empty time. The form saves when it is committed. Its title row shows a clock, and the selected mode uses that block’s color.
 

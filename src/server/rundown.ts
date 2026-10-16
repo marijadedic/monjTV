@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { GRACE_SEC, MIN_REMAINING_SEC } from "../shared/constants.ts";
 import type {
+  Progress,
   RundownItem,
   Schedule,
   ScheduleBlock,
+  SlotMiss,
   TodayRundown,
 } from "../shared/types.ts";
 import { dateKey, formatHm, parseHm, weekday } from "./clock.ts";
@@ -90,10 +92,9 @@ export async function buildRundown(date = dateKey()): Promise<TodayRundown> {
 
     if (block.mode === "specific-file") {
       const file = block.file;
-      const remaining = blockEnd - cursorStart;
-      if (!file || remaining < MIN_REMAINING_SEC || !(await isVideoFile(file))) continue;
+      if (!file || !(await isVideoFile(file))) continue;
       const durationSec = await probeDuration(file);
-      if (durationSec > remaining + GRACE_SEC) continue;
+      if (!itemFits(durationSec, blockEnd - cursorStart)) continue;
       items.push(makeItem(block, file, cursorStart, durationSec));
       continue;
     }
@@ -101,28 +102,40 @@ export async function buildRundown(date = dateKey()): Promise<TodayRundown> {
     const files = await videosIn(block.folder);
     if (files.length === 0) continue;
     const used: string[] = [];
+    const passed = new Set<string>();
     let lastCompleted = progress.lastCompleted[block.folder];
     let cursor = cursorStart;
 
     while (true) {
       const remaining = blockEnd - cursor;
-      if (remaining < MIN_REMAINING_SEC) break;
+      if (remaining <= 0) break;
 
-      let file: string | null = null;
+      let picked: string | null = null;
+      let durationSec = 0;
       if (block.mode === "next-episode") {
-        file = nextFrom(files, lastCompleted);
+        const file = nextFrom(files, lastCompleted);
+        if (!file) break;
+        durationSec = await probeDuration(file);
+        if (!itemFits(durationSec, remaining)) break;
+        picked = file;
       } else {
         const recent = progress.recentRandom[block.folder] ?? [];
-        file = randomFile(files, [...recent, ...used]);
+        const pool = files.filter((candidate) => !passed.has(candidate) && !used.includes(candidate));
+        if (pool.length === 0) break;
+        const file = randomFile(pool, recent);
+        if (!file) break;
+        durationSec = await probeDuration(file);
+        if (!itemFits(durationSec, remaining)) {
+          passed.add(file);
+          continue;
+        }
+        picked = file;
       }
-      if (!file) break;
+      if (!picked) break;
 
-      const durationSec = await probeDuration(file);
-      if (durationSec > remaining + GRACE_SEC) break;
-
-      items.push(makeItem(block, file, cursor, durationSec));
-      used.push(file);
-      if (block.mode === "next-episode") lastCompleted = file;
+      items.push(makeItem(block, picked, cursor, durationSec));
+      used.push(picked);
+      if (block.mode === "next-episode") lastCompleted = picked;
       cursor += durationSec;
     }
   }
@@ -159,10 +172,92 @@ function makeItem(
   };
 }
 
-// True when the file can still start in the time left in the block.
+// True when the clock is inside this file's planned window.
+export function coversNow(item: RundownItem, now: number): boolean {
+  const start = parseHm(item.start);
+  return now >= start && now < start + item.durationSec;
+}
+
+// Planned file the clock is inside. A later start wins when two windows overlap.
+export function onAirItem(items: RundownItem[], now: number): RundownItem | null {
+  let chosen: RundownItem | null = null;
+  for (const item of items) {
+    if (item.status !== "planned") continue;
+    if (!coversNow(item, now)) continue;
+    if (!chosen || parseHm(item.start) >= parseHm(chosen.start)) chosen = item;
+  }
+  return chosen;
+}
+
+// Seconds from the start of the file to this clock time.
+export function joinOffset(item: RundownItem, now: number): number {
+  return Math.max(0, now - parseHm(item.start));
+}
+
+// True when the file can start with this many seconds left in the block.
 export function itemFits(durationSec: number, remainingSec: number): boolean {
+  if (remainingSec <= 0 || durationSec <= 0) return false;
+  if (durationSec <= remainingSec) return true;
   if (remainingSec < MIN_REMAINING_SEC) return false;
   return durationSec <= remainingSec + GRACE_SEC;
+}
+
+// Longest file that can start in a block of this length.
+export function maxPlayableSec(slotSec: number): number {
+  if (slotSec <= 0) return 0;
+  if (slotSec < MIN_REMAINING_SEC) return slotSec;
+  return slotSec + GRACE_SEC;
+}
+
+// Why a saved block cannot start a file, for blocks that were just added or edited.
+export async function missesForBlocks(blocks: ScheduleBlock[]): Promise<SlotMiss[]> {
+  const progress = await loadProgress();
+  const misses: SlotMiss[] = [];
+  for (const block of blocks) {
+    const miss = await missForBlock(block, progress);
+    if (miss) misses.push(miss);
+  }
+  return misses;
+}
+
+// The file this block would start, when that file is too long for the slot.
+async function missForBlock(block: ScheduleBlock, progress: Progress): Promise<SlotMiss | null> {
+  const slotSec = parseHm(block.end) - parseHm(block.start);
+  const limitSec = maxPlayableSec(slotSec);
+  if (block.mode === "specific-file") {
+    const file = block.file;
+    if (!file || !(await isVideoFile(file))) return null;
+    const durationSec = await probeDuration(file);
+    if (itemFits(durationSec, slotSec)) return null;
+    return { blockId: block.id, kind: "video", title: titleFromPath(file), durationSec, limitSec };
+  }
+
+  const files = await videosIn(block.folder);
+  if (files.length === 0) return null;
+  if (block.mode === "next-episode") {
+    const file = nextFrom(files, progress.lastCompleted[block.folder]);
+    if (!file) return null;
+    const durationSec = await probeDuration(file);
+    if (itemFits(durationSec, slotSec)) return null;
+    return { blockId: block.id, kind: "episode", title: titleFromPath(file), durationSec, limitSec };
+  }
+
+  let shortest: { title: string; durationSec: number } | null = null;
+  for (const file of files) {
+    const durationSec = await probeDuration(file);
+    if (itemFits(durationSec, slotSec)) return null;
+    if (!shortest || durationSec < shortest.durationSec) {
+      shortest = { title: titleFromPath(file), durationSec };
+    }
+  }
+  if (!shortest) return null;
+  return {
+    blockId: block.id,
+    kind: "folder",
+    title: shortest.title,
+    durationSec: shortest.durationSec,
+    limitSec,
+  };
 }
 
 // Replace a random item with another file and retime its block.

@@ -41,6 +41,14 @@ export interface TodayRundown {
   items: RundownItem[];
 }
 
+export interface SlotMiss {
+  blockId: string;
+  kind: "video" | "episode" | "folder";
+  title: string;
+  durationSec: number;
+  limitSec: number;
+}
+
 export interface PlayerStatus {
   running: boolean;
   waitingUntil: string | null;

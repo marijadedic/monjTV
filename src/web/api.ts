@@ -2,6 +2,7 @@ import type {
   BrowseResult,
   PlayerStatus,
   Schedule,
+  SlotMiss,
   TodayRundown,
 } from "../shared/types.ts";
 
@@ -22,7 +23,7 @@ export const api = {
   today: () => req<TodayRundown>("/api/today"),
   schedule: () => req<Schedule>("/api/schedule"),
   saveSchedule: (schedule: Schedule) =>
-    req<{ schedule: Schedule; today: TodayRundown }>("/api/schedule", {
+    req<{ schedule: Schedule; today: TodayRundown; misses: SlotMiss[] }>("/api/schedule", {
       method: "PUT",
       body: JSON.stringify(schedule),
     }),
