@@ -7,7 +7,8 @@
     "dev": "concurrently -k \"vite\" \"tsx watch src/server/index.ts\"",
     "build": "vite build",
     "start": "tsx src/server/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "desktop": "node scripts/install-desktop.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

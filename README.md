@@ -137,7 +137,19 @@ echo "$DISPLAY"          # X11, often :0
 echo "$WAYLAND_DISPLAY"  # Wayland
 ```
 
-`scripts/install-desktop.sh` writes a desktop entry from `scripts/monjtv.desktop`. That template is not in this repository, so the installer cannot succeed from a clean checkout. Use `scripts/start.sh`.
+### Desktop icon
+
+`node scripts/install-desktop.mjs` checks the operating system and installs an icon for this checkout:
+
+| System | What appears |
+| --- | --- |
+| Raspberry Pi OS and other Linux | `monjTV` on the desktop and in the application menu |
+| macOS | `monjTV.app` on the Desktop |
+| Windows | a Desktop shortcut |
+
+Linux and the Pi use the same `.desktop` file. The icon runs `scripts/start.sh` on macOS and Linux, and `scripts/start.ps1` on Windows. Both start the server, open the remote, and start mpv. Run the installer from the graphical session. Run it again after you move the folder. The icon stores this checkout's path and the Node that ran the installer.
+
+`scripts/install-desktop.sh` runs that same installer on macOS and Linux. `npm run desktop` is the same command.
 
 ## First session
 
@@ -217,6 +229,7 @@ Days are `mon` `tue` `wed` `thu` `fri` `sat` `sun`. Times are `HH:mm`.
 | `npm start` | API on port 3000. Serves `dist/client` when that build exists. |
 | `npm run typecheck` | `tsc --noEmit`. |
 | `./scripts/start.sh` | Build if needed, start the server in the background, open the UI, start mpv. |
+| `node scripts/install-desktop.mjs` | Install a desktop icon for this operating system. |
 
 Health check:
 
