@@ -7,6 +7,10 @@ function showsFrame(mode: RundownItem["mode"]): boolean {
   return mode === "random-file" || mode === "specific-file";
 }
 
+function stillSrc(item: RundownItem): string {
+  return `/api/today/items/${encodeURIComponent(item.id)}/still?file=${encodeURIComponent(item.path)}`;
+}
+
 function folderName(filePath: string): string {
   const parts = filePath.split(/[/\\]/).filter(Boolean);
   if (parts.length < 2) return filePath;
@@ -112,10 +116,10 @@ export function Today() {
     scheduled && scheduled.status === "planned" && scheduled.id !== willStart?.id ? scheduled : null;
   const stripItem = current ?? willStart ?? held;
   const stripStill =
-    stripItem && showsFrame(stripItem.mode) && !missed[stripItem.id] ? stripItem : null;
+    stripItem && showsFrame(stripItem.mode) && !missed[stripItem.path] ? stripItem : null;
 
-  function hideStill(id: string) {
-    setMissed((currentMissed) => ({ ...currentMissed, [id]: true }));
+  function hideStill(filePath: string) {
+    setMissed((currentMissed) => ({ ...currentMissed, [filePath]: true }));
   }
   const fraction = current ? progressOf(current, sec) : 0;
   const modeLabel = (mode: RundownItem["mode"]) => {
@@ -139,10 +143,11 @@ export function Today() {
           <div class={`now-strip${stripStill ? " has-still" : ""}`}>
             {stripStill && (
               <img
+                key={stripStill.path}
                 class="still"
-                src={`/api/today/items/${stripStill.id}/still`}
+                src={stillSrc(stripStill)}
                 alt=""
-                onError={() => hideStill(stripStill.id)}
+                onError={() => hideStill(stripStill.path)}
               />
             )}
             <div>
@@ -211,7 +216,7 @@ export function Today() {
           {today.items.length > 0 && (
             <div class="rail">
               {today.items.map((item) => {
-                const cardStill = showsFrame(item.mode) && !missed[item.id];
+                const cardStill = showsFrame(item.mode) && !missed[item.path];
                 const starting = willStart?.id === item.id;
                 const wontStart = held?.id === item.id;
                 return (
@@ -220,10 +225,11 @@ export function Today() {
                   <article class={`card ${item.status}${cardStill ? " has-still" : ""}`}>
                     {cardStill && (
                       <img
+                        key={item.path}
                         class="still"
-                        src={`/api/today/items/${item.id}/still`}
+                        src={stillSrc(item)}
                         alt=""
-                        onError={() => hideStill(item.id)}
+                        onError={() => hideStill(item.path)}
                       />
                     )}
                     <div class="time">

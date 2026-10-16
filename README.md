@@ -267,6 +267,8 @@ A healthy server returns `{"ok":true}`.
 
 `mpv IPC socket did not appear`**.** mpv started and the server could not connect to its socket within 8 seconds. This is usually a missing display: run the server from the desktop session on the machine. `logs/monjtv.log` has the mpv stderr when you used `scripts/start.sh`.
 
+**mpv is a blue screen on the Pi.** The thumbnail is a frame from ffmpeg, so the file itself is readable. `--hwdec=auto` on a Raspberry Pi decodes in hardware and then fails to draw that frame, which leaves the mpv window blue. monjTV starts mpv there with copy-back decoding instead. Quit with **Shut down**, start the server again, and press **Start TV**.
+
 **Browse on Linux asks you to type the path.** None of `zenity`, `kdialog`, `qarma`, or `yad` is installed. The path field takes an absolute path. When one of those programs is already installed, the dialog opens on the server's screen.
 
 **The rail is empty.** Today is built from blocks whose days include today. A Monday-only block does not appear on Thursday. An empty schedule, or a folder with no recognized videos, also leaves the rail empty. Outside every block, a fallback folder still plays in mpv and shows its title in the on-air strip.

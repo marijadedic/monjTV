@@ -675,34 +675,6 @@ export function Admin() {
             </div>
           </div>
           {fieldError.time && <p class="field-error">{t.error(fieldError.time)}</p>}
-          <div class="folder-block">
-            <span class="k">{draft.mode === "specific-file" ? t.video : t.folder}</span>
-            {(draft.mode === "specific-file" ? draft.file : draft.folder) && (
-              <p class="folder-name">
-                {draft.mode === "specific-file" ? fileTitle(draft.file) : folderLabel(draft.folder)}
-              </p>
-            )}
-            <FolderPath
-              key={draft.mode}
-              kind={draft.mode === "specific-file" ? "video" : "folder"}
-              value={draft.mode === "specific-file" ? draft.file : draft.folder}
-              placeholder={draft.mode === "specific-file" ? t.videoPlaceholder : t.folderPlaceholder}
-              invalid={Boolean(fieldError.folder)}
-              actionLabel={picking === "draft" ? t.choosing : t.browse}
-              actionBusy={picking === "draft"}
-              listLabel={draft.mode === "specific-file" ? t.video : t.folder}
-              onChange={(value) => {
-                setDraft(
-                  draft.mode === "specific-file"
-                    ? { ...draft, file: value, folder: parentDir(value) }
-                    : { ...draft, folder: value },
-                );
-                setFieldError((current) => ({ ...current, folder: undefined }));
-              }}
-              onAction={() => void choosePath()}
-            />
-            {fieldError.folder && <p class="field-error">{t.error(fieldError.folder)}</p>}
-          </div>
           <div class="pick-mode">
             <span class="k">{t.playHow}</span>
             <div class="modes" role="radiogroup" aria-label={t.playHow}>
@@ -737,6 +709,34 @@ export function Admin() {
                 <span>{t.oneHint}</span>
               </button>
             </div>
+          </div>
+          <div class="folder-block">
+            <span class="k">{draft.mode === "specific-file" ? t.video : t.folder}</span>
+            {(draft.mode === "specific-file" ? draft.file : draft.folder) && (
+              <p class="folder-name">
+                {draft.mode === "specific-file" ? fileTitle(draft.file) : folderLabel(draft.folder)}
+              </p>
+            )}
+            <FolderPath
+              key={draft.mode}
+              kind={draft.mode === "specific-file" ? "video" : "folder"}
+              value={draft.mode === "specific-file" ? draft.file : draft.folder}
+              placeholder={draft.mode === "specific-file" ? t.videoPlaceholder : t.folderPlaceholder}
+              invalid={Boolean(fieldError.folder)}
+              actionLabel={picking === "draft" ? t.choosing : t.browse}
+              actionBusy={picking === "draft"}
+              listLabel={draft.mode === "specific-file" ? t.video : t.folder}
+              onChange={(value) => {
+                setDraft(
+                  draft.mode === "specific-file"
+                    ? { ...draft, file: value, folder: parentDir(value) }
+                    : { ...draft, folder: value },
+                );
+                setFieldError((current) => ({ ...current, folder: undefined }));
+              }}
+              onAction={() => void choosePath()}
+            />
+            {fieldError.folder && <p class="field-error">{t.error(fieldError.folder)}</p>}
           </div>
           <div class="also">
             <span class="k">{t.alsoOn}</span>

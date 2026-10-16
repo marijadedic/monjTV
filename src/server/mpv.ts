@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { unlink } from "node:fs/promises";
 import net from "node:net";
 import os from "node:os";
@@ -40,6 +41,28 @@ function waitForSocket(sockPath: string, timeoutMs = 8000): Promise<void> {
   });
 }
 
+// Direct hardware decode on the Pi leaves a blue window. Copy the frames back.
+function decodeArgs(): string[] {
+  if (!isRaspberryPi()) return ["--hwdec=auto"];
+  return [
+    "--vo=gpu",
+    "--gpu-api=opengl",
+    "--hwdec=auto-copy",
+    "--vd-lavc-software-fallback=yes",
+  ];
+}
+
+// True when this machine is a Raspberry Pi.
+function isRaspberryPi(): boolean {
+  if (process.platform !== "linux") return false;
+  try {
+    const model = readFileSync("/proc/device-tree/model", "utf8").replaceAll("\0", "");
+    return /raspberry pi/i.test(model);
+  } catch {
+    return false;
+  }
+}
+
 export class Mpv {
   private proc: ChildProcess | null = null;
   private sock: net.Socket | null = null;
@@ -64,13 +87,13 @@ export class Mpv {
       [
         "--idle=yes",
         "--fs",
-        "--hwdec=auto",
         `--input-ipc-server=${this.sockPath}`,
         "--force-window=yes",
         "--keep-open=no",
         "--no-terminal",
+        ...decodeArgs(),
       ],
-      { stdio: ["ignore", "ignore", "pipe"] },
+      { stdio: ["ignore", "ignore", "inherit"] },
     );
     this.proc.once("exit", () => {
       this.cleanup();
