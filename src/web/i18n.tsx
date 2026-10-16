@@ -24,6 +24,10 @@ type Copy = {
   waiting: string;
   nextAt: (time: string) => string;
   nothingOn: string;
+  willStart: string;
+  scheduled: string;
+  willNotStart: string;
+  missedStart: (title: string, end: string) => string;
   progress: string;
   nextEpisode: string;
   random: string;
@@ -89,6 +93,10 @@ const en: Copy = {
   waiting: "Waiting",
   nextAt: (time) => `Next block at ${time}`,
   nothingOn: "Nothing is on right now.",
+  willStart: "Will start",
+  scheduled: "Scheduled",
+  willNotStart: "Will not start",
+  missedStart: (title, end) => `${title} is scheduled until ${end}. It will not start.`,
   progress: "Time through the current show",
   nextEpisode: "Next episode",
   random: "Random",
@@ -223,6 +231,10 @@ const hr: Copy = {
   waiting: "Čeka",
   nextAt: (time) => `Sljedeći blok u ${time}`,
   nothingOn: "Trenutno se ništa ne emitira.",
+  willStart: "Počet će",
+  scheduled: "Na rasporedu",
+  willNotStart: "Neće krenuti",
+  missedStart: (title, end) => `${title} je na rasporedu do ${end}. Neće krenuti.`,
   progress: "Proteklo vrijeme trenutne emisije",
   nextEpisode: "Sljedeća epizoda",
   random: "Nasumično",

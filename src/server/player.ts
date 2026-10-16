@@ -31,11 +31,18 @@ mpv.onExit = () => {
 export async function getStatus(): Promise<PlayerStatus> {
   const today = await loadToday();
   const current = today.items.find((i) => i.status === "playing");
+  let willStartItemId: string | null = null;
+  if (!current && !fallbackPath) {
+    const schedule = await loadSchedule();
+    const blocks = blocksForDay(schedule, weekday());
+    willStartItemId = previewStart(today, blocks, nowSec())?.id ?? null;
+  }
   return {
     running: mpv.running,
     waitingUntil,
     error: lastError,
     currentItemId: current?.id ?? null,
+    willStartItemId,
     fallbackTitle: current || !fallbackPath ? null : titleFromPath(fallbackPath),
   };
 }
@@ -175,7 +182,7 @@ async function playFallback(folder: string): Promise<void> {
   }
 }
 
-// First planned item in the block that still fits the remaining time.
+// Mark earlier planned items that do not fit as skipped, then return the one that does.
 async function firstFitting(
   today: TodayRundown,
   block: ScheduleBlock,
@@ -183,20 +190,42 @@ async function firstFitting(
 ): Promise<RundownItem | null> {
   const remaining = parseHm(block.end) - now;
   let changed = false;
-  let picked: RundownItem | null = null;
   for (const item of today.items) {
-    if (item.blockId !== block.id) continue;
-    if (item.status !== "planned") continue;
+    if (item.blockId !== block.id || item.status !== "planned") continue;
     if (!itemFits(item.durationSec, remaining)) {
       item.status = "skipped";
       changed = true;
       continue;
     }
-    picked = item;
     break;
   }
   if (changed) await saveToday(today);
-  return picked;
+  return nextStartable(today, block, now);
+}
+
+// Same file playNow would start, without marking anything skipped.
+function previewStart(today: TodayRundown, blocks: ScheduleBlock[], now: number): RundownItem | null {
+  const currentBlock = blocks.find((b) => parseHm(b.start) <= now && now < parseHm(b.end));
+  if (!currentBlock) return null;
+  const picked = nextStartable(today, currentBlock, now);
+  if (picked) return picked;
+  const later = blocks.filter((b) => parseHm(b.start) >= parseHm(currentBlock.end));
+  for (const block of later) {
+    const item = nextStartable(today, block, now);
+    if (item) return item;
+  }
+  return null;
+}
+
+// First planned item in the block that still fits the remaining time.
+function nextStartable(today: TodayRundown, block: ScheduleBlock, now: number): RundownItem | null {
+  const remaining = parseHm(block.end) - now;
+  for (const item of today.items) {
+    if (item.blockId !== block.id || item.status !== "planned") continue;
+    if (!itemFits(item.durationSec, remaining)) continue;
+    return item;
+  }
+  return null;
 }
 
 // Load an item in mpv and mark it playing.

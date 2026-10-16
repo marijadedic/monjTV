@@ -45,6 +45,7 @@ export interface PlayerStatus {
   waitingUntil: string | null;
   error: string | null;
   currentItemId: string | null;
+  willStartItemId: string | null;
   fallbackTitle: string | null;
 }
 

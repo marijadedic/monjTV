@@ -28,6 +28,16 @@ function progressOf(item: RundownItem, sec: number): number {
   return Math.min(1, Math.max(0, (sec - start) / (end - start)));
 }
 
+function scheduledNow(items: RundownItem[], sec: number): RundownItem | null {
+  for (const item of items) {
+    const start = hmToSec(item.start);
+    const end = hmToSec(item.end);
+    if (start == null || end == null || end <= start) continue;
+    if (sec >= start && sec < end) return item;
+  }
+  return null;
+}
+
 export function Today() {
   const { t } = useI18n();
   const pill: Record<ItemStatus, string> = {
@@ -88,16 +98,21 @@ export function Today() {
   }
 
   const current = today?.items.find((item) => item.id === status?.currentItemId) ?? null;
-  const idleItem =
-    current || status?.fallbackTitle || status?.waitingUntil ? null : (today?.items[0] ?? null);
-  const stripItem = current ?? idleItem;
+  const sec = nowSec(now);
+  const willStart =
+    !current && status?.willStartItemId
+      ? (today?.items.find((item) => item.id === status.willStartItemId) ?? null)
+      : null;
+  const scheduled = today ? scheduledNow(today.items, sec) : null;
+  const held =
+    scheduled && scheduled.status === "planned" && scheduled.id !== willStart?.id ? scheduled : null;
+  const stripItem = current ?? willStart ?? held;
   const stripStill =
     stripItem && stripItem.mode === "random-file" && !missed[stripItem.id] ? stripItem : null;
 
   function hideStill(id: string) {
     setMissed((currentMissed) => ({ ...currentMissed, [id]: true }));
   }
-  const sec = nowSec(now);
   const fraction = current ? progressOf(current, sec) : 0;
   const modeLabel = (mode: RundownItem["mode"]) =>
     mode === "next-episode" ? t.nextEpisode : t.random;
@@ -152,14 +167,33 @@ export function Today() {
                     {status.waitingUntil ? ` · ${t.nextAt(status.waitingUntil)}` : ""}
                   </div>
                 </>
+              ) : willStart ? (
+                <>
+                  <span class="pill next">{t.willStart}</span>
+                  <h2 class="strip-title">{willStart.title}</h2>
+                  <div class="muted" title={willStart.path}>
+                    {willStart.start}–{willStart.end} · {modeLabel(willStart.mode)} ·{" "}
+                    {folderName(willStart.path)}
+                  </div>
+                  {held && <p class="muted strip-note">{t.missedStart(held.title, held.end)}</p>}
+                </>
               ) : status?.waitingUntil ? (
                 <>
                   <span class="pill">{t.waiting}</span>
                   <h2 class="strip-title">{t.nextAt(status.waitingUntil)}</h2>
                 </>
+              ) : held ? (
+                <>
+                  <span class="pill">{t.scheduled}</span>
+                  <h2 class="strip-title">{held.title}</h2>
+                  <div class="muted" title={held.path}>
+                    {held.start}–{held.end} · {modeLabel(held.mode)} · {folderName(held.path)}
+                  </div>
+                  <p class="muted strip-note">{t.willNotStart}</p>
+                </>
               ) : (
                 <>
-                  <h2 class="strip-title">{today.items[0] ? today.items[0].title : t.today}</h2>
+                  <h2 class="strip-title">{t.today}</h2>
                   <div class="muted">{t.nothingOn}</div>
                 </>
               )}
@@ -172,8 +206,10 @@ export function Today() {
             <div class="rail">
               {today.items.map((item) => {
                 const cardStill = item.mode === "random-file" && !missed[item.id];
+                const starting = willStart?.id === item.id;
+                const wontStart = held?.id === item.id;
                 return (
-                <div key={item.id} class={`rail-item ${item.status}`}>
+                <div key={item.id} class={`rail-item ${item.status}${starting ? " will-start" : ""}`}>
                   <i class="dot" />
                   <article class={`card ${item.status}${cardStill ? " has-still" : ""}`}>
                     {cardStill && (
@@ -193,9 +229,12 @@ export function Today() {
                         {item.status !== "planned" && (
                           <span class={`pill ${item.status}`}>{pill[item.status]}</span>
                         )}
+                        {starting && <span class="pill next">{t.willStart}</span>}
+                        {wontStart && <span class="pill">{t.scheduled}</span>}
                       </div>
                       <div class="muted" title={item.path}>
                         {modeLabel(item.mode)} · {folderName(item.path)}
+                        {wontStart ? ` · ${t.willNotStart}` : ""}
                       </div>
                     </div>
                     <div>
