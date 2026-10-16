@@ -1,18 +1,21 @@
 import { randomUUID } from "node:crypto";
 import { GRACE_SEC, MIN_REMAINING_SEC } from "../shared/constants.ts";
 import type {
+  BlockMode,
   Progress,
   RundownItem,
   Schedule,
   ScheduleBlock,
+  SlotLength,
   SlotMiss,
   TodayRundown,
 } from "../shared/types.ts";
+import { windowOn } from "../shared/window.ts";
 import { dateKey, formatHm, parseHm, weekday } from "./clock.ts";
 import { probeDuration } from "./duration.ts";
-import { isVideoFile, titleFromPath } from "./files.ts";
+import { isDir, isVideoFile, titleFromPath } from "./files.ts";
 import { todayPath } from "./paths.ts";
-import { randomFile, videosIn } from "./picker.ts";
+import { nextEpisode, randomFile, videosIn } from "./picker.ts";
 import { loadProgress } from "./progress.ts";
 import { blocksForDay, loadSchedule } from "./schedule.ts";
 import { readJson, writeJson } from "./store.ts";
@@ -87,8 +90,9 @@ export async function buildRundown(date = dateKey()): Promise<TodayRundown> {
   const items: RundownItem[] = [];
 
   for (const block of blocks) {
-    const cursorStart = parseHm(block.start);
-    const blockEnd = parseHm(block.end);
+    const placed = windowOn(block, day);
+    const cursorStart = parseHm(placed.start);
+    const blockEnd = parseHm(placed.end);
 
     if (block.mode === "specific-file") {
       const file = block.file;
@@ -209,6 +213,54 @@ export function maxPlayableSec(slotSec: number): number {
   return slotSec + GRACE_SEC;
 }
 
+// Length of the file a new slot will play. A random folder uses its longest video.
+export async function slotLength(opts: {
+  mode: BlockMode;
+  folder: string;
+  file?: string;
+}): Promise<SlotLength | null> {
+  if (opts.mode === "specific-file") {
+    const file = opts.file?.trim() ?? "";
+    if (!file || !(await isVideoFile(file))) return null;
+    return {
+      title: titleFromPath(file),
+      path: file,
+      durationSec: await probeDuration(file),
+      kind: "video",
+    };
+  }
+
+  const folder = opts.folder.trim();
+  if (!folder || !(await isDir(folder))) return null;
+  const files = await videosIn(folder);
+  if (files.length === 0) return null;
+
+  if (opts.mode === "next-episode") {
+    const progress = await loadProgress();
+    const file = nextEpisode(files, progress.lastCompleted[folder]);
+    if (!file) return null;
+    return {
+      title: titleFromPath(file),
+      path: file,
+      durationSec: await probeDuration(file),
+      kind: "episode",
+    };
+  }
+
+  let longest: { file: string; durationSec: number } | null = null;
+  for (const file of files) {
+    const durationSec = await probeDuration(file);
+    if (!longest || durationSec > longest.durationSec) longest = { file, durationSec };
+  }
+  if (!longest) return null;
+  return {
+    title: titleFromPath(longest.file),
+    path: longest.file,
+    durationSec: longest.durationSec,
+    kind: "random",
+  };
+}
+
 // Why a saved block cannot start a file, for blocks that were just added or edited.
 export async function missesForBlocks(blocks: ScheduleBlock[]): Promise<SlotMiss[]> {
   const progress = await loadProgress();
@@ -222,7 +274,7 @@ export async function missesForBlocks(blocks: ScheduleBlock[]): Promise<SlotMiss
 
 // The file this block would start, when that file is too long for the slot.
 async function missForBlock(block: ScheduleBlock, progress: Progress): Promise<SlotMiss | null> {
-  const slotSec = parseHm(block.end) - parseHm(block.start);
+  const slotSec = tightestSlotSec(block);
   const limitSec = maxPlayableSec(slotSec);
   if (block.mode === "specific-file") {
     const file = block.file;
@@ -294,12 +346,23 @@ export async function shuffleItem(itemId: string): Promise<TodayRundown> {
 
 // Recalculate start and end times for every item in a block.
 function recomputeBlockTimes(rundown: TodayRundown, block: ScheduleBlock): void {
-  let cursor = parseHm(block.start);
+  let cursor = parseHm(windowOn(block, weekday()).start);
   for (const item of rundown.items.filter((i) => i.blockId === block.id)) {
     item.start = formatHm(cursor);
     item.end = formatHm(cursor + item.durationSec);
     cursor += item.durationSec;
   }
+}
+
+// Shortest window among the block's days, in seconds.
+function tightestSlotSec(block: ScheduleBlock): number {
+  let slotSec = 0;
+  for (const day of block.days) {
+    const placed = windowOn(block, day);
+    const span = parseHm(placed.end) - parseHm(placed.start);
+    if (slotSec === 0 || span < slotSec) slotSec = span;
+  }
+  return slotSec;
 }
 
 // Schedule block with the given id.

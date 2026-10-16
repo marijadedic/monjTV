@@ -33,7 +33,6 @@ export function closeAppTabs(ports: number[]): Promise<void> {
 
 // Ask each running Mac browser to close tabs pointed at this app.
 async function closeMacTabs(ports: number[]): Promise<void> {
-  if (isRunning("firefox")) await closeFirefoxFrontTab();
   const running = MAC_BROWSERS.filter(isRunning);
   const match = ports.map((port) => `u contains ":${port}"`).join(" or ");
   for (const name of running) {
@@ -41,25 +40,51 @@ async function closeMacTabs(ports: number[]): Promise<void> {
   if it is running then
     set windowCount to count of windows
     repeat with wi from windowCount to 1 by -1
-      set tabCount to count of tabs of window wi
-      repeat with i from tabCount to 1 by -1
-        set u to (URL of tab i of window wi)
-        if ${match} then close tab i of window wi
-      end repeat
+      try
+        set tabCount to count of tabs of window wi
+        repeat with i from tabCount to 1 by -1
+          try
+            set u to (URL of tab i of window wi)
+            if ${match} then close tab i of window wi
+          end try
+        end repeat
+      end try
     end repeat
   end if
 end tell`;
     await run("osascript", ["-e", source], 8000);
   }
+  await closeFrontMonjTab();
 }
 
-// Firefox hides its windows from scripting. If the click is in Firefox, close that front tab.
-function closeFirefoxFrontTab(): Promise<void> {
-  const source = `tell application "System Events"
-  if (name of first process whose frontmost is true) is not "firefox" then return
-  keystroke "w" using command down
-end tell`;
-  return run("osascript", ["-e", source], 3000);
+// Close the focused monjTV tab. Firefox has no tab API, and an embedded browser is not a Chrome tab.
+async function closeFrontMonjTab(): Promise<void> {
+  const info = await output(
+    "osascript",
+    [
+      "-e",
+      `tell application "System Events"
+  set frontApp to name of first process whose frontmost is true
+  if (count of windows of process frontApp) is 0 then return ""
+  return frontApp & linefeed & (name of front window of process frontApp)
+end tell`,
+    ],
+    3000,
+  );
+  const [app = "", title = ""] = info.split("\n");
+  if (!focusedMonjTab(app, title)) return;
+  await run("osascript", ["-e", 'tell application "System Events" to keystroke "w" using command down'], 3000);
+}
+
+// True when the focused window is the monjTV page, not an editor tab in this project.
+function focusedMonjTab(app: string, title: string): boolean {
+  const cleaned = title.replace(/^[●•]\s*/, "").trim();
+  if (!cleaned.includes("monjTV")) return false;
+  if (app === "Cursor" || app === "Code") {
+    const parts = cleaned.split(/\s+[—–-]\s+/);
+    return parts.length === 2 && parts[0] === "monjTV" && parts[1] === "monjTV";
+  }
+  return app !== "Terminal" && app !== "iTerm2" && app !== "Warp";
 }
 
 // Close windows whose title is the monjTV page. Linux has no shared tab API.
@@ -112,6 +137,17 @@ function isRunning(name: string): boolean {
 
 function run(file: string, args: string[], timeout: number): Promise<void> {
   return new Promise((resolve) => {
-    execFile(file, args, { timeout }, () => resolve());
+    execFile(file, args, { timeout }, (err, _stdout, stderr) => {
+      if (err) console.error(`close tab: ${err.message} ${stderr ?? ""}`.trim());
+      resolve();
+    });
+  });
+}
+
+function output(file: string, args: string[], timeout: number): Promise<string> {
+  return new Promise((resolve) => {
+    execFile(file, args, { timeout, encoding: "utf8" }, (err, stdout) => {
+      resolve(err ? "" : String(stdout ?? "").trim());
+    });
   });
 }

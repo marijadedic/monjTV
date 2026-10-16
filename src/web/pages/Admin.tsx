@@ -5,8 +5,10 @@ import {
   type Day,
   type Schedule,
   type ScheduleBlock,
+  type SlotLength,
   type SlotMiss,
 } from "../../shared/types.ts";
+import { windowOn } from "../../shared/window.ts";
 import { api } from "../api.ts";
 import { useI18n } from "../i18n.tsx";
 
@@ -25,6 +27,7 @@ type Draft = {
   days: Day[];
   start: string;
   end: string;
+  starts: Partial<Record<Day, string>>;
   folder: string;
   file: string;
   mode: BlockMode;
@@ -219,20 +222,17 @@ function slotKind(block: { folder: string; mode: BlockMode }): string {
   return "";
 }
 
-function formatNow(d = new Date()): string {
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
-
 function piecesFor(day: Day, blocks: ScheduleBlock[]): Piece[] {
   const mine = blocks
     .filter((block) => block.days.includes(day))
     .slice()
-    .sort((a, b) => toMin(a.start) - toMin(b.start));
+    .sort((a, b) => toMin(windowOn(a, day).start) - toMin(windowOn(b, day).start));
   const out: Piece[] = [];
   let cursor = 0;
   for (const block of mine) {
-    const start = toMin(block.start);
-    const end = toMin(block.end);
+    const placed = windowOn(block, day);
+    const start = toMin(placed.start);
+    const end = toMin(placed.end);
     if (start > cursor) out.push({ kind: "gap", start: cursor, end: start });
     if (end > start) out.push({ kind: "slot", block, start, end });
     cursor = Math.max(cursor, end);
@@ -244,11 +244,81 @@ function piecesFor(day: Day, blocks: ScheduleBlock[]): Piece[] {
 function ghostRange(draft: Draft, blocks: ScheduleBlock[]): { start: number; end: number } | null {
   if (!/^\d{2}:\d{2}$/.test(draft.start) || !/^\d{2}:\d{2}$/.test(draft.end)) return null;
   const saved = draft.id ? blocks.find((block) => block.id === draft.id) : undefined;
-  if (saved && saved.start === draft.start && saved.end === draft.end) return null;
+  const savedWindow = saved ? windowOn(saved, draft.origin) : null;
+  if (savedWindow && savedWindow.start === draft.start && savedWindow.end === draft.end) return null;
   const start = Math.max(0, Math.min(toMin(draft.start), DAY_MINUTES));
   const end = Math.max(0, Math.min(toMin(draft.end), DAY_MINUTES));
   if (end <= start) return null;
   return { start, end };
+}
+
+function endFromDuration(start: string, durationSec: number): string {
+  const endMin = toMin(start) + Math.max(1, Math.ceil(durationSec / 60));
+  if (endMin >= DAY_MINUTES) return "23:59";
+  return inputTime(endMin);
+}
+
+function spillsPastDay(start: string, durationSec: number): boolean {
+  return toMin(start) + Math.max(1, Math.ceil(durationSec / 60)) >= DAY_MINUTES;
+}
+
+function measureKey(draft: Draft): string {
+  return draft.mode === "specific-file"
+    ? `video:${draft.file.trim()}`
+    : `${draft.mode}:${draft.folder.trim()}`;
+}
+
+function nextOnDay(
+  day: Day,
+  start: string,
+  blocks: ScheduleBlock[],
+  exceptId: string | null,
+): ScheduleBlock | null {
+  if (!/^\d{2}:\d{2}$/.test(start)) return null;
+  const startMin = toMin(start);
+  let next: ScheduleBlock | null = null;
+  for (const block of blocks) {
+    if (block.id === exceptId) continue;
+    if (!block.days.includes(day)) continue;
+    const placed = windowOn(block, day);
+    if (toMin(placed.start) < startMin) continue;
+    if (!next || toMin(placed.start) < toMin(windowOn(next, day).start)) next = block;
+  }
+  return next;
+}
+
+function startOnDraft(draft: Draft, day: Day): string {
+  if (day === draft.origin) return draft.start;
+  return draft.starts[day] ?? draft.start;
+}
+
+function selectedDays(draft: Draft): Day[] {
+  return [draft.origin, ...DAYS.filter((day) => day !== draft.origin && draft.days.includes(day))];
+}
+
+function dayClashes(
+  draft: Draft,
+  blocks: ScheduleBlock[],
+  durationSec: number,
+): { day: Day; title: string; start: string; end: string }[] {
+  const clashes: { day: Day; title: string; start: string; end: string }[] = [];
+  for (const day of draft.days) {
+    const start = startOnDraft(draft, day);
+    if (!/^\d{2}:\d{2}$/.test(start)) continue;
+    const end = endFromDuration(start, durationSec);
+    const startMin = toMin(start);
+    const endMin = toMin(end);
+    if (endMin <= startMin) continue;
+    for (const block of blocks) {
+      if (block.id === draft.id) continue;
+      if (!block.days.includes(day)) continue;
+      const placed = windowOn(block, day);
+      if (toMin(placed.start) < endMin && toMin(placed.end) > startMin) {
+        clashes.push({ day, title: slotLabel(block), start: placed.start, end });
+      }
+    }
+  }
+  return clashes;
 }
 
 function emptySchedule(): Schedule {
@@ -267,16 +337,16 @@ export function Admin() {
   const [picking, setPicking] = useState<"draft" | "fallback" | null>(null);
   const [intermissionOpen, setIntermissionOpen] = useState(false);
   const [panelToken, setPanelToken] = useState(0);
-  const [clock, setClock] = useState(formatNow);
+  const [measured, setMeasured] = useState<{
+    key: string;
+    length: SlotLength | null;
+    error?: string;
+  } | null>(null);
+  const [measuring, setMeasuring] = useState(false);
   const savedFallback = useRef("");
-  const startRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const intermissionButtonRef = useRef<HTMLButtonElement>(null);
   const intermissionPanelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const id = setInterval(() => setClock(formatNow()), 1000);
-    return () => clearInterval(id);
-  }, []);
 
   useEffect(() => {
     api
@@ -308,8 +378,7 @@ export function Admin() {
 
   useEffect(() => {
     if (!draft) return;
-    startRef.current?.focus();
-    startRef.current?.form?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    formRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
     function onKey(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
       setDraft(null);
@@ -318,6 +387,54 @@ export function Admin() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [panelToken]);
+
+  useEffect(() => {
+    if (!draft) {
+      setMeasured(null);
+      setMeasuring(false);
+      return;
+    }
+    const key = measureKey(draft);
+    const empty = draft.mode === "specific-file" ? !draft.file.trim() : !draft.folder.trim();
+    if (empty) {
+      setMeasured({ key, length: null });
+      setMeasuring(false);
+      return;
+    }
+    let cancel = false;
+    setMeasuring(true);
+    const timer = setTimeout(() => {
+      api
+        .slotLength(draft.mode, draft.folder, draft.file)
+        .then((res) => {
+          if (cancel) return;
+          setMeasured({ key, length: res.length });
+          setMeasuring(false);
+        })
+        .catch((err: unknown) => {
+          if (cancel) return;
+          const message = err instanceof Error ? err.message : String(err);
+          setMeasured({ key, length: null, error: message });
+          setMeasuring(false);
+        });
+    }, 250);
+    return () => {
+      cancel = true;
+      clearTimeout(timer);
+    };
+  }, [draft?.mode, draft?.folder, draft?.file, panelToken]);
+
+  useEffect(() => {
+    setDraft((current) => {
+      if (!current || !measured || measured.key !== measureKey(current)) return current;
+      if (!measured.length) {
+        if (measured.error) return current;
+        return current.end === "" ? current : { ...current, end: "" };
+      }
+      const end = endFromDuration(current.start, measured.length.durationSec);
+      return current.end === end ? current : { ...current, end };
+    });
+  }, [measured, draft?.start]);
 
   function openPanel() {
     setPanelToken((token) => token + 1);
@@ -340,13 +457,13 @@ export function Admin() {
     let start = startMin + Math.round((at - startMin) / 30) * 30;
     start = Math.min(Math.max(start, startMin), endMin);
     if (endMin - start < 30) start = startMin;
-    const end = Math.min(endMin, start + 120);
     setDraft({
       id: null,
       origin: day,
       days: [day],
       start: inputTime(start),
-      end: inputTime(end),
+      end: "",
+      starts: {},
       folder: "",
       file: "",
       mode: "random-file",
@@ -357,24 +474,32 @@ export function Admin() {
   }
 
   function openSlot(block: ScheduleBlock, day: Day) {
+    const placed = windowOn(block, day);
     const others = schedule.blocks
       .filter((item) => item.id !== block.id && item.days.includes(day))
+      .map((item) => windowOn(item, day))
       .sort((a, b) => toMin(a.start) - toMin(b.start));
     let freeEnd = DAY_MINUTES;
     for (const other of others) {
-      if (toMin(other.start) >= toMin(block.end)) freeEnd = Math.min(freeEnd, toMin(other.start));
+      if (toMin(other.start) >= toMin(placed.end)) freeEnd = Math.min(freeEnd, toMin(other.start));
+    }
+    const starts: Partial<Record<Day, string>> = {};
+    for (const item of block.days) {
+      if (item === day) continue;
+      starts[item] = windowOn(block, item).start;
     }
     setDraft({
       id: block.id,
       origin: day,
       days: [...block.days],
-      start: block.start,
-      end: block.end,
+      start: placed.start,
+      end: placed.end,
+      starts,
       folder: block.folder,
       file: block.file ?? "",
       mode: block.mode,
       freeEnd,
-      gapStart: toMin(block.start),
+      gapStart: toMin(placed.start),
     });
     openPanel();
   }
@@ -382,10 +507,16 @@ export function Admin() {
   function toggleDay(day: Day) {
     setDraft((current) => {
       if (!current || day === current.origin) return current;
-      const days = current.days.includes(day)
-        ? current.days.filter((item) => item !== day)
-        : [...current.days, day];
-      return { ...current, days };
+      if (current.days.includes(day)) {
+        const starts = { ...current.starts };
+        delete starts[day];
+        return { ...current, days: current.days.filter((item) => item !== day), starts };
+      }
+      return {
+        ...current,
+        days: [...current.days, day],
+        starts: { ...current.starts, [day]: current.start },
+      };
     });
   }
 
@@ -456,10 +587,30 @@ export function Admin() {
   async function commit() {
     if (!draft) return;
     const next: FieldError = {};
-    if (!/^\d{2}:\d{2}$/.test(draft.start) || !/^\d{2}:\d{2}$/.test(draft.end)) {
+    if (measuring) {
+      next.time = "Still measuring the video.";
+    } else if (!draft.end) {
+      next.time = "Choose a video or folder to set the length.";
+    } else if (!/^\d{2}:\d{2}$/.test(draft.start) || !/^\d{2}:\d{2}$/.test(draft.end)) {
       next.time = "start and end must be HH:mm";
     } else if (toMin(draft.end) <= toMin(draft.start)) {
       next.time = `Block ${draft.start}–${draft.end} must end after it starts (same day)`;
+    } else {
+      for (const day of draft.days) {
+        if (day === draft.origin) continue;
+        const start = draft.starts[day] ?? draft.start;
+        if (!/^\d{2}:\d{2}$/.test(start)) {
+          next.time = "start and end must be HH:mm";
+          break;
+        }
+        const known = measured && measured.key === measureKey(draft) ? measured.length : null;
+        if (!known) continue;
+        const end = endFromDuration(start, known.durationSec);
+        if (toMin(end) <= toMin(start)) {
+          next.time = `Block ${start}–${end} must end after it starts (same day)`;
+          break;
+        }
+      }
     }
     const video = draft.mode === "specific-file";
     if (video) {
@@ -472,11 +623,21 @@ export function Admin() {
       return;
     }
     const file = draft.file.trim();
+    const known = measured && measured.key === measureKey(draft) ? measured.length : null;
+    const slotMin = known ? Math.max(1, Math.ceil(known.durationSec / 60)) : 0;
+    const days = draft.days.includes(draft.origin) ? draft.days : [draft.origin, ...draft.days];
+    const starts: Partial<Record<Day, string>> = {};
+    for (const day of days) {
+      if (day === draft.origin) continue;
+      starts[day] = draft.starts[day] ?? draft.start;
+    }
     const block: ScheduleBlock = {
       id: draft.id ?? crypto.randomUUID(),
-      days: draft.days.includes(draft.origin) ? draft.days : [draft.origin, ...draft.days],
+      days,
       start: draft.start,
       end: draft.end,
+      ...(slotMin > 0 ? { lengthMin: slotMin } : {}),
+      ...(Object.keys(starts).length > 0 ? { starts } : {}),
       folder: video ? parentDir(file) : draft.folder.trim(),
       ...(video ? { file } : {}),
       mode: draft.mode,
@@ -509,7 +670,15 @@ export function Admin() {
   }
 
   const fallbackName = schedule.fallbackFolder ? folderLabel(schedule.fallbackFolder) : "";
-  const lengthMins = draft ? Math.max(0, toMin(draft.end) - toMin(draft.start)) : 0;
+  const matched = draft && measured?.key === measureKey(draft) ? measured : null;
+  const length = matched?.length ?? null;
+  const lengthMins = length ? Math.ceil(length.durationSec / 60) : 0;
+  const pathChosen = draft
+    ? draft.mode === "specific-file"
+      ? Boolean(draft.file.trim())
+      : Boolean(draft.folder.trim())
+    : false;
+  const clashes = draft && length ? dayClashes(draft, schedule.blocks, length.durationSec) : [];
   const ghost = draft ? ghostRange(draft, schedule.blocks) : null;
 
   return (
@@ -601,10 +770,9 @@ export function Admin() {
                       </button>
                     );
                   }
-                  const picked =
-                    draft?.id === piece.block.id &&
-                    draft.start === piece.block.start &&
-                    draft.end === piece.block.end;
+                  const placed = windowOn(piece.block, day);
+                  const draftTime = draft ? startOnDraft(draft, day) : "";
+                  const picked = draft?.id === piece.block.id && draftTime === placed.start;
                   return (
                     <button
                       key={piece.block.id}
@@ -616,7 +784,7 @@ export function Admin() {
                     >
                       <b>{slotLabel(piece.block)}</b>
                       <i>
-                        {piece.block.start}–{piece.block.end} · {t.lengthOf(piece.end - piece.start)}
+                        {clockFace(piece.start)}–{clockFace(piece.end)} · {t.lengthOf(piece.end - piece.start)}
                       </i>
                     </button>
                   );
@@ -642,6 +810,7 @@ export function Admin() {
       {draft && <div class="scrim" />}
       {draft && (
         <form
+          ref={formRef}
           class="add-form"
           onSubmit={(event) => {
             event.preventDefault();
@@ -650,45 +819,8 @@ export function Admin() {
         >
           <header>
             <b>{draft.id ? t.editSlot(t.dayName[draft.origin]) : t.newSlot(t.dayName[draft.origin])}</b>
-            <time class="now" dateTime={clock}>
-              <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
-                <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.4" />
-                <path d="M8 4.5V8.2L10.4 9.6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
-              </svg>
-              {clock}
-            </time>
           </header>
           {fieldError.form && <p class="field-error">{t.error(fieldError.form)}</p>}
-          <div class="add-when">
-            <label>
-              {t.start}
-              <input
-                ref={startRef}
-                type="time"
-                value={draft.start}
-                onInput={(event) => {
-                  setDraft({ ...draft, start: (event.target as HTMLInputElement).value });
-                  setFieldError((current) => ({ ...current, time: undefined }));
-                }}
-              />
-            </label>
-            <label>
-              {t.end}
-              <input
-                type="time"
-                value={draft.end}
-                onInput={(event) => {
-                  setDraft({ ...draft, end: (event.target as HTMLInputElement).value });
-                  setFieldError((current) => ({ ...current, time: undefined }));
-                }}
-              />
-            </label>
-            <div class="len">
-              <span class="k">{t.length}</span>
-              <b>{t.lengthOf(lengthMins)}</b>
-            </div>
-          </div>
-          {fieldError.time && <p class="field-error">{t.error(fieldError.time)}</p>}
           <div class="pick-mode">
             <span class="k">{t.playHow}</span>
             <div class="modes" role="radiogroup" aria-label={t.playHow}>
@@ -725,12 +857,7 @@ export function Admin() {
             </div>
           </div>
           <div class="folder-block">
-            <span class="k">{draft.mode === "specific-file" ? t.video : t.folder}</span>
-            {(draft.mode === "specific-file" ? draft.file : draft.folder) && (
-              <p class="folder-name">
-                {draft.mode === "specific-file" ? fileTitle(draft.file) : folderLabel(draft.folder)}
-              </p>
-            )}
+            <span class="k">{draft.mode === "specific-file" ? t.chooseVideo : t.chooseFolder}</span>
             <FolderPath
               key={draft.mode}
               kind={draft.mode === "specific-file" ? "video" : "folder"}
@@ -751,6 +878,27 @@ export function Admin() {
               onAction={() => void choosePath()}
             />
             {fieldError.folder && <p class="field-error">{t.error(fieldError.folder)}</p>}
+            {!pathChosen || (!measuring && !length) ? (
+              <p class="picked dash">—</p>
+            ) : draft.mode === "random-file" && length ? (
+              <div class="picked">
+                <div>
+                  <span class="k">{t.slotDuration}</span>
+                  <span class="value">{t.slotDurationOf(lengthMins)}</span>
+                </div>
+                <div>
+                  <span class="k">{t.longestVideo}</span>
+                  <span class="value">{length.title}</span>
+                </div>
+              </div>
+            ) : (
+              <div class="picked one">
+                <div>
+                  <span class="k">{t.slotDuration}</span>
+                  <span class="value">{measuring || !length ? t.measuring : t.slotDurationOf(lengthMins)}</span>
+                </div>
+              </div>
+            )}
           </div>
           <div class="also">
             <span class="k">{t.alsoOn}</span>
@@ -769,6 +917,57 @@ export function Admin() {
               ))}
             </div>
           </div>
+          <div class="day-times">
+            {selectedDays(draft).map((day) => {
+              const start = startOnDraft(draft, day);
+              const clash = clashes
+                .filter((item) => item.day === day)
+                .sort((a, b) => toMin(a.start) - toMin(b.start))[0];
+              const spills = Boolean(length && spillsPastDay(start, length.durationSec));
+              const next = nextOnDay(day, start, schedule.blocks, draft.id);
+              const note = clash
+                ? t.runsInto(clash.end, clash.title, clash.start)
+                : spills
+                  ? t.pastMidnight
+                  : next
+                    ? t.nextSlotAt(windowOn(next, day).start, slotLabel(next))
+                    : t.noLaterSlot;
+              const warn = Boolean(clash || spills);
+              return (
+                <div class="day-start" key={day}>
+                  <span class="day-name">{t.day[day]}</span>
+                  <input
+                    class="time"
+                    type="time"
+                    value={start}
+                    aria-label={`${t.dayName[day]} ${t.start}`}
+                    onInput={(event) => {
+                      const value = (event.target as HTMLInputElement).value;
+                      setDraft((current) => {
+                        if (!current) return current;
+                        if (day === current.origin) {
+                          const known =
+                            measured && measured.key === measureKey(current) ? measured.length : null;
+                          const end = known ? endFromDuration(value, known.durationSec) : current.end;
+                          return { ...current, start: value, end };
+                        }
+                        return { ...current, starts: { ...current.starts, [day]: value } };
+                      });
+                      setFieldError((current) => ({ ...current, time: undefined }));
+                    }}
+                  />
+                  <span class={warn ? "note warn" : "note"} role="status">
+                    {note}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          {!measuring && pathChosen && matched && !length && !matched.error && (
+            <p class="field-error">{t.noVideo}</p>
+          )}
+          {matched?.error && <p class="field-error">{t.error(matched.error)}</p>}
+          {fieldError.time && <p class="field-error">{t.error(fieldError.time)}</p>}
           <div class="actions">
             {draft.id && (
               <button type="button" class="quiet" onClick={() => void removeDraft()}>

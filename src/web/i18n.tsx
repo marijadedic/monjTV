@@ -48,6 +48,11 @@ type Copy = {
   hideDays: string;
   length: string;
   lengthOf: (mins: number) => string;
+  chooseFolder: string;
+  chooseVideo: string;
+  slotDuration: string;
+  slotDurationOf: (mins: number) => string;
+  longestVideo: string;
   newSlot: (day: string) => string;
   editSlot: (day: string) => string;
   folder: string;
@@ -82,6 +87,15 @@ type Copy = {
   wontFitVideo: (title: string, length: string, limit: string) => string;
   wontFitEpisode: (title: string, length: string, limit: string) => string;
   wontFitFolder: (title: string, length: string, limit: string) => string;
+  nextSlotAt: (time: string, title: string) => string;
+  noLaterSlot: string;
+  runsInto: (end: string, title: string, start: string) => string;
+  runsIntoOn: (day: string, end: string, title: string, start: string) => string;
+  pastMidnight: string;
+  measuring: string;
+  followsVideo: string;
+  until: (time: string) => string;
+  noVideo: string;
 };
 
 const en: Copy = {
@@ -132,6 +146,17 @@ const en: Copy = {
     if (h) return `${h}h`;
     return `${m}m`;
   },
+  chooseFolder: "Choose folder",
+  chooseVideo: "Choose video",
+  slotDuration: "Slot duration",
+  slotDurationOf: (mins) => {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h && m) return `${h}h ${m}min`;
+    if (h) return `${h}h`;
+    return `${m}min`;
+  },
+  longestVideo: "The longest video",
   newSlot: (day) => `New slot · ${day}`,
   editSlot: (day) => `Edit slot · ${day}`,
   folder: "Folder",
@@ -177,6 +202,17 @@ const en: Copy = {
     `The next episode, ${title}, is ${length}. This slot can play up to ${limit}, so it will not play.`,
   wontFitFolder: (title, length, limit) =>
     `The shortest video, ${title}, is ${length}. This slot can play up to ${limit}, so nothing will play.`,
+  nextSlotAt: (time, title) => `Next slot at ${time} · ${title}`,
+  noLaterSlot: "Nothing else is scheduled after this start.",
+  runsInto: (end, title, start) =>
+    `This runs until ${end} and into ${title}, which starts at ${start}.`,
+  runsIntoOn: (day, end, title, start) =>
+    `${day}: this runs until ${end} and into ${title}, which starts at ${start}.`,
+  pastMidnight: "This runs past the end of the day.",
+  measuring: "Measuring…",
+  followsVideo: "Follows the video",
+  until: (time) => `Until ${time}`,
+  noVideo: "No video found there.",
 };
 
 function runLength(sec: number, hr: boolean): string {
@@ -224,6 +260,9 @@ const hrExact: Record<string, string> = {
     "Odabir datoteke dostupan je samo na macOS-u i Linuxu.",
   "mpv is not installed or not on PATH": "mpv nije instaliran ili nije na PATH-u.",
   "mpv is not running": "mpv nije pokrenut.",
+  "Choose a video or folder to set the length.":
+    "Odaberite video ili mapu da bi termin dobio trajanje.",
+  "Still measuring the video.": "Video se još mjeri.",
 };
 
 function hrError(message: string): string {
@@ -311,6 +350,17 @@ const hr: Copy = {
     if (h) return `${h} h`;
     return `${m} min`;
   },
+  chooseFolder: "Odaberi mapu",
+  chooseVideo: "Odaberi video",
+  slotDuration: "Trajanje termina",
+  slotDurationOf: (mins) => {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h && m) return `${h} h ${m} min`;
+    if (h) return `${h} h`;
+    return `${m} min`;
+  },
+  longestVideo: "Najdulji video",
   newSlot: (day) => `Novi termin · ${day}`,
   editSlot: (day) => `Uredi termin · ${day}`,
   folder: "Mapa",
@@ -356,6 +406,17 @@ const hr: Copy = {
     `Sljedeća epizoda, ${title}, traje ${length}. U ovaj termin stane najviše ${limit}, pa se neće pustiti.`,
   wontFitFolder: (title, length, limit) =>
     `Najkraći video, ${title}, traje ${length}. U ovaj termin stane najviše ${limit}, pa se ništa neće pustiti.`,
+  nextSlotAt: (time, title) => `Sljedeći termin u ${time} · ${title}`,
+  noLaterSlot: "Nakon ovog početka nema drugog termina.",
+  runsInto: (end, title, start) =>
+    `Ovo traje do ${end} i preklapa se s ${title}, koji počinje u ${start}.`,
+  runsIntoOn: (day, end, title, start) =>
+    `${day}: ovo traje do ${end} i preklapa se s ${title}, koji počinje u ${start}.`,
+  pastMidnight: "Ovo prelazi u sljedeći dan.",
+  measuring: "Mjerenje…",
+  followsVideo: "Slijedi video",
+  until: (time) => `Do ${time}`,
+  noVideo: "Tamo nema videa.",
 };
 
 const copy: Record<Lang, Copy> = { en, hr };

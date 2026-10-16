@@ -16,6 +16,7 @@ import {
   missesForBlocks,
   rebuildTodayPreservingPlayback,
   shuffleItem,
+  slotLength,
 } from "./rundown.ts";
 import { assertFolder, changedBlocks, loadSchedule, saveSchedule } from "./schedule.ts";
 import { frameOf } from "./still.ts";
@@ -51,6 +52,23 @@ app.put("/api/schedule", async (c) => {
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
   }
+});
+
+// Length of the video a slot will play. A random folder uses its longest video.
+app.get("/api/slot-length", async (c) => {
+  const mode = c.req.query("mode");
+  if (mode !== "next-episode" && mode !== "random-file" && mode !== "specific-file") {
+    return c.json(
+      { error: "mode must be next-episode, random-file, or specific-file" },
+      400,
+    );
+  }
+  const length = await slotLength({
+    mode,
+    folder: c.req.query("folder") ?? "",
+    file: c.req.query("file") ?? "",
+  });
+  return c.json({ length });
 });
 
 // Return today's rundown, building it if the date changed.
@@ -129,13 +147,16 @@ app.get("/api/player/status", async (c) => {
 });
 
 // Quit mpv, close the browser tab, and exit the process.
-app.post("/api/shutdown", (c) => {
+app.post("/api/shutdown", async (c) => {
   if (!stopping) {
     stopping = true;
     closePorts = portsFrom(c.req.header("origin") ?? c.req.header("referer") ?? "");
+    // Close while this request is still open. A page cannot close its own tab,
+    // and trying to leaves about:blank before a later close can see the URL.
+    await closeAppTabs(closePorts);
     setTimeout(() => {
       void finishShutdown();
-    }, 80);
+    }, 30);
   }
   return c.json({ ok: true });
 });
@@ -170,10 +191,9 @@ async function main(): Promise<void> {
   });
 }
 
-// Close the remote, stop playback, then leave the port free.
+// Stop playback, then leave the port free. The tab is already closed.
 async function finishShutdown(): Promise<void> {
   try {
-    await closeAppTabs(closePorts);
     await shutdownPlayer();
   } finally {
     httpServer?.close();

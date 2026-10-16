@@ -9,6 +9,10 @@ export interface ScheduleBlock {
   days: Day[];
   start: string;
   end: string;
+  /** Slot length in minutes. Other days end this long after their own start. */
+  lengthMin?: number;
+  /** Start time for an extra day. A missing day uses `start`. */
+  starts?: Partial<Record<Day, string>>;
   folder: string;
   file?: string;
   mode: BlockMode;
@@ -47,6 +51,13 @@ export interface SlotMiss {
   title: string;
   durationSec: number;
   limitSec: number;
+}
+
+export interface SlotLength {
+  title: string;
+  path: string;
+  durationSec: number;
+  kind: "video" | "episode" | "random";
 }
 
 export interface PlayerStatus {

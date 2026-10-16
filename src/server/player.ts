@@ -1,10 +1,11 @@
-import type { PlayerStatus, RundownItem, ScheduleBlock, TodayRundown } from "../shared/types.ts";
+import type { Day, PlayerStatus, RundownItem, ScheduleBlock, TodayRundown } from "../shared/types.ts";
 import { formatHm, msUntil, nowSec, parseHm, weekday } from "./clock.ts";
 import { titleFromPath } from "./files.ts";
 import { Mpv } from "./mpv.ts";
 import { pick } from "./picker.ts";
 import { markEpisodeDone, markRandomPlayed } from "./progress.ts";
 import { ensureToday, joinOffset, loadToday, onAirItem, saveToday } from "./rundown.ts";
+import { windowOn } from "../shared/window.ts";
 import { blocksForDay, loadSchedule } from "./schedule.ts";
 
 const mpv = new Mpv();
@@ -148,7 +149,8 @@ async function playNow(): Promise<void> {
   waitingUntil = null;
   const today = await ensureToday();
   const schedule = await loadSchedule();
-  const dayBlocks = blocksForDay(schedule, weekday());
+  const day = weekday();
+  const dayBlocks = blocksForDay(schedule, day);
   const now = nowSec();
   const air = onAirItem(today.items, now);
 
@@ -170,25 +172,29 @@ async function playNow(): Promise<void> {
     }
   }
 
-  const currentBlock = dayBlocks.find((b) => parseHm(b.start) <= now && now < parseHm(b.end));
+  const currentBlock = dayBlocks.find((block) => {
+    const placed = windowOn(block, day);
+    return parseHm(placed.start) <= now && now < parseHm(placed.end);
+  });
   if (currentBlock) {
     await stopIntermission();
     const wake = nextPlannedStart(today, now);
-    const blockEnd = parseHm(currentBlock.end);
-    if (wake != null && wake < blockEnd) {
+    const blockEnd = windowOn(currentBlock, day).end;
+    if (wake != null && wake < parseHm(blockEnd)) {
       armWaitUntil(wake);
       return;
     }
-    armWaitForNext(dayBlocks, currentBlock.end);
+    armWaitForNext(dayBlocks, day, blockEnd);
     return;
   }
 
-  const next = dayBlocks.find((b) => parseHm(b.start) > now);
+  const next = dayBlocks.find((block) => parseHm(windowOn(block, day).start) > now);
   if (next) {
-    waitingUntil = next.start;
+    const start = windowOn(next, day).start;
+    waitingUntil = start;
     waitTimer = setTimeout(() => {
       void playNow();
-    }, msUntil(parseHm(next.start)));
+    }, msUntil(parseHm(start)));
   }
   if (schedule.fallbackFolder) await playFallback(schedule.fallbackFolder);
 }
@@ -274,11 +280,11 @@ function armWaitUntil(atSec: number): void {
 }
 
 // Wake when this block ends. The label names the next block, which still waits for its start.
-function armWaitForNext(blocks: ScheduleBlock[], afterEnd: string): void {
+function armWaitForNext(blocks: ScheduleBlock[], day: Day, afterEnd: string): void {
   const endSec = parseHm(afterEnd);
   if (endSec <= nowSec()) return;
-  const next = blocks.find((block) => parseHm(block.start) >= endSec);
-  waitingUntil = next?.start ?? null;
+  const next = blocks.find((block) => parseHm(windowOn(block, day).start) >= endSec);
+  waitingUntil = next ? windowOn(next, day).start : null;
   waitTimer = setTimeout(() => {
     void playNow();
   }, msUntil(endSec));

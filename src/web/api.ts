@@ -1,7 +1,9 @@
 import type {
+  BlockMode,
   BrowseResult,
   PlayerStatus,
   Schedule,
+  SlotLength,
   SlotMiss,
   TodayRundown,
 } from "../shared/types.ts";
@@ -37,6 +39,10 @@ export const api = {
     ),
   pickFolder: () => req<{ path: string | null }>("/api/browse/pick", { method: "POST" }),
   pickFile: () => req<{ path: string | null }>("/api/browse/pick-file", { method: "POST" }),
+  slotLength: (mode: BlockMode, folder: string, file = "") =>
+    req<{ length: SlotLength | null }>(
+      `/api/slot-length?mode=${encodeURIComponent(mode)}&folder=${encodeURIComponent(folder)}&file=${encodeURIComponent(file)}`,
+    ),
   startPlayer: () => req<PlayerStatus>("/api/player/start", { method: "POST" }),
   status: () => req<PlayerStatus>("/api/player/status"),
   shutdown: () => req<{ ok: true }>("/api/shutdown", { method: "POST" }),

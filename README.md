@@ -173,7 +173,7 @@ Linux and the Pi use the same `.desktop` file. The icon runs `scripts/start.sh` 
 2. Start the app (`npm run dev`, or `npm start`).
 3. Open **Admin**.
 4. Click an empty stretch of a day column. A ghost of that slice stays on the hour, and the form opens over the week.
-5. Set the days, start, end, folder, and mode, then commit the form. **Browse** opens a folder dialog on the machine running the server, which is the machine with the screen. macOS uses the system picker. On Linux, Browse opens `zenity`, `kdialog`, `qarma`, or `yad` when one of those is already installed, on the machine running the server. Otherwise type an absolute path (`/home/you/videos/cartoons`). Existing folders on the server are listed under the field as you type. The folder must already exist. **One video** uses a file dialog instead, and a typed path lists videos. The file must already exist.
+5. Choose how it plays, then browse to a folder or a video, then the other days. The path is labeled Choose folder, or Choose video. Under Browse, the form shows the slot length. An empty path shows a dash. One video uses that file. Next episode uses the next file in the folder (the first file when nothing there has finished). A random folder uses its longest video, and the form names that video. Each selected day has its own start, with that day’s next slot on the same row. An extra day begins at the original day’s time until it is changed. The form warns on that row when this length runs into the next slot. **Browse** opens a folder dialog on the machine running the server, which is the machine with the screen. macOS uses the system picker. On Linux, Browse opens `zenity`, `kdialog`, `qarma`, or `yad` when one of those is already installed, on the machine running the server. Otherwise type an absolute path (`/home/you/videos/cartoons`). Existing folders on the server are listed under the field as you type. The folder must already exist. **One video** uses a file dialog instead, and a typed path lists videos. The file must already exist.
 6. Open **Today** and press **Start TV**. mpv goes fullscreen and joins whatever is on at that minute.
 
 Blocks on the same day cannot overlap, and a block ends the same day it starts (`18:00`–`19:30` is valid; `22:00`–`01:00` is not). Saving the schedule rebuilds today and keeps items that are already playing or finished.
@@ -182,7 +182,7 @@ Blocks on the same day cannot overlap, and a block ends the same day it starts (
 
 ## How a day plays
 
-`schedule.json` is the weekly grid. Each block has days, a start, an end, a folder, and a mode. A `specific-file` block also stores the video path in `file`.
+`schedule.json` is the weekly grid. Each block has days, a start, an end, a folder, and a mode. It may also store the length in minutes and a start time for each extra day. A day without its own start uses the block start, and ends the same length later, still on that day. A `specific-file` block also stores the video path in `file`.
 
 - `next-episode` walks the folder in order and remembers the last file that finished. The next start continues after that file, and wraps to the beginning after the last file.
 - `random-file` picks a file and avoids the recent ones. Shuffle on Today only replaces a `random-file` item that is still `planned`.
@@ -204,7 +204,7 @@ If `ffprobe` is missing or cannot read a file, that file is treated as 45 minute
 
 **Today** (`/`) is a time rail with no page title. The date sits to the right of the clock as `DD.MM.YYYY`. The current show is in the on-air strip and again on the rail. **Start TV** starts mpv if it is not running and joins the show at the current minute. **Shuffle** replaces one planned random-file item. A random-file item and a one-video item show a cached frame from the file.
 
-**Admin** (`/admin`) is a clock of day columns under a quiet Weekly schedule heading. A next-episode block is rose, a random-file block is blue, and a one-video block is clay, or copper in Meadow. Each fades from a light top. A new slot is a click on empty time. The form saves when it is committed. Its title row shows a clock, and the selected mode uses that block’s color.
+**Admin** (`/admin`) is a clock of day columns under a quiet Weekly schedule heading. A next-episode block is rose, a random-file block is blue, and a one-video block is clay, or copper in Meadow. Each fades from a light top. A new slot is a click on empty time. The form saves when it is committed. Mode is first, then browse, then the other days, and a clock at the bottom sets the start. The length follows the video that will play. The selected mode uses that block’s color.
 
 ## Data
 

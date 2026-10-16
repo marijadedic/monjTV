@@ -63,13 +63,13 @@ export function App() {
 
   async function shutDown() {
     if (off) return;
+    setOff(true);
     try {
       await api.shutdown();
     } catch (err) {
-      if (!(err instanceof TypeError)) return;
+      // The tab may already be gone, or the server may already have exited.
+      if (!(err instanceof TypeError)) setOff(false);
     }
-    window.close();
-    setOff(true);
   }
 
   useEffect(() => {

@@ -1079,19 +1079,8 @@ html[data-theme="light"] .week-wrap .scrim {
   font-size: 1.05rem;
 }
 
-.add-form header .now {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  flex: none;
-  font-size: 0.95rem;
-  font-weight: 650;
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-}
-
-.add-form header .now svg {
-  display: block;
+.add-form .fit-warn {
+  margin: 0;
 }
 
 .add-form header p {
@@ -1114,15 +1103,7 @@ html[data-theme="light"] .week-wrap .scrim {
   text-transform: uppercase;
 }
 
-.add-when {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.7fr);
-  gap: 16px;
-  align-items: end;
-}
-
 .add-form label,
-.add-when > div,
 .folder-block,
 .pick-mode,
 .also {
@@ -1131,8 +1112,7 @@ html[data-theme="light"] .week-wrap .scrim {
   gap: 4px;
 }
 
-.add-form label input,
-.add-when b {
+.add-form label input {
   font-size: 0.95rem;
   font-weight: 650;
   letter-spacing: 0;
@@ -1154,13 +1134,72 @@ html[data-theme="light"] .week-wrap .scrim {
   min-height: 34px;
 }
 
-.len b {
+.picked {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.picked.one {
+  grid-template-columns: auto;
+}
+
+.picked.dash {
+  margin: 18px 0 0;
+  color: var(--muted);
+}
+
+.picked div {
   display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.picked .value {
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  overflow-wrap: anywhere;
+}
+
+.day-times {
+  display: grid;
+  gap: 10px;
+}
+
+.day-start {
+  display: grid;
+  grid-template-columns: 2.8rem 9.5rem minmax(0, 1fr);
+  gap: 8px 10px;
   align-items: center;
-  min-height: 34px;
-  padding: 6px 0;
-  border: 0;
-  background: transparent;
+}
+
+.day-name {
+  font-size: 0.95rem;
+  font-weight: 650;
+  text-transform: capitalize;
+}
+
+.day-start input.time {
+  width: 9.5rem;
+}
+
+.day-start .note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  overflow-wrap: anywhere;
+}
+
+.day-start .note.warn {
+  color: var(--warn);
 }
 
 .add-form .field {
@@ -1301,7 +1340,9 @@ html[data-theme="dusk"] .add-form .mode.on.film {
   overflow-wrap: break-word;
 }
 
-html[data-theme="dusk"] .add-form .now,
+html[data-theme="dusk"] .add-form .day-name,
+html[data-theme="dusk"] .add-form .day-start .note,
+html[data-theme="dusk"] .add-form .picked,
 html[data-theme="dusk"] .add-form .k,
 html[data-theme="dusk"] .add-form label,
 html[data-theme="dusk"] .add-form input,
@@ -1337,11 +1378,6 @@ html[data-theme="light"] .add-form .chip.on {
   border: 1px solid var(--primary);
   color: var(--on-primary);
   box-shadow: none;
-}
-
-.len {
-  min-width: 0;
-  text-align: left;
 }
 
 .add-form .actions {
@@ -1439,4 +1475,14 @@ html[data-theme="dusk"] .intermission.on {
 
 .intermission-open .folder-name {
   color: var(--text);
+}
+
+@media (max-width: 640px) {
+  .day-start {
+    grid-template-columns: 2.8rem minmax(0, 1fr);
+  }
+
+  .day-start .note {
+    grid-column: 1 / -1;
+  }
 }
