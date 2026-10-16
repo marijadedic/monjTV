@@ -207,12 +207,12 @@ export async function pickFolder(): Promise<string | null> {
 // Open the system file picker and return the chosen video. Null when canceled.
 export async function pickFile(): Promise<string | null> {
   if (process.platform === "darwin") {
-    const types = [...VIDEO_EXT].map((ext) => `"${ext.slice(1)}"`).join(", ");
+    // Extensions are not AppleScript types. public.movie covers the videos we play.
     return runPicker(
       "osascript",
       [
         "-e",
-        `POSIX path of (choose file with prompt "Choose a video for this block" of type {${types}})`,
+        'POSIX path of (choose file with prompt "Choose a video for this block" of type {"public.movie"})',
       ],
       "video",
     );
