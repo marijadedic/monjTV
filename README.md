@@ -173,7 +173,7 @@ Linux and the Pi use the same `.desktop` file. The icon runs `scripts/start.sh` 
 2. Start the app (`npm run dev`, or `npm start`).
 3. Open **Admin**.
 4. Click an empty stretch of a day column. A ghost of that slice stays on the hour, and the form opens over the week.
-5. Set the days, start, end, folder, and mode, then commit the form. **Browse** opens a folder dialog on the machine running the server, which is the machine with the screen. macOS uses the system picker. On Linux, Browse opens `zenity`, `kdialog`, `qarma`, or `yad` when one of those is already installed, on the machine running the server. Otherwise type an absolute path (`/home/you/videos/cartoons`). Existing folders on the server are listed under the field as you type. The folder must already exist.
+5. Set the days, start, end, folder, and mode, then commit the form. **Browse** opens a folder dialog on the machine running the server, which is the machine with the screen. macOS uses the system picker. On Linux, Browse opens `zenity`, `kdialog`, `qarma`, or `yad` when one of those is already installed, on the machine running the server. Otherwise type an absolute path (`/home/you/videos/cartoons`). Existing folders on the server are listed under the field as you type. The folder must already exist. **One video** uses a file dialog instead, and a typed path lists videos. The file must already exist.
 6. Open **Today** and press **Start TV**. mpv goes fullscreen and loads whatever fits right now.
 
 Blocks on the same day cannot overlap, and a block ends the same day it starts (`18:00`–`19:30` is valid; `22:00`–`01:00` is not). Saving the schedule rebuilds today and keeps items that are already playing or finished.
@@ -182,10 +182,11 @@ Blocks on the same day cannot overlap, and a block ends the same day it starts (
 
 ## How a day plays
 
-`schedule.json` is the weekly grid. Each block has days, a start, an end, a folder, and a mode:
+`schedule.json` is the weekly grid. Each block has days, a start, an end, a folder, and a mode. A `specific-file` block also stores the video path in `file`.
 
 - `next-episode` walks the folder in order and remembers the last file that finished. The next start continues after that file, and wraps to the beginning after the last file.
 - `random-file` picks a file and avoids the recent ones. Shuffle on Today only replaces a `random-file` item that is still `planned`.
+- `specific-file` plays one chosen video, once. Finishing it does not change episode progress. If the video ends before the block ends, the next block waits for its own start time.
 
 `today.json` is that date's rundown: concrete files, planned times, and a status of `planned`, `playing`, `done`, or `skipped`. The UI shows this list. mpv plays one file at a time from it. It is not an mpv playlist.
 
@@ -195,15 +196,15 @@ A file that has already started plays out, even if its block ends. Before a file
 
 Progress updates when a file reaches the end (`eof`). Stopping mpv puts a `playing` item back to `planned`, and puts back to `planned` any item that this start marked `skipped`.
 
-If the clock is outside every block and a fallback folder is set, mpv plays a random file from that folder until the next block. Those plays are not rundown items and do not change episode progress. Set the fallback folder at the bottom of Admin.
+If the clock is outside every block and an intermission folder is set, mpv walks that folder in order, the same way a next-episode block does. A scheduled block cuts that file off when the block starts. An intermission file does not have to finish. Those plays are not rundown items. A file that reaches the end on its own remembers its place in that folder. A file cut off by the next block does not, so the next gap starts it again from the beginning. Set that folder from the Intermission chip above the day columns. The chip is Pauza in Croatian, and nije odabrano when no folder is chosen. The panel says it plays if nothing is scheduled, and that a new slot cuts the file off. Browse opens the same folder dialog as a slot, and a typed path lists folders on the server.
 
 If `ffprobe` is missing or cannot read a file, that file is treated as 45 minutes long, and the rundown times drift. Install FFmpeg if the rails look wrong.
 
 ## Pages
 
-**Today** (`/`) is a time rail. The current show is in the on-air strip and again on the rail. **Start TV** starts mpv if it is not running and plays what fits now. **Shuffle** replaces one planned random-file item.
+**Today** (`/`) is a time rail with no page title. The date sits to the right of the clock as `DD.MM.YYYY`. The current show is in the on-air strip and again on the rail. **Start TV** starts mpv if it is not running and plays what fits now. **Shuffle** replaces one planned random-file item. A random-file item and a one-video item show a cached frame from the file.
 
-**Admin** (`/admin`) is a clock of day columns. A new slot is a click on empty time. The form saves when it is committed.
+**Admin** (`/admin`) is a clock of day columns under a quiet Weekly schedule heading. A next-episode block is rose, a random-file block is blue, and a one-video block is clay, or copper in Meadow. Each fades from a light top. A new slot is a click on empty time. The form saves when it is committed. Its title row shows a clock, and the selected mode uses that block’s color.
 
 ## Data
 

@@ -6,7 +6,7 @@ import path from "node:path";
 import { Hono } from "hono";
 import type { Schedule } from "../shared/types.ts";
 import { PORT } from "../shared/constants.ts";
-import { browse, pickFolder, suggestFolders } from "./files.ts";
+import { assertVideo, browse, pickFile, pickFolder, suggestPaths } from "./files.ts";
 import { clientDir } from "./paths.ts";
 import { getStatus, shutdownPlayer, startPlayer } from "./player.ts";
 import { loadProgress } from "./progress.ts";
@@ -33,7 +33,8 @@ app.put("/api/schedule", async (c) => {
   const body = (await c.req.json()) as Schedule;
   try {
     for (const block of body.blocks ?? []) {
-      await assertFolder(block.folder);
+      if (block.mode === "specific-file") await assertVideo(block.file ?? "");
+      else await assertFolder(block.folder);
     }
     if (body.fallbackFolder?.trim()) await assertFolder(body.fallbackFolder.trim());
     const saved = await saveSchedule(body);
@@ -49,11 +50,11 @@ app.get("/api/today", async (c) => {
   return c.json(await ensureToday());
 });
 
-// Serve one cached frame for a random-file rundown item.
+// Serve one cached frame for a random-file or specific-file rundown item.
 app.get("/api/today/items/:id/still", async (c) => {
   const today = await ensureToday();
   const item = today.items.find((entry) => entry.id === c.req.param("id"));
-  if (!item || item.mode !== "random-file") return c.notFound();
+  if (!item || (item.mode !== "random-file" && item.mode !== "specific-file")) return c.notFound();
   const file = await frameOf(item.path);
   if (!file) return c.notFound();
   const bytes = await readFile(file);
@@ -72,6 +73,15 @@ app.post("/api/today/items/:id/shuffle", async (c) => {
   }
 });
 
+// Open the system video picker and return the chosen file.
+app.post("/api/browse/pick-file", async (c) => {
+  try {
+    return c.json({ path: await pickFile() });
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+  }
+});
+
 // Open the system folder picker and return the chosen path.
 app.post("/api/browse/pick", async (c) => {
   try {
@@ -81,9 +91,10 @@ app.post("/api/browse/pick", async (c) => {
   }
 });
 
-// Child folders that match a path being typed.
+// Child folders, or videos, that match a path being typed.
 app.get("/api/browse/suggest", async (c) => {
-  return c.json({ dirs: await suggestFolders(c.req.query("path") ?? "") });
+  const kind = c.req.query("kind") === "video" ? "video" : "folder";
+  return c.json(await suggestPaths(c.req.query("path") ?? "", kind));
 });
 
 // List folders and videos for the folder picker.

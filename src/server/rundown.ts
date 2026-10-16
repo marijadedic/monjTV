@@ -8,7 +8,7 @@ import type {
 } from "../shared/types.ts";
 import { dateKey, formatHm, parseHm, weekday } from "./clock.ts";
 import { probeDuration } from "./duration.ts";
-import { titleFromPath } from "./files.ts";
+import { isVideoFile, titleFromPath } from "./files.ts";
 import { todayPath } from "./paths.ts";
 import { randomFile, videosIn } from "./picker.ts";
 import { loadProgress } from "./progress.ts";
@@ -85,12 +85,24 @@ export async function buildRundown(date = dateKey()): Promise<TodayRundown> {
   const items: RundownItem[] = [];
 
   for (const block of blocks) {
+    const cursorStart = parseHm(block.start);
+    const blockEnd = parseHm(block.end);
+
+    if (block.mode === "specific-file") {
+      const file = block.file;
+      const remaining = blockEnd - cursorStart;
+      if (!file || remaining < MIN_REMAINING_SEC || !(await isVideoFile(file))) continue;
+      const durationSec = await probeDuration(file);
+      if (durationSec > remaining + GRACE_SEC) continue;
+      items.push(makeItem(block, file, cursorStart, durationSec));
+      continue;
+    }
+
     const files = await videosIn(block.folder);
     if (files.length === 0) continue;
     const used: string[] = [];
     let lastCompleted = progress.lastCompleted[block.folder];
-    let cursor = parseHm(block.start);
-    const blockEnd = parseHm(block.end);
+    let cursor = cursorStart;
 
     while (true) {
       const remaining = blockEnd - cursor;

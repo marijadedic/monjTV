@@ -20,15 +20,27 @@ function readTheme(): Theme {
   return "dark";
 }
 
-function formatClock(d = new Date()): string {
+function formatClock(d: Date): string {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function formatDate(d: Date): string {
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  return `${day}.${month}.${d.getFullYear()}`;
+}
+
+function dateStamp(d: Date): string {
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${month}-${day}`;
 }
 
 export function App() {
   const { lang, setLang, t } = useI18n();
   const admin = location.pathname.startsWith("/admin");
   const [theme, setTheme] = useState<Theme>(readTheme);
-  const [clock, setClock] = useState(formatClock);
+  const [now, setNow] = useState(() => new Date());
   const [off, setOff] = useState(false);
   const prefsRef = useRef<HTMLDetailsElement>(null);
   const themeLabel: Record<Theme, string> = { dark: t.dark, dusk: t.meadow, light: t.light };
@@ -45,7 +57,7 @@ export function App() {
   }, [theme]);
 
   useEffect(() => {
-    const id = setInterval(() => setClock(formatClock()), 1000);
+    const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
 
@@ -80,9 +92,14 @@ export function App() {
           <a class="brand" href="/">
             monjTV
           </a>
-          <time class="clock" dateTime={clock}>
-            {clock}
-          </time>
+          <div class="when">
+            <time class="clock" dateTime={formatClock(now)}>
+              {formatClock(now)}
+            </time>
+            <time class="date" dateTime={dateStamp(now)}>
+              {formatDate(now)}
+            </time>
+          </div>
           <details class="prefs" ref={prefsRef}>
             <summary>{t.options}</summary>
             <div class="prefs-body">

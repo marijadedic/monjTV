@@ -1,5 +1,5 @@
 import type { BlockMode } from "../shared/types.ts";
-import { listVideos } from "./files.ts";
+import { isVideoFile, listVideos } from "./files.ts";
 import { loadProgress } from "./progress.ts";
 
 // Sorted video paths in a folder.
@@ -24,13 +24,18 @@ export function randomFile(files: string[], exclude: string[]): string | null {
   return source[Math.floor(Math.random() * source.length)]!;
 }
 
-// Next episode or a random file, based on the block mode.
+// Next episode, a random file, or the chosen video, based on the block mode.
 export async function pick(opts: {
   folder: string;
   mode: BlockMode;
+  file?: string;
   exclude?: string[];
   lastCompletedOverride?: string;
 }): Promise<string | null> {
+  if (opts.mode === "specific-file") {
+    if (!opts.file || !(await isVideoFile(opts.file))) return null;
+    return opts.file;
+  }
   const files = await videosIn(opts.folder);
   if (opts.mode === "next-episode") {
     const progress = await loadProgress();

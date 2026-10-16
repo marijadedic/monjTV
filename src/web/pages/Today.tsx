@@ -3,6 +3,10 @@ import type { ItemStatus, PlayerStatus, RundownItem, TodayRundown } from "../../
 import { api } from "../api.ts";
 import { useI18n } from "../i18n.tsx";
 
+function showsFrame(mode: RundownItem["mode"]): boolean {
+  return mode === "random-file" || mode === "specific-file";
+}
+
 function folderName(filePath: string): string {
   const parts = filePath.split(/[/\\]/).filter(Boolean);
   if (parts.length < 2) return filePath;
@@ -108,18 +112,20 @@ export function Today() {
     scheduled && scheduled.status === "planned" && scheduled.id !== willStart?.id ? scheduled : null;
   const stripItem = current ?? willStart ?? held;
   const stripStill =
-    stripItem && stripItem.mode === "random-file" && !missed[stripItem.id] ? stripItem : null;
+    stripItem && showsFrame(stripItem.mode) && !missed[stripItem.id] ? stripItem : null;
 
   function hideStill(id: string) {
     setMissed((currentMissed) => ({ ...currentMissed, [id]: true }));
   }
   const fraction = current ? progressOf(current, sec) : 0;
-  const modeLabel = (mode: RundownItem["mode"]) =>
-    mode === "next-episode" ? t.nextEpisode : t.random;
+  const modeLabel = (mode: RundownItem["mode"]) => {
+    if (mode === "next-episode") return t.nextEpisode;
+    if (mode === "specific-file") return t.oneVideo;
+    return t.random;
+  };
 
   return (
     <section class="today">
-      <h1>{t.todayTitle(today?.date ?? "")}</h1>
       {status?.error && <p class="error">{t.error(status.error)}</p>}
       {error && <p class="error">{t.error(error)}</p>}
       {today && today.items.length === 0 && !status?.fallbackTitle && (
@@ -164,7 +170,7 @@ export function Today() {
                   <h2 class="strip-title">{status.fallbackTitle}</h2>
                   <div class="muted">
                     {t.ifEmpty}
-                    {status.waitingUntil ? ` · ${t.nextAt(status.waitingUntil)}` : ""}
+                    {status.waitingUntil ? ` · ${t.nextAt(status.waitingUntil)}` : ""}. {t.intermissionCut}
                   </div>
                 </>
               ) : willStart ? (
@@ -205,7 +211,7 @@ export function Today() {
           {today.items.length > 0 && (
             <div class="rail">
               {today.items.map((item) => {
-                const cardStill = item.mode === "random-file" && !missed[item.id];
+                const cardStill = showsFrame(item.mode) && !missed[item.id];
                 const starting = willStart?.id === item.id;
                 const wontStart = held?.id === item.id;
                 return (

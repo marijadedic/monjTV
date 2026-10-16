@@ -1,7 +1,7 @@
 export const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 export type Day = (typeof DAYS)[number];
 
-export type BlockMode = "next-episode" | "random-file";
+export type BlockMode = "next-episode" | "random-file" | "specific-file";
 export type ItemStatus = "planned" | "playing" | "done" | "skipped";
 
 export interface ScheduleBlock {
@@ -10,6 +10,7 @@ export interface ScheduleBlock {
   start: string;
   end: string;
   folder: string;
+  file?: string;
   mode: BlockMode;
 }
 

@@ -30,9 +30,12 @@ export const api = {
     req<TodayRundown>(`/api/today/items/${id}/shuffle`, { method: "POST" }),
   browse: (path?: string) =>
     req<BrowseResult>(`/api/browse${path ? `?path=${encodeURIComponent(path)}` : ""}`),
-  suggestFolders: (path: string) =>
-    req<{ dirs: BrowseResult["dirs"] }>(`/api/browse/suggest?path=${encodeURIComponent(path)}`),
+  suggestPaths: (path: string, kind: "folder" | "video" = "folder") =>
+    req<{ dirs: BrowseResult["dirs"]; videos: BrowseResult["videos"] }>(
+      `/api/browse/suggest?path=${encodeURIComponent(path)}&kind=${kind}`,
+    ),
   pickFolder: () => req<{ path: string | null }>("/api/browse/pick", { method: "POST" }),
+  pickFile: () => req<{ path: string | null }>("/api/browse/pick-file", { method: "POST" }),
   startPlayer: () => req<PlayerStatus>("/api/player/start", { method: "POST" }),
   status: () => req<PlayerStatus>("/api/player/status"),
   shutdown: () => req<{ ok: true }>("/api/shutdown", { method: "POST" }),

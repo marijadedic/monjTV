@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import path from "node:path";
 import { DAYS, type Day, type Schedule, type ScheduleBlock } from "../shared/types.ts";
 import { parseHm, isHm } from "./clock.ts";
 import { isDir } from "./files.ts";
@@ -68,8 +69,21 @@ function normalizeBlock(raw: ScheduleBlock): ScheduleBlock {
   if (parseHm(raw.end) <= parseHm(raw.start)) {
     throw new Error(`Block ${raw.start}–${raw.end} must end after it starts (same day)`);
   }
-  if (raw.mode !== "next-episode" && raw.mode !== "random-file") {
-    throw new Error("mode must be next-episode or random-file");
+  if (raw.mode !== "next-episode" && raw.mode !== "random-file" && raw.mode !== "specific-file") {
+    throw new Error("mode must be next-episode, random-file, or specific-file");
+  }
+  if (raw.mode === "specific-file") {
+    const file = (raw.file ?? "").trim();
+    if (!file) throw new Error("Each specific-file block needs a video");
+    return {
+      id,
+      days,
+      start: raw.start,
+      end: raw.end,
+      folder: path.dirname(file),
+      file,
+      mode: raw.mode,
+    };
   }
   const folder = (raw.folder ?? "").trim();
   if (!folder) throw new Error("Each block needs a folder");

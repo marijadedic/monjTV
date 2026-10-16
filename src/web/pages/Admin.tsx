@@ -25,6 +25,7 @@ type Draft = {
   start: string;
   end: string;
   folder: string;
+  file: string;
   mode: BlockMode;
   freeEnd: number;
   gapStart: number;
@@ -63,6 +64,25 @@ function folderLabel(folder: string): string {
   return parts[parts.length - 1] || folder;
 }
 
+function parentDir(file: string): string {
+  const trimmed = file.trim().replace(/[\\/]+$/, "");
+  const slash = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
+  if (slash <= 0) return "";
+  return trimmed.slice(0, slash);
+}
+
+function fileTitle(file: string): string {
+  const base = folderLabel(file);
+  const dot = base.lastIndexOf(".");
+  if (dot <= 0) return base;
+  return base.slice(0, dot);
+}
+
+function slotLabel(block: { folder: string; file?: string; mode: BlockMode }): string {
+  if (block.mode === "specific-file" && block.file) return fileTitle(block.file);
+  return folderLabel(block.folder);
+}
+
 type FolderHit = { name: string; path: string };
 
 function FolderPath({
@@ -72,6 +92,7 @@ function FolderPath({
   actionLabel,
   actionBusy,
   listLabel,
+  kind = "folder",
   onChange,
   onAction,
   onBlur,
@@ -82,6 +103,7 @@ function FolderPath({
   actionLabel: string;
   actionBusy: boolean;
   listLabel: string;
+  kind?: "folder" | "video";
   onChange: (value: string) => void;
   onAction: () => void;
   onBlur?: () => void;
@@ -100,10 +122,10 @@ function FolderPath({
     let cancel = false;
     const timer = setTimeout(() => {
       api
-        .suggestFolders(value)
+        .suggestPaths(value, kind)
         .then((next) => {
           if (cancel) return;
-          setDirs(next.dirs);
+          setDirs(kind === "video" ? [...next.videos, ...next.dirs] : next.dirs);
           setActive(-1);
         })
         .catch(() => {
@@ -114,7 +136,7 @@ function FolderPath({
       cancel = true;
       clearTimeout(timer);
     };
-  }, [open, value]);
+  }, [open, value, kind]);
 
   function onKey(event: KeyboardEvent) {
     if (event.key === "Escape" && open && dirs.length > 0) {
@@ -192,7 +214,12 @@ function FolderPath({
 function slotKind(block: { folder: string; mode: BlockMode }): string {
   const name = folderLabel(block.folder).toLowerCase();
   if (name === "shows" || block.mode === "next-episode") return " shows";
+  if (block.mode === "specific-file") return " film";
   return "";
+}
+
+function formatNow(d = new Date()): string {
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 function piecesFor(day: Day, blocks: ScheduleBlock[]): Piece[] {
@@ -236,12 +263,18 @@ export function Admin() {
   const [fieldError, setFieldError] = useState<FieldError>({});
   const [saved, setSaved] = useState(false);
   const [picking, setPicking] = useState<"draft" | "fallback" | null>(null);
-  const [loungeOpen, setLoungeOpen] = useState(false);
+  const [intermissionOpen, setIntermissionOpen] = useState(false);
   const [panelToken, setPanelToken] = useState(0);
+  const [clock, setClock] = useState(formatNow);
   const savedFallback = useRef("");
   const startRef = useRef<HTMLInputElement>(null);
-  const loungeButtonRef = useRef<HTMLButtonElement>(null);
-  const loungePanelRef = useRef<HTMLDivElement>(null);
+  const intermissionButtonRef = useRef<HTMLButtonElement>(null);
+  const intermissionPanelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const id = setInterval(() => setClock(formatNow()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     api
@@ -255,21 +288,21 @@ export function Admin() {
   }, []);
 
   useEffect(() => {
-    if (draft) setLoungeOpen(false);
+    if (draft) setIntermissionOpen(false);
   }, [draft]);
 
   useEffect(() => {
-    if (!loungeOpen) return;
+    if (!intermissionOpen) return;
     function onPointerDown(event: PointerEvent) {
       const target = event.target;
       if (!(target instanceof Node)) return;
-      if (loungeButtonRef.current?.contains(target)) return;
-      if (loungePanelRef.current?.contains(target)) return;
-      setLoungeOpen(false);
+      if (intermissionButtonRef.current?.contains(target)) return;
+      if (intermissionPanelRef.current?.contains(target)) return;
+      setIntermissionOpen(false);
     }
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [loungeOpen]);
+  }, [intermissionOpen]);
 
   useEffect(() => {
     if (!draft) return;
@@ -311,6 +344,7 @@ export function Admin() {
       start: inputTime(start),
       end: inputTime(end),
       folder: "",
+      file: "",
       mode: "random-file",
       freeEnd: endMin,
       gapStart: startMin,
@@ -333,6 +367,7 @@ export function Admin() {
       start: block.start,
       end: block.end,
       folder: block.folder,
+      file: block.file ?? "",
       mode: block.mode,
       freeEnd,
       gapStart: toMin(block.start),
@@ -350,12 +385,38 @@ export function Admin() {
     });
   }
 
-  async function chooseFolder() {
+  function chooseMode(mode: BlockMode) {
+    setDraft((current) => {
+      if (!current || current.mode === mode) return current;
+      if (mode === "specific-file") {
+        const folder = current.folder.trim().replace(/[\\/]+$/, "");
+        const kept = current.file && parentDir(current.file) === folder;
+        return { ...current, mode, file: kept ? current.file : current.folder };
+      }
+      const folder =
+        current.mode === "specific-file" && current.file
+          ? parentDir(current.file) || current.folder
+          : current.folder;
+      return { ...current, mode, folder };
+    });
+    setFieldError((current) => ({ ...current, folder: undefined }));
+  }
+
+  async function choosePath() {
+    const video = draft?.mode === "specific-file";
     setPicking("draft");
     setFieldError((current) => ({ ...current, folder: undefined, form: undefined }));
     try {
-      const picked = await api.pickFolder();
-      if (picked.path) setDraft((current) => (current ? { ...current, folder: picked.path! } : current));
+      const picked = video ? await api.pickFile() : await api.pickFolder();
+      if (!picked.path) return;
+      const chosen = picked.path;
+      setDraft((current) => {
+        if (!current) return current;
+        if (current.mode === "specific-file") {
+          return { ...current, file: chosen, folder: parentDir(chosen) };
+        }
+        return { ...current, folder: chosen };
+      });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       setFieldError((current) => ({ ...current, folder: message }));
@@ -396,17 +457,24 @@ export function Admin() {
     } else if (toMin(draft.end) <= toMin(draft.start)) {
       next.time = `Block ${draft.start}–${draft.end} must end after it starts (same day)`;
     }
-    if (!draft.folder.trim()) next.folder = "Each block needs a folder";
+    const video = draft.mode === "specific-file";
+    if (video) {
+      if (!draft.file.trim()) next.folder = "Each specific-file block needs a video";
+    } else if (!draft.folder.trim()) {
+      next.folder = "Each block needs a folder";
+    }
     if (next.time || next.folder) {
       setFieldError(next);
       return;
     }
+    const file = draft.file.trim();
     const block: ScheduleBlock = {
       id: draft.id ?? crypto.randomUUID(),
       days: draft.days.includes(draft.origin) ? draft.days : [draft.origin, ...draft.days],
       start: draft.start,
       end: draft.end,
-      folder: draft.folder.trim(),
+      folder: video ? parentDir(file) : draft.folder.trim(),
+      ...(video ? { file } : {}),
       mode: draft.mode,
     };
     const blocks = draft.id
@@ -445,26 +513,28 @@ export function Admin() {
         <h1>{t.week}</h1>
         {!draft && (
           <button
-            ref={loungeButtonRef}
+            ref={intermissionButtonRef}
             type="button"
-            class={loungeOpen ? "lounge on" : "lounge"}
-            aria-expanded={loungeOpen}
-            onClick={() => setLoungeOpen((open) => !open)}
+            class={intermissionOpen ? "intermission on" : "intermission"}
+            aria-expanded={intermissionOpen}
+            onClick={() => setIntermissionOpen((open) => !open)}
           >
-            {t.lounge} · <b>{fallbackName || t.none}</b>
-            <i>{loungeOpen ? "▴" : "▾"}</i>
+            {t.intermission} · <b>{fallbackName || t.none}</b>
+            <i>{intermissionOpen ? "▴" : "▾"}</i>
           </button>
         )}
       </div>
       {error && <p class="error">{t.error(error)}</p>}
       <div class={draft ? "week-wrap drafting" : "week-wrap"}>
-      {!draft && loungeOpen && (
-        <div class="lounge-open" ref={loungePanelRef}>
+      {!draft && intermissionOpen && (
+        <div class="intermission-open" ref={intermissionPanelRef}>
           <span>{t.ifEmpty}</span>
+          {fallbackName && <p class="folder-name">{fallbackName}</p>}
           <FolderPath
+            kind="folder"
             value={schedule.fallbackFolder}
             placeholder={t.folderPlaceholder}
-            actionLabel={picking === "fallback" ? t.choosing : t.change}
+            actionLabel={picking === "fallback" ? t.choosing : t.browse}
             actionBusy={picking === "fallback"}
             listLabel={t.folder}
             onChange={(fallbackFolder) => {
@@ -474,6 +544,9 @@ export function Admin() {
             onAction={() => void chooseFallback()}
             onBlur={() => void commitFallback()}
           />
+          <span>
+            {t.nextHint} {t.intermissionCut}
+          </span>
         </div>
       )}
       <div class="week-scale">
@@ -524,10 +597,10 @@ export function Admin() {
                       type="button"
                       class={`slot${slotKind(piece.block)}${picked ? " pick" : ""}`}
                       style={{ height: `${hours * HOUR_PX}px` }}
-                      title={piece.block.folder}
+                      title={piece.block.file ?? piece.block.folder}
                       onClick={() => openSlot(piece.block, day)}
                     >
-                      <b>{folderLabel(piece.block.folder)}</b>
+                      <b>{slotLabel(piece.block)}</b>
                       <i>
                         {piece.block.start}–{piece.block.end} · {t.lengthOf(piece.end - piece.start)}
                       </i>
@@ -563,6 +636,13 @@ export function Admin() {
         >
           <header>
             <b>{draft.id ? t.editSlot(t.dayName[draft.origin]) : t.newSlot(t.dayName[draft.origin])}</b>
+            <time class="now" dateTime={clock}>
+              <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
+                <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.4" />
+                <path d="M8 4.5V8.2L10.4 9.6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+              </svg>
+              {clock}
+            </time>
           </header>
           {fieldError.form && <p class="field-error">{t.error(fieldError.form)}</p>}
           <div class="add-when">
@@ -596,44 +676,67 @@ export function Admin() {
           </div>
           {fieldError.time && <p class="field-error">{t.error(fieldError.time)}</p>}
           <div class="folder-block">
-            <span class="k">{t.folder}</span>
-            {draft.folder && <p class="folder-name">{folderLabel(draft.folder)}</p>}
+            <span class="k">{draft.mode === "specific-file" ? t.video : t.folder}</span>
+            {(draft.mode === "specific-file" ? draft.file : draft.folder) && (
+              <p class="folder-name">
+                {draft.mode === "specific-file" ? fileTitle(draft.file) : folderLabel(draft.folder)}
+              </p>
+            )}
             <FolderPath
-              value={draft.folder}
-              placeholder={t.folderPlaceholder}
+              key={draft.mode}
+              kind={draft.mode === "specific-file" ? "video" : "folder"}
+              value={draft.mode === "specific-file" ? draft.file : draft.folder}
+              placeholder={draft.mode === "specific-file" ? t.videoPlaceholder : t.folderPlaceholder}
               invalid={Boolean(fieldError.folder)}
               actionLabel={picking === "draft" ? t.choosing : t.browse}
               actionBusy={picking === "draft"}
-              listLabel={t.folder}
-              onChange={(folder) => {
-                setDraft({ ...draft, folder });
+              listLabel={draft.mode === "specific-file" ? t.video : t.folder}
+              onChange={(value) => {
+                setDraft(
+                  draft.mode === "specific-file"
+                    ? { ...draft, file: value, folder: parentDir(value) }
+                    : { ...draft, folder: value },
+                );
                 setFieldError((current) => ({ ...current, folder: undefined }));
               }}
-              onAction={() => void chooseFolder()}
+              onAction={() => void choosePath()}
             />
             {fieldError.folder && <p class="field-error">{t.error(fieldError.folder)}</p>}
           </div>
-          <div class="modes" role="radiogroup" aria-label={t.mode}>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={draft.mode === "random-file"}
-              class={draft.mode === "random-file" ? "mode on" : "mode"}
-              onClick={() => setDraft({ ...draft, mode: "random-file" })}
-            >
-              <b>{t.randomFile}</b>
-              <span>{t.randomHint}</span>
-            </button>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={draft.mode === "next-episode"}
-              class={draft.mode === "next-episode" ? "mode on" : "mode"}
-              onClick={() => setDraft({ ...draft, mode: "next-episode" })}
-            >
-              <b>{t.nextEpisode}</b>
-              <span>{t.nextHint}</span>
-            </button>
+          <div class="pick-mode">
+            <span class="k">{t.playHow}</span>
+            <div class="modes" role="radiogroup" aria-label={t.playHow}>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={draft.mode === "random-file"}
+                class={draft.mode === "random-file" ? "mode on movie" : "mode"}
+                onClick={() => chooseMode("random-file")}
+              >
+                <b>{t.randomFile}</b>
+                <span>{t.randomHint}</span>
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={draft.mode === "next-episode"}
+                class={draft.mode === "next-episode" ? "mode on shows" : "mode"}
+                onClick={() => chooseMode("next-episode")}
+              >
+                <b>{t.nextEpisode}</b>
+                <span>{t.nextHint}</span>
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={draft.mode === "specific-file"}
+                class={draft.mode === "specific-file" ? "mode on film" : "mode"}
+                onClick={() => chooseMode("specific-file")}
+              >
+                <b>{t.oneVideo}</b>
+                <span>{t.oneHint}</span>
+              </button>
+            </div>
           </div>
           <div class="also">
             <span class="k">{t.alsoOn}</span>

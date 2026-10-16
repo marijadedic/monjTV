@@ -17,7 +17,6 @@ type Copy = {
   language: string;
   english: string;
   croatian: string;
-  todayTitle: (date: string) => string;
   noBlocks: string;
   addInAdmin: string;
   onAir: string;
@@ -54,9 +53,15 @@ type Copy = {
   folder: string;
   randomHint: string;
   nextHint: string;
+  oneVideo: string;
+  oneHint: string;
+  video: string;
+  videoPlaceholder: string;
   alsoOn: string;
+  playHow: string;
   ifEmpty: string;
-  lounge: string;
+  intermission: string;
+  intermissionCut: string;
   none: string;
   change: string;
   clickFirst: string;
@@ -86,7 +91,6 @@ const en: Copy = {
   language: "Language",
   english: "English",
   croatian: "Croatian",
-  todayTitle: (date) => (date ? `Today · ${date}` : "Today"),
   noBlocks: "No blocks for today.",
   addInAdmin: "Add some in Admin",
   onAir: "On air",
@@ -110,7 +114,7 @@ const en: Copy = {
   options: "Options",
   shutDown: "Shut down",
   off: "monjTV is off",
-  week: "Week",
+  week: "Weekly schedule",
   add: "Add",
   save: "Save",
   cancel: "Cancel",
@@ -127,11 +131,17 @@ const en: Copy = {
   newSlot: (day) => `New slot · ${day}`,
   editSlot: (day) => `Edit slot · ${day}`,
   folder: "Folder",
-  randomHint: "Skips files played recently.",
+  randomHint: "Picks a folder. Skips recently played files.",
   nextHint: "Walks the folder in order.",
-  alsoOn: "Also on",
-  ifEmpty: "If nothing is scheduled",
-  lounge: "Lounge",
+  oneVideo: "One video",
+  oneHint: "Plays a specific file.",
+  video: "Video",
+  videoPlaceholder: "/path/to/video.mp4",
+  alsoOn: "Also play on",
+  playHow: "Choose how it plays",
+  ifEmpty: "Plays if nothing is scheduled",
+  intermission: "Intermission",
+  intermissionCut: "A new slot cuts it off.",
   none: "None",
   change: "Change",
   clickFirst: "Click to add the first slot",
@@ -181,8 +191,13 @@ const hrExact: Record<string, string> = {
   "Invalid block": "Neispravan blok.",
   "Each block needs at least one day": "Svaki blok treba barem jedan dan.",
   "start and end must be HH:mm": "Početak i kraj moraju biti u obliku HH:mm.",
-  "mode must be next-episode or random-file": "Način mora biti sljedeća epizoda ili nasumična datoteka.",
+  "mode must be next-episode, random-file, or specific-file":
+    "Način mora biti sljedeća epizoda, nasumična datoteka ili jedan video.",
+  "Each specific-file block needs a video": "Blok s jednim videom treba odabranu datoteku.",
   "Each block needs a folder": "Svaki blok treba mapu.",
+  "Type the video path.": "Upišite putanju videa.",
+  "The file picker is only available on macOS and Linux.":
+    "Odabir datoteke dostupan je samo na macOS-u i Linuxu.",
   "mpv is not installed or not on PATH": "mpv nije instaliran ili nije na PATH-u.",
   "mpv is not running": "mpv nije pokrenut.",
 };
@@ -196,6 +211,17 @@ function hrError(message: string): string {
 
   match = /^Folder does not exist: (.+)$/.exec(message);
   if (match) return `Mapa ne postoji: ${match[1]}`;
+
+  match = /^Video does not exist: (.+)$/.exec(message);
+  if (match) return `Video ne postoji: ${match[1]}`;
+
+  match = /^Not a video file: (.+)$/.exec(message);
+  if (match) return `Nije video datoteka: ${match[1]}`;
+
+  match = /^Could not open a file picker\. Type the video path\.(?: (.+))?$/.exec(message);
+  if (match) {
+    return `Odabir datoteke nije uspio. Upišite putanju videa.${match[1] ? ` ${match[1]}` : ""}`;
+  }
 
   match = /^Block (.+) must end after it starts \(same day\)$/.exec(message);
   if (match) return `Blok ${match[1]} mora završiti nakon početka (isti dan).`;
@@ -224,7 +250,6 @@ const hr: Copy = {
   language: "Jezik",
   english: "English",
   croatian: "Hrvatski",
-  todayTitle: (date) => (date ? `Danas · ${date}` : "Danas"),
   noBlocks: "Nema blokova za danas.",
   addInAdmin: "Dodaj ih u Adminu",
   onAir: "U eteru",
@@ -248,7 +273,7 @@ const hr: Copy = {
   options: "Opcije",
   shutDown: "Ugasi monjTV",
   off: "monjTV je ugašen",
-  week: "Tjedan",
+  week: "Tjedni raspored",
   add: "Dodaj",
   save: "Spremi",
   cancel: "Odustani",
@@ -265,12 +290,18 @@ const hr: Copy = {
   newSlot: (day) => `Novi termin · ${day}`,
   editSlot: (day) => `Uredi termin · ${day}`,
   folder: "Mapa",
-  randomHint: "Preskače nedavno puštene datoteke.",
+  randomHint: "Bira mapu. Preskače nedavno puštene datoteke.",
   nextHint: "Ide redom kroz mapu.",
-  alsoOn: "Također",
-  ifEmpty: "Ako ništa nije zakazano",
-  lounge: "Predah",
-  none: "Nema",
+  oneVideo: "Jedan video",
+  oneHint: "Pušta određenu datoteku.",
+  video: "Video",
+  videoPlaceholder: "/putanja/do/videa.mp4",
+  alsoOn: "Pusti i na",
+  playHow: "Odaberi kako se pušta",
+  ifEmpty: "Reproducira se ako ništa nije zakazano",
+  intermission: "Pauza",
+  intermissionCut: "Novi termin prekida reprodukciju.",
+  none: "nije odabrano",
   change: "Promijeni",
   clickFirst: "Klikni za prvi termin",
   dayWord: "Dan",
