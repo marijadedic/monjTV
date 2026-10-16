@@ -10,16 +10,23 @@ if ! curl -sf "http://127.0.0.1:${PORT}/api/health" >/dev/null; then
     echo "Run npm install in $ROOT first" >&2
     exit 1
   fi
-  if [ ! -f dist/client/index.html ]; then
-    npm run build
+  if [ -f dist/client/index.html ]; then
+    nohup npm run start:server >> logs/monjtv.log 2>&1 &
+  else
+    nohup npm start >> logs/monjtv.log 2>&1 &
   fi
-  nohup npm start >> logs/monjtv.log 2>&1 &
-  for _ in $(seq 1 40); do
+  ready=0
+  for _ in $(seq 1 240); do
     if curl -sf "http://127.0.0.1:${PORT}/api/health" >/dev/null; then
+      ready=1
       break
     fi
-    sleep 0.25
+    sleep 0.5
   done
+  if [ "$ready" -ne 1 ]; then
+    echo "monjTV did not start. See $ROOT/logs/monjtv.log" >&2
+    exit 1
+  fi
 fi
 
 if command -v xdg-open >/dev/null; then

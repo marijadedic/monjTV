@@ -1,17 +1,21 @@
 # monjTV
 
-monjTV is a weekly TV schedule for a screen you already have. One long-lived [mpv](https://mpv.io/) window is the television. The browser is the remote. **Today** shows what is on, and **Admin** is where you build the week. Playback is an mpv window, so a phone or another computer on the LAN can run the remote while the picture stays on the TV.
+monjTV is a weekly TV schedule. One long-lived [mpv](https://mpv.io/) window is the player. The browser is the remote. **Today** tab shows what is on, and **Admin** is where you build the week. Playback is an mpv window, so a phone or another computer on the LAN can run the remote while the picture stays on the TV.
 
 The server keeps one mpv process idle and swaps the current file when the wall clock says the next one should start.
 
+You have to provide your own local movie library. 😁
+
 ## What you need
 
-| Tool | Why |
-| --- | --- |
-| Node.js `^20.19.0` or `>=22.12.0` | Vite 8 will not start on older Node. `node -v` should print v20.19+ or v22.12+.|
-| mpv on `PATH` | The picture. `mpv --version` should print a version. |
-| ffprobe on `PATH` | Comes with FFmpeg. Used to measure each file when the day's rundown is built. `ffprobe -version` should print a version. |
-| A graphical session | mpv opens a fullscreen window on the machine running the server. A headless SSH session with no display will start the API and then fail to show video. |
+
+| Tool                              | Why                                                                                                                                                     |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Node.js `^20.19.0` or `>=22.12.0` | Vite 8 will not start on older Node. `node -v` should print v20.19+ or v22.12+.                                                                         |
+| mpv on `PATH`                     | The picture. `mpv --version` should print a version.                                                                                                    |
+| ffprobe on `PATH`                 | Comes with FFmpeg. Used to measure each file when the day's rundown is built. `ffprobe -version` should print a version.                                |
+| A graphical session               | mpv opens a fullscreen window on the machine running the server. A headless SSH session with no display will start the API and then fail to show video. |
+
 
 Install the system tools, then clone.
 
@@ -45,7 +49,7 @@ sudo apt install nodejs npm mpv ffmpeg
 
 `node -v` should print v20.19 or newer. That is the Node package in Trixie. Bookworm images include Node 18, which is too old for this app, so use the current Raspberry Pi OS image.
 
-On Linux, **Browse** opens `zenity`, `kdialog`, `qarma`, or `yad` when one of those is already installed. It does not install one. Otherwise type the folder path.
+On Linux, **Browse** opens `zenity`, `kdialog`, `qarma`, or `yad` when one of those is already installed. It does not install one. Otherwise you will have to type the folder path when selecting a movie/show location folder.
 
 Confirm the three binaries before continuing:
 
@@ -55,6 +59,8 @@ mpv --version
 ffprobe -version
 ```
 
+
+
 ## Get the code
 
 ```bash
@@ -62,8 +68,6 @@ git clone https://github.com/marijadedic/monjTV.git
 cd monjTV
 npm install
 ```
-
-`npm install` creates `node_modules`. Nothing else has to be configured. There is no `.env`. The first time the server reads its data it creates `data/` (see [Data](#data)).
 
 Video files stay where they already are on disk. monjTV does not import or copy them. A block points at a folder. The server walks that folder, skips names that start with `.`, and keeps files with these extensions:
 
@@ -92,29 +96,38 @@ The dev server does not start mpv by itself. Use **Start TV** on Today, or:
 curl -X POST http://127.0.0.1:3000/api/player/start
 ```
 
+
+
 ## Run it for the TV
 
-Build the UI once, then start the API. After a build, port 3000 serves `dist/client` and the API. This is the process that should run on the machine.
+`npm start` builds the UI, then starts the API. Port 3000 serves `dist/client` and the API. This is the process that should run on the machine.
 
 ```bash
-npm run build
 npm start
+```
+
+When that build already exists, start the API without building again:
+
+```bash
+npm run start:server
 ```
 
 Open [http://127.0.0.1:3000](http://127.0.0.1:3000). From another device on the same network, open `http://<this-machine-ip>:3000`. Stop the server with Ctrl+C in that terminal. If a fullscreen mpv window is still up, click it and press `q`.
 
-`PORT` changes the listen port (the default is `3000`):
+`PORT` changes the listen port for either command (the default is `3000`):
 
 ```bash
 PORT=3001 npm start
 ```
+
+
 
 ### Launcher script
 
 `scripts/start.sh` is the same production run, in the background:
 
 1. If `http://127.0.0.1:3000/api/health` is already up, it leaves that server alone.
-2. Otherwise it runs `npm run build` when `dist/client/index.html` is missing, then `npm start` under `nohup`. Logs go to `logs/monjtv.log`.
+2. Otherwise it runs `npm run start:server` under `nohup` when `dist/client/index.html` exists, and `npm start` when that file is missing. Logs go to `logs/monjtv.log`.
 3. It opens the UI in the default browser (`open` on macOS, `xdg-open` on Linux).
 4. It posts `/api/player/start`, which starts mpv.
 
@@ -137,15 +150,19 @@ echo "$DISPLAY"          # X11, often :0
 echo "$WAYLAND_DISPLAY"  # Wayland
 ```
 
+
+
 ### Desktop icon
 
 `node scripts/install-desktop.mjs` checks the operating system and installs an icon for this checkout:
 
-| System | What appears |
-| --- | --- |
+
+| System                          | What appears                                        |
+| ------------------------------- | --------------------------------------------------- |
 | Raspberry Pi OS and other Linux | `monjTV` on the desktop and in the application menu |
-| macOS | `monjTV.app` on the Desktop |
-| Windows | a Desktop shortcut |
+| macOS                           | `monjTV.app` on the Desktop                         |
+| Windows                         | a Desktop shortcut                                  |
+
 
 Linux and the Pi use the same `.desktop` file. The icon runs `scripts/start.sh` on macOS and Linux, and `scripts/start.ps1` on Windows. Both start the server, open the remote, and start mpv. Run the installer from the graphical session. Run it again after you move the folder. The icon stores this checkout's path and the Node that ran the installer.
 
@@ -154,7 +171,7 @@ Linux and the Pi use the same `.desktop` file. The icon runs `scripts/start.sh` 
 ## First session
 
 1. Put at least one video in a folder the server can read. That folder has to be on the machine (or a drive mounted there). The path you save is the path the server opens.
-2. Start the app (`npm run dev`, or `npm start` after a build).
+2. Start the app (`npm run dev`, or `npm start`).
 3. Open **Admin**.
 4. Click an empty stretch of a day column. A ghost of that slice stays on the hour, and the form opens over the week.
 5. Set the days, start, end, folder, and mode, then commit the form. **Browse** opens a folder dialog on the machine running the server, which is the machine with the screen. macOS uses the system picker. On Linux, Browse opens `zenity`, `kdialog`, `qarma`, or `yad` when one of those is already installed, on the machine running the server. Otherwise type an absolute path (`/home/you/videos/cartoons`). Existing folders on the server are listed under the field as you type. The folder must already exist.
@@ -193,11 +210,13 @@ If `ffprobe` is missing or cannot read a file, that file is treated as 45 minute
 
 `data/` is local state and is gitignored. A missing or empty file is created from an empty fallback on read. Invalid JSON is left on disk; the process uses the empty fallback in memory.
 
-| File | Contents |
-| --- | --- |
-| `data/schedule.json` | The week: `blocks` and `fallbackFolder`. |
-| `data/today.json` | Today's rundown. Rebuilt when the date changes or the schedule is saved. |
-| `data/progress.json` | `lastCompleted` (last finished path per folder) and `recentRandom`. |
+
+| File                 | Contents                                                                 |
+| -------------------- | ------------------------------------------------------------------------ |
+| `data/schedule.json` | The week: `blocks` and `fallbackFolder`.                                 |
+| `data/today.json`    | Today's rundown. Rebuilt when the date changes or the schedule is saved. |
+| `data/progress.json` | `lastCompleted` (last finished path per folder) and `recentRandom`.      |
+
 
 A schedule with one weekday block looks like this:
 
@@ -221,15 +240,18 @@ Days are `mon` `tue` `wed` `thu` `fri` `sat` `sun`. Times are `HH:mm`.
 
 ## Commands
 
-| Command | What it does |
-| --- | --- |
-| `npm install` | Install JavaScript dependencies. |
-| `npm run dev` | Vite on port 5173 and the API on port 3000, with reload. |
-| `npm run build` | Write the UI to `dist/client`. |
-| `npm start` | API on port 3000. Serves `dist/client` when that build exists. |
-| `npm run typecheck` | `tsc --noEmit`. |
-| `./scripts/start.sh` | Build if needed, start the server in the background, open the UI, start mpv. |
-| `node scripts/install-desktop.mjs` | Install a desktop icon for this operating system. |
+
+| Command                            | What it does                                                                 |
+| ---------------------------------- | ---------------------------------------------------------------------------- |
+| `npm install`                      | Install JavaScript dependencies.                                             |
+| `npm run dev`                      | Vite on port 5173 and the API on port 3000, with reload.                     |
+| `npm run build`                    | Write the UI to `dist/client`. `npm start` does this.                        |
+| `npm start`                        | Build the UI, then serve it and the API on port 3000.                        |
+| `npm run start:server`             | Start the API on port 3000 when `dist/client` already exists.                |
+| `npm run typecheck`                | `tsc --noEmit`.                                                              |
+| `./scripts/start.sh`               | Start the server in the background, open the UI, start mpv.                  |
+| `node scripts/install-desktop.mjs` | Install a desktop icon for this operating system.                            |
+
 
 Health check:
 
@@ -241,14 +263,15 @@ A healthy server returns `{"ok":true}`.
 
 ## When something fails
 
-**`mpv is not installed or not on PATH`.** The Start TV request returns this when `spawn("mpv")` cannot find the binary. Install mpv and open a new terminal so `PATH` includes it. `which mpv` should print a path.
+`mpv is not installed or not on PATH`**.** The Start TV request returns this when `spawn("mpv")` cannot find the binary. Install mpv and open a new terminal so `PATH` includes it. `which mpv` should print a path.
 
-**`mpv IPC socket did not appear`.** mpv started and the server could not connect to its socket within 8 seconds. This is usually a missing display: run the server from the desktop session on the machine. `logs/monjtv.log` has the mpv stderr when you used `scripts/start.sh`.
+`mpv IPC socket did not appear`**.** mpv started and the server could not connect to its socket within 8 seconds. This is usually a missing display: run the server from the desktop session on the machine. `logs/monjtv.log` has the mpv stderr when you used `scripts/start.sh`.
 
 **Browse on Linux asks you to type the path.** None of `zenity`, `kdialog`, `qarma`, or `yad` is installed. The path field takes an absolute path. When one of those programs is already installed, the dialog opens on the server's screen.
 
 **The rail is empty.** Today is built from blocks whose days include today. A Monday-only block does not appear on Thursday. An empty schedule, or a folder with no recognized videos, also leaves the rail empty. Outside every block, a fallback folder still plays in mpv and shows its title in the on-air strip.
 
-**Another computer cannot open the UI.** Use `npm run build` and `npm start`, then `http://<machine-ip>:3000`. Port 5173 is the dev UI on the machine. If the page does not load, allow inbound TCP 3000 on the machine's firewall.
+**Another computer cannot open the UI.** Use `npm start`, then `http://<machine-ip>:3000`. Port 5173 is the dev UI on the machine. If the page does not load, allow inbound TCP 3000 on the machine's firewall.
+
 
 **Durations are all about 45 minutes.** `ffprobe` is missing or could not read the files. Install FFmpeg, delete `data/today.json`, and save the schedule again so the rundown is probed once more.

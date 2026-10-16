@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k \"vite\" \"tsx watch src/server/index.ts\"",
+    "dev": "npm run build && concurrently -k \"vite\" \"tsx watch src/server/index.ts\"",
     "build": "vite build",
-    "start": "tsx src/server/index.ts",
+    "start:server": "tsx src/server/index.ts",
+    "start": "npm run build && npm run start:server",
     "typecheck": "tsc --noEmit",
     "desktop": "node scripts/install-desktop.mjs"
   },

@@ -44,23 +44,24 @@ if (-not (Healthy)) {
   if (-not (Test-Path (Join-Path $Root "node_modules"))) {
     Fail "Run npm install in $Root first."
   }
-  if (-not (Test-Path (Join-Path $Root "dist\client\index.html"))) {
-    & cmd.exe /c "npm run build >> logs\monjtv.log 2>&1"
-    if ($LASTEXITCODE -ne 0) {
-      Fail "npm run build failed. See logs\monjtv.log in the monjTV folder."
-    }
-  }
   $start = New-Object System.Diagnostics.ProcessStartInfo
   $start.FileName = "cmd.exe"
-  $start.Arguments = "/c npm start >> logs\monjtv.log 2>&1"
+  if (Test-Path (Join-Path $Root "dist\client\index.html")) {
+    $start.Arguments = "/c npm run start:server >> logs\monjtv.log 2>&1"
+  } else {
+    $start.Arguments = "/c npm start >> logs\monjtv.log 2>&1"
+  }
   $start.WorkingDirectory = $Root
   $start.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
   $start.CreateNoWindow = $true
   $start.UseShellExecute = $false
   [void][System.Diagnostics.Process]::Start($start)
-  for ($i = 0; $i -lt 40; $i++) {
+  for ($i = 0; $i -lt 240; $i++) {
     if (Healthy) { break }
-    Start-Sleep -Milliseconds 250
+    Start-Sleep -Milliseconds 500
+  }
+  if (-not (Healthy)) {
+    Fail "monjTV did not start. See logs\monjtv.log in the monjTV folder."
   }
 }
 
