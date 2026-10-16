@@ -193,7 +193,7 @@ The wall clock picks the block. Every file starts at `00:00`. Starting the app h
 
 A file that has already started plays out, even if its block ends. Before a file starts, it has to fit in the time left in the block plus 8 minutes. With under 3 minutes left, it does not start. A file that does not fit is marked `skipped`, progress stays where it was, and the server moves on to the next block that does fit.
 
-Progress updates when a file reaches the end (`eof`). Stopping mpv puts a `playing` item back to `planned`.
+Progress updates when a file reaches the end (`eof`). Stopping mpv puts a `playing` item back to `planned`, and puts back to `planned` any item that this start marked `skipped`.
 
 If the clock is outside every block and a fallback folder is set, mpv plays a random file from that folder until the next block. Those plays are not rundown items and do not change episode progress. Set the fallback folder at the bottom of Admin.
 

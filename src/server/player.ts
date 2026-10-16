@@ -15,6 +15,7 @@ let handlingEnd = false;
 let replacing = false;
 let stopping = false;
 let fallbackPath: string | null = null;
+let provisionalSkips: string[] = [];
 
 mpv.onEndFile = (reason) => {
   void onEndFile(reason);
@@ -24,7 +25,7 @@ mpv.onExit = () => {
   waitingUntil = null;
   fallbackPath = null;
   clearWait();
-  void markPlayingAsPlanned();
+  void releaseQuit();
 };
 
 // Current player state for the API.
@@ -72,15 +73,31 @@ export async function shutdownPlayer(): Promise<void> {
   waitingUntil = null;
   fallbackPath = null;
   await mpv.quit();
-  await markPlayingAsPlanned();
+  await releaseQuit();
 }
 
-// Put a playing item back to planned when mpv exits.
-async function markPlayingAsPlanned(): Promise<void> {
+let releasing: Promise<void> | null = null;
+
+// Put this start back to planned. A quit does not skip the file.
+function releaseQuit(): Promise<void> {
+  if (releasing) return releasing;
+  releasing = revertQuit().finally(() => {
+    releasing = null;
+  });
+  return releasing;
+}
+
+// Write the quit back onto today's rundown.
+async function revertQuit(): Promise<void> {
+  fallbackPath = null;
+  clearWait();
+  waitingUntil = null;
+  const undo = new Set(provisionalSkips);
+  provisionalSkips = [];
   const today = await loadToday();
   let changed = false;
   for (const item of today.items) {
-    if (item.status === "playing") {
+    if (item.status === "playing" || (item.status === "skipped" && undo.has(item.id))) {
       item.status = "planned";
       changed = true;
     }
@@ -88,12 +105,23 @@ async function markPlayingAsPlanned(): Promise<void> {
   if (changed) await saveToday(today);
 }
 
-// Mark the finished item done and start the next one.
+// Mark the finished item done and start the next one. Quit leaves it planned.
 async function onEndFile(reason: string): Promise<void> {
+  if (reason === "quit") {
+    if (handlingEnd) return;
+    handlingEnd = true;
+    try {
+      await releaseQuit();
+    } finally {
+      handlingEnd = false;
+    }
+    return;
+  }
   if (replacing || handlingEnd) return;
   if (reason !== "eof") return;
   handlingEnd = true;
   try {
+    provisionalSkips = [];
     const today = await loadToday();
     const current = today.items.find((i) => i.status === "playing");
     if (current) {
@@ -128,7 +156,10 @@ async function playNow(): Promise<void> {
     if (item.status !== "planned") continue;
     const block = dayBlocks.find((b) => b.id === item.blockId);
     if (!block) continue;
-    if (now >= parseHm(block.end)) item.status = "skipped";
+    if (now >= parseHm(block.end)) {
+      item.status = "skipped";
+      provisionalSkips.push(item.id);
+    }
   }
   await saveToday(today);
 
@@ -194,6 +225,7 @@ async function firstFitting(
     if (item.blockId !== block.id || item.status !== "planned") continue;
     if (!itemFits(item.durationSec, remaining)) {
       item.status = "skipped";
+      provisionalSkips.push(item.id);
       changed = true;
       continue;
     }
@@ -241,11 +273,17 @@ async function playItem(item: RundownItem): Promise<void> {
     await mpv.loadFile(item.path);
   } catch (err) {
     lastError = err instanceof Error ? err.message : String(err);
+    replacing = false;
+    if (stopping || !mpv.running) {
+      await releaseQuit();
+      return;
+    }
     const again = await loadToday();
     const row = again.items.find((i) => i.id === item.id);
-    if (row) row.status = "skipped";
-    await saveToday(again);
-    replacing = false;
+    if (row && row.status === "playing") {
+      row.status = "skipped";
+      await saveToday(again);
+    }
     await playNow();
     return;
   }
