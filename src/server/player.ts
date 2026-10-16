@@ -13,12 +13,14 @@ let waitTimer: ReturnType<typeof setTimeout> | null = null;
 let lastError: string | null = null;
 let handlingEnd = false;
 let replacing = false;
+let stopping = false;
 let fallbackPath: string | null = null;
 
 mpv.onEndFile = (reason) => {
   void onEndFile(reason);
 };
 mpv.onExit = () => {
+  if (stopping) return;
   waitingUntil = null;
   fallbackPath = null;
   clearWait();
@@ -53,6 +55,17 @@ export async function startPlayer(): Promise<PlayerStatus> {
   }
   await playNow();
   return getStatus();
+}
+
+// Quit mpv and exit playback so the process can stop.
+export async function shutdownPlayer(): Promise<void> {
+  stopping = true;
+  replacing = true;
+  clearWait();
+  waitingUntil = null;
+  fallbackPath = null;
+  await mpv.quit();
+  await markPlayingAsPlanned();
 }
 
 // Put a playing item back to planned when mpv exits.

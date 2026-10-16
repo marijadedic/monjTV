@@ -18,8 +18,8 @@ const CREAM = [243, 234, 212];
 const INK = [18, 20, 26];
 const GOLD = [212, 162, 74];
 
-// Paint a meadow TV mark. The same picture is the Linux PNG, the Mac icon, and the Windows icon.
-export function renderIconPng(size) {
+// Paint a meadow TV mark. fullBleed fills the icon slot so the desktop shape stays solid.
+export function renderIconPng(size, { fullBleed = false } = {}) {
   const stride = size * 4 + 1;
   const raw = Buffer.alloc(stride * size);
   const put = (x, y, rgb, cover) => {
@@ -35,7 +35,9 @@ export function renderIconPng(size) {
     raw[i + 3] = Math.round(outA * 255);
   };
   const s = size;
-  const body = { x: s * 0.08, y: s * 0.08, w: s * 0.84, h: s * 0.84, r: s * 0.2 };
+  const body = fullBleed
+    ? { x: 0, y: 0, w: s, h: s, r: s * 0.225 }
+    : { x: s * 0.08, y: s * 0.08, w: s * 0.84, h: s * 0.84, r: s * 0.2 };
   const bezel = { x: s * 0.18, y: s * 0.16, w: s * 0.64, h: s * 0.5, r: s * 0.07 };
   const screen = { x: s * 0.22, y: s * 0.2, w: s * 0.56, h: s * 0.42, r: s * 0.05 };
   const bar = { x: s * 0.3, y: s * 0.48, w: s * 0.4, h: Math.max(2, s * 0.035), r: s * 0.02 };
@@ -119,7 +121,25 @@ export function installDarwin(masterPng, desktopDir = path.join(os.homedir(), "D
   } catch {
     // A local bundle can launch without an ad-hoc signature.
   }
+  const icnsPath = path.join(resources, "monjtv.icns");
+  if (existsSync(icnsPath)) stampFinderIcon(appPath, icnsPath);
   return appPath;
+}
+
+// Finder shows a plain icon for a script bundle unless the picture is stamped on the file.
+function stampFinderIcon(appPath, icnsPath) {
+  const source = `ObjC.import("AppKit");
+const image = $.NSImage.alloc.initWithContentsOfFile(${JSON.stringify(icnsPath)});
+if (!image) throw new Error("icon");
+const ok = $.NSWorkspace.sharedWorkspace.setIconForFileOptions(image, ${JSON.stringify(appPath)}, 0);
+if (!ok) throw new Error("setIcon");
+`;
+  try {
+    execFileSync("osascript", ["-l", "JavaScript", "-e", source], { stdio: "pipe" });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message.split("\n")[0] : "";
+    console.error(`Finder kept the plain icon.${detail ? ` ${detail}` : ""}`);
+  }
 }
 
 // Windows gets a shortcut whose icon is stored beside the launcher script it runs.
@@ -206,7 +226,7 @@ function main() {
     return;
   }
   if (process.platform === "darwin") {
-    const appPath = installDarwin(renderIconPng(1024));
+    const appPath = installDarwin(renderIconPng(1024, { fullBleed: true }));
     console.log(`macOS: installed ${appPath}`);
     return;
   }
@@ -291,8 +311,36 @@ StartupNotify=false
 function macLauncher() {
   const prefix = unixPathDirs().map(shSingle).join(":");
   return `#!/bin/bash
-export PATH=${prefix}:$PATH
-exec /bin/bash ${shSingle(startSh)}
+# This app cannot read a checkout on the Desktop. Terminal can.
+cmd=/tmp/monjtv-run.command
+cat > "$cmd" << 'EOF'
+#!/bin/bash
+export PATH=${prefix}:\$PATH
+/bin/bash ${shSingle(startSh)}
+tty_name=\$(tty)
+osascript - "\$tty_name" << 'APPLESCRIPT'
+on run argv
+  set browserName to ""
+  tell application "System Events"
+    try
+      set browserName to name of first application process whose frontmost is true
+    end try
+  end tell
+  tell application "Terminal"
+    repeat with w in windows
+      try
+        if (tty of tab 1 of w) is (item 1 of argv) then close w
+      end try
+    end repeat
+  end tell
+  if browserName is not "" and browserName is not "Terminal" then
+    tell application browserName to activate
+  end if
+end run
+APPLESCRIPT
+EOF
+chmod +x "$cmd"
+/usr/bin/open "$cmd"
 `;
 }
 

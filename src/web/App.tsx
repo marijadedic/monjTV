@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "preact/hooks";
+import { api } from "./api.ts";
 import { GroveFrame } from "./Grove.tsx";
 import { Today } from "./pages/Today.tsx";
 import { Admin } from "./pages/Admin.tsx";
@@ -28,6 +29,7 @@ export function App() {
   const admin = location.pathname.startsWith("/admin");
   const [theme, setTheme] = useState<Theme>(readTheme);
   const [clock, setClock] = useState(formatClock);
+  const [off, setOff] = useState(false);
   const prefsRef = useRef<HTMLDetailsElement>(null);
   const themeLabel: Record<Theme, string> = { dark: t.dark, dusk: t.meadow, light: t.light };
   const langLabel: Record<Lang, string> = { en: "EN", hr: "HR" };
@@ -46,6 +48,17 @@ export function App() {
     const id = setInterval(() => setClock(formatClock()), 1000);
     return () => clearInterval(id);
   }, []);
+
+  async function shutDown() {
+    if (off) return;
+    try {
+      await api.shutdown();
+    } catch (err) {
+      if (!(err instanceof TypeError)) return;
+    }
+    window.close();
+    setOff(true);
+  }
 
   useEffect(() => {
     function onPointerDown(event: PointerEvent) {
@@ -106,6 +119,9 @@ export function App() {
                   </button>
                 ))}
               </div>
+              <button type="button" class="prefs-quit" disabled={off} onClick={() => void shutDown()}>
+                {t.shutDown}
+              </button>
             </div>
           </details>
         </header>
@@ -117,7 +133,7 @@ export function App() {
             {t.admin}
           </a>
         </nav>
-        <main>{admin ? <Admin /> : <Today />}</main>
+        <main>{off ? <p class="empty">{t.off}</p> : admin ? <Admin /> : <Today />}</main>
       </div>
     </>
   );

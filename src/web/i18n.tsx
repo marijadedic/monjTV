@@ -35,6 +35,8 @@ type Copy = {
   playNow: string;
   startTv: string;
   options: string;
+  shutDown: string;
+  off: string;
   week: string;
   add: string;
   save: string;
@@ -98,6 +100,8 @@ const en: Copy = {
   playNow: "Play now",
   startTv: "Start TV",
   options: "Options",
+  shutDown: "Shut down",
+  off: "monjTV is off",
   week: "Week",
   add: "Add",
   save: "Save",
@@ -230,6 +234,8 @@ const hr: Copy = {
   playNow: "Pusti sada",
   startTv: "Pokreni TV",
   options: "Opcije",
+  shutDown: "Ugasi",
+  off: "monjTV je ugašen",
   week: "Tjedan",
   add: "Dodaj",
   save: "Spremi",

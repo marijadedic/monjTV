@@ -35,4 +35,5 @@ export const api = {
   pickFolder: () => req<{ path: string | null }>("/api/browse/pick", { method: "POST" }),
   startPlayer: () => req<PlayerStatus>("/api/player/start", { method: "POST" }),
   status: () => req<PlayerStatus>("/api/player/status"),
+  shutdown: () => req<{ ok: true }>("/api/shutdown", { method: "POST" }),
 };

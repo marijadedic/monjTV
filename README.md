@@ -112,7 +112,7 @@ When that build already exists, start the API without building again:
 npm run start:server
 ```
 
-Open [http://127.0.0.1:3000](http://127.0.0.1:3000). From another device on the same network, open `http://<this-machine-ip>:3000`. Stop the server with Ctrl+C in that terminal. If a fullscreen mpv window is still up, click it and press `q`.
+Open [http://127.0.0.1:3000](http://127.0.0.1:3000). From another device on the same network, open `http://<this-machine-ip>:3000`. **Shut down** in Options quits mpv, closes the monjTV browser tab on this machine, and exits the server. In a terminal session, Ctrl+C stops it too.
 
 `PORT` changes the listen port for either command (the default is `3000`):
 
@@ -127,16 +127,15 @@ PORT=3001 npm start
 `scripts/start.sh` is the same production run, in the background:
 
 1. If `http://127.0.0.1:3000/api/health` is already up, it leaves that server alone.
-2. Otherwise it runs `npm run start:server` under `nohup` when `dist/client/index.html` exists, and `npm start` when that file is missing. Logs go to `logs/monjtv.log`.
-3. It opens the UI in the default browser (`open` on macOS, `xdg-open` on Linux).
-4. It posts `/api/player/start`, which starts mpv.
+2. Otherwise it runs `npm run start:server` when `dist/client/index.html` exists, and `npm start` when that file is missing. The server is detached, so the launcher can exit. Logs go to `logs/monjtv.log`.
+3. It opens the UI in the default browser (`open` on macOS, `xdg-open` on Linux) and leaves that window in front. Closing that tab leaves the server running. Click the icon again and the remote opens. mpv starts from **Start TV** on Today.
 
 ```bash
 chmod +x scripts/start.sh
 ./scripts/start.sh
 ```
 
-`logs/` is gitignored. To stop a server started this way:
+`logs/` is gitignored. **Shut down** in Options stops a server started this way. If the page is already closed:
 
 ```bash
 lsof -nP -iTCP:3000 -sTCP:LISTEN
@@ -164,7 +163,7 @@ echo "$WAYLAND_DISPLAY"  # Wayland
 | Windows                         | a Desktop shortcut                                  |
 
 
-Linux and the Pi use the same `.desktop` file. The icon runs `scripts/start.sh` on macOS and Linux, and `scripts/start.ps1` on Windows. Both start the server, open the remote, and start mpv. Run the installer from the graphical session. Run it again after you move the folder. The icon stores this checkout's path and the Node that ran the installer.
+Linux and the Pi use the same `.desktop` file. The icon runs `scripts/start.sh` on macOS and Linux, and `scripts/start.ps1` on Windows. Both start the server and open the remote. On macOS the icon asks Terminal to do that, because a Desktop app cannot read the project folder. Run the installer from the graphical session. Run it again after you move the folder. The icon stores this checkout's path and the Node that ran the installer.
 
 `scripts/install-desktop.sh` runs that same installer on macOS and Linux. `npm run desktop` is the same command.
 
@@ -179,7 +178,7 @@ Linux and the Pi use the same `.desktop` file. The icon runs `scripts/start.sh` 
 
 Blocks on the same day cannot overlap, and a block ends the same day it starts (`18:00`–`19:30` is valid; `22:00`–`01:00` is not). Saving the schedule rebuilds today and keeps items that are already playing or finished.
 
-**Options** in the header holds language (English or Croatian) and theme (Dark, Meadow, Light). Those stay in the browser.
+**Options** in the header holds language (English or Croatian), theme (Dark, Meadow, Light), and **Shut down**. Language and theme stay in the browser. **Shut down** quits mpv, closes the monjTV browser tab on this machine, and exits the server.
 
 ## How a day plays
 
@@ -249,7 +248,7 @@ Days are `mon` `tue` `wed` `thu` `fri` `sat` `sun`. Times are `HH:mm`.
 | `npm start`                        | Build the UI, then serve it and the API on port 3000.                        |
 | `npm run start:server`             | Start the API on port 3000 when `dist/client` already exists.                |
 | `npm run typecheck`                | `tsc --noEmit`.                                                              |
-| `./scripts/start.sh`               | Start the server in the background, open the UI, start mpv.                  |
+| `./scripts/start.sh`               | Start the server in the background and open the UI.                          |
 | `node scripts/install-desktop.mjs` | Install a desktop icon for this operating system.                            |
 
 

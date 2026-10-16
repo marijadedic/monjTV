@@ -66,12 +66,3 @@ if (-not (Healthy)) {
 }
 
 Start-Process "http://127.0.0.1:${Port}/"
-if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
-  & curl.exe -sf -X POST "http://127.0.0.1:${Port}/api/player/start" *> $null
-} else {
-  try {
-    Invoke-WebRequest -UseBasicParsing -Method POST "http://127.0.0.1:$Port/api/player/start" -TimeoutSec 5 | Out-Null
-  } catch {
-    # The remote is open either way. Start TV on Today starts mpv when this post missed.
-  }
-}

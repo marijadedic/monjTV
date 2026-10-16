@@ -8,13 +8,17 @@ import type { Schedule } from "../shared/types.ts";
 import { PORT } from "../shared/constants.ts";
 import { browse, pickFolder, suggestFolders } from "./files.ts";
 import { clientDir } from "./paths.ts";
-import { getStatus, startPlayer } from "./player.ts";
+import { getStatus, shutdownPlayer, startPlayer } from "./player.ts";
 import { loadProgress } from "./progress.ts";
 import { ensureToday, loadToday, rebuildTodayPreservingPlayback, shuffleItem } from "./rundown.ts";
 import { assertFolder, loadSchedule, saveSchedule } from "./schedule.ts";
 import { frameOf, isMoviesFile } from "./still.ts";
+import { closeAppTabs, portsFrom } from "./tabs.ts";
 
 const app = new Hono();
+let httpServer: { close: () => void } | undefined;
+let stopping = false;
+let closePorts = [PORT];
 
 // Liveness check.
 app.get("/api/health", (c) => c.json({ ok: true }));
@@ -105,6 +109,18 @@ app.get("/api/player/status", async (c) => {
   return c.json(await getStatus());
 });
 
+// Quit mpv, close the browser tab, and exit the process.
+app.post("/api/shutdown", (c) => {
+  if (!stopping) {
+    stopping = true;
+    closePorts = portsFrom(c.req.header("origin") ?? c.req.header("referer") ?? "");
+    setTimeout(() => {
+      void finishShutdown();
+    }, 80);
+  }
+  return c.json({ ok: true });
+});
+
 const clientIndex = path.join(clientDir, "index.html");
 if (existsSync(clientIndex)) {
   app.use(
@@ -127,12 +143,23 @@ async function main(): Promise<void> {
   const today = await loadToday();
   if (!today.date) await ensureToday();
 
-  serve({ fetch: app.fetch, port: PORT, hostname: "0.0.0.0" }, (info) => {
+  httpServer = serve({ fetch: app.fetch, port: PORT, hostname: "0.0.0.0" }, (info) => {
     console.log(`monjTV on http://0.0.0.0:${info.port}`);
     if (!existsSync(clientIndex)) {
       console.log("UI dev server: http://127.0.0.1:5173 (npm run dev)");
     }
   });
+}
+
+// Close the remote, stop playback, then leave the port free.
+async function finishShutdown(): Promise<void> {
+  try {
+    await closeAppTabs(closePorts);
+    await shutdownPlayer();
+  } finally {
+    httpServer?.close();
+    process.exit(0);
+  }
 }
 
 void main();

@@ -572,6 +572,22 @@ html[data-theme="dusk"] .prefs .themes button.on {
   color: #fff;
 }
 
+.prefs-quit {
+  width: 100%;
+  margin-top: 2px;
+  font: 0.92rem/1.45 system-ui, sans-serif;
+  text-align: center;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+}
+
+.prefs-quit:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--line) 45%, transparent);
+}
+
 .prefs[open] .prefs-body {
   display: flex;
 }
