@@ -1,4 +1,4 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { GroveFrame } from "./Grove.tsx";
 import { Today } from "./pages/Today.tsx";
 import { Admin } from "./pages/Admin.tsx";
@@ -28,6 +28,7 @@ export function App() {
   const admin = location.pathname.startsWith("/admin");
   const [theme, setTheme] = useState<Theme>(readTheme);
   const [clock, setClock] = useState(formatClock);
+  const prefsRef = useRef<HTMLDetailsElement>(null);
   const themeLabel: Record<Theme, string> = { dark: t.dark, dusk: t.meadow, light: t.light };
   const langLabel: Record<Lang, string> = { en: "EN", hr: "HR" };
   const langName: Record<Lang, string> = { en: t.english, hr: t.croatian };
@@ -46,6 +47,18 @@ export function App() {
     return () => clearInterval(id);
   }, []);
 
+  useEffect(() => {
+    function onPointerDown(event: PointerEvent) {
+      const prefs = prefsRef.current;
+      if (!prefs?.open) return;
+      const target = event.target;
+      if (!(target instanceof Node) || prefs.contains(target)) return;
+      prefs.open = false;
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, []);
+
   return (
     <>
       {theme === "dusk" && <GroveFrame />}
@@ -57,7 +70,7 @@ export function App() {
           <time class="clock" dateTime={clock}>
             {clock}
           </time>
-          <details class="prefs">
+          <details class="prefs" ref={prefsRef}>
             <summary>{t.options}</summary>
             <div class="prefs-body">
               <span class="prefs-label">{t.language}</span>

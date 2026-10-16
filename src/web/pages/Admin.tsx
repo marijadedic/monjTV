@@ -63,6 +63,138 @@ function folderLabel(folder: string): string {
   return parts[parts.length - 1] || folder;
 }
 
+type FolderHit = { name: string; path: string };
+
+function FolderPath({
+  value,
+  placeholder,
+  invalid,
+  actionLabel,
+  actionBusy,
+  listLabel,
+  onChange,
+  onAction,
+  onBlur,
+}: {
+  value: string;
+  placeholder: string;
+  invalid?: boolean;
+  actionLabel: string;
+  actionBusy: boolean;
+  listLabel: string;
+  onChange: (value: string) => void;
+  onAction: () => void;
+  onBlur?: () => void;
+}) {
+  const [dirs, setDirs] = useState<FolderHit[]>([]);
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
+  const listId = useRef(`folders-${Math.random().toString(36).slice(2)}`).current;
+
+  useEffect(() => {
+    if (!open || !value.trim()) {
+      setDirs([]);
+      setActive(-1);
+      return;
+    }
+    let cancel = false;
+    const timer = setTimeout(() => {
+      api
+        .suggestFolders(value)
+        .then((next) => {
+          if (cancel) return;
+          setDirs(next.dirs);
+          setActive(-1);
+        })
+        .catch(() => {
+          if (!cancel) setDirs([]);
+        });
+    }, 150);
+    return () => {
+      cancel = true;
+      clearTimeout(timer);
+    };
+  }, [open, value]);
+
+  function onKey(event: KeyboardEvent) {
+    if (event.key === "Escape" && open && dirs.length > 0) {
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(false);
+      return;
+    }
+    if (!open || dirs.length === 0) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActive((index) => (index + 1) % dirs.length);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActive((index) => (index <= 0 ? dirs.length - 1 : index - 1));
+    } else if (event.key === "Enter" && active >= 0 && dirs[active]) {
+      event.preventDefault();
+      onChange(dirs[active].path);
+    }
+  }
+
+  const shown = open && dirs.length > 0;
+
+  return (
+    <div class="path-field">
+      <div class="field">
+        <input
+          value={value}
+          placeholder={placeholder}
+          role="combobox"
+          aria-expanded={shown}
+          aria-controls={listId}
+          aria-autocomplete="list"
+          aria-invalid={invalid ? "true" : undefined}
+          aria-activedescendant={shown && active >= 0 ? `${listId}-${active}` : undefined}
+          onFocus={() => setOpen(true)}
+          onInput={(event) => {
+            setOpen(true);
+            onChange((event.target as HTMLInputElement).value);
+          }}
+          onKeyDown={onKey}
+          onBlur={() => {
+            setOpen(false);
+            onBlur?.();
+          }}
+        />
+        <button type="button" onClick={onAction} disabled={actionBusy}>
+          {actionLabel}
+        </button>
+      </div>
+      {shown && (
+        <ul class="path-suggest" id={listId} role="listbox" aria-label={listLabel}>
+          {dirs.map((dir, index) => (
+            <li key={dir.path} role="presentation">
+              <button
+                type="button"
+                id={`${listId}-${index}`}
+                role="option"
+                aria-selected={index === active}
+                class={index === active ? "on" : ""}
+                title={dir.path}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => onChange(dir.path)}
+              >
+                {dir.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function slotKind(block: { folder: string; mode: BlockMode }): string {
+  const name = folderLabel(block.folder).toLowerCase();
+  if (name === "shows" || block.mode === "next-episode") return " shows";
+  return "";
+}
+
 function piecesFor(day: Day, blocks: ScheduleBlock[]): Piece[] {
   const mine = blocks
     .filter((block) => block.days.includes(day))
@@ -104,9 +236,12 @@ export function Admin() {
   const [fieldError, setFieldError] = useState<FieldError>({});
   const [saved, setSaved] = useState(false);
   const [picking, setPicking] = useState<"draft" | "fallback" | null>(null);
+  const [loungeOpen, setLoungeOpen] = useState(false);
   const [panelToken, setPanelToken] = useState(0);
   const savedFallback = useRef("");
   const startRef = useRef<HTMLInputElement>(null);
+  const loungeButtonRef = useRef<HTMLButtonElement>(null);
+  const loungePanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     api
@@ -118,6 +253,23 @@ export function Admin() {
       })
       .catch((e: Error) => setError(e.message));
   }, []);
+
+  useEffect(() => {
+    if (draft) setLoungeOpen(false);
+  }, [draft]);
+
+  useEffect(() => {
+    if (!loungeOpen) return;
+    function onPointerDown(event: PointerEvent) {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (loungeButtonRef.current?.contains(target)) return;
+      if (loungePanelRef.current?.contains(target)) return;
+      setLoungeOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [loungeOpen]);
 
   useEffect(() => {
     if (!draft) return;
@@ -289,9 +441,41 @@ export function Admin() {
 
   return (
     <section>
-      <h1>{t.week}</h1>
+      <div class="week-head">
+        <h1>{t.week}</h1>
+        {!draft && (
+          <button
+            ref={loungeButtonRef}
+            type="button"
+            class={loungeOpen ? "lounge on" : "lounge"}
+            aria-expanded={loungeOpen}
+            onClick={() => setLoungeOpen((open) => !open)}
+          >
+            {t.lounge} · <b>{fallbackName || t.none}</b>
+            <i>{loungeOpen ? "▴" : "▾"}</i>
+          </button>
+        )}
+      </div>
       {error && <p class="error">{t.error(error)}</p>}
       <div class={draft ? "week-wrap drafting" : "week-wrap"}>
+      {!draft && loungeOpen && (
+        <div class="lounge-open" ref={loungePanelRef}>
+          <span>{t.ifEmpty}</span>
+          <FolderPath
+            value={schedule.fallbackFolder}
+            placeholder={t.folderPlaceholder}
+            actionLabel={picking === "fallback" ? t.choosing : t.change}
+            actionBusy={picking === "fallback"}
+            listLabel={t.folder}
+            onChange={(fallbackFolder) => {
+              setSchedule((current) => ({ ...current, fallbackFolder }));
+              setSaved(false);
+            }}
+            onAction={() => void chooseFallback()}
+            onBlur={() => void commitFallback()}
+          />
+        </div>
+      )}
       <div class="week-scale">
         <div class="hours" aria-hidden="true">
           {["00", "04", "08", "12", "16", "20", "24"].map((hour) => (
@@ -338,7 +522,7 @@ export function Admin() {
                     <button
                       key={piece.block.id}
                       type="button"
-                      class={`slot${picked ? " pick" : ""}`}
+                      class={`slot${slotKind(piece.block)}${picked ? " pick" : ""}`}
                       style={{ height: `${hours * HOUR_PX}px` }}
                       title={piece.block.folder}
                       onClick={() => openSlot(piece.block, day)}
@@ -352,7 +536,7 @@ export function Admin() {
                 })}
                 {editing && ghost && (
                   <span
-                    class="ghost"
+                    class={`ghost${slotKind(draft)}`}
                     style={{
                       top: `${(ghost.start / DAY_MINUTES) * 100}%`,
                       height: `${((ghost.end - ghost.start) / DAY_MINUTES) * 100}%`,
@@ -414,20 +598,19 @@ export function Admin() {
           <div class="folder-block">
             <span class="k">{t.folder}</span>
             {draft.folder && <p class="folder-name">{folderLabel(draft.folder)}</p>}
-            <div class="field">
-              <input
-                value={draft.folder}
-                placeholder={t.folderPlaceholder}
-                aria-invalid={fieldError.folder ? "true" : undefined}
-                onInput={(event) => {
-                  setDraft({ ...draft, folder: (event.target as HTMLInputElement).value });
-                  setFieldError((current) => ({ ...current, folder: undefined }));
-                }}
-              />
-              <button type="button" onClick={() => void chooseFolder()} disabled={picking === "draft"}>
-                {picking === "draft" ? t.choosing : t.browse}
-              </button>
-            </div>
+            <FolderPath
+              value={draft.folder}
+              placeholder={t.folderPlaceholder}
+              invalid={Boolean(fieldError.folder)}
+              actionLabel={picking === "draft" ? t.choosing : t.browse}
+              actionBusy={picking === "draft"}
+              listLabel={t.folder}
+              onChange={(folder) => {
+                setDraft({ ...draft, folder });
+                setFieldError((current) => ({ ...current, folder: undefined }));
+              }}
+              onAction={() => void chooseFolder()}
+            />
             {fieldError.folder && <p class="field-error">{t.error(fieldError.folder)}</p>}
           </div>
           <div class="modes" role="radiogroup" aria-label={t.mode}>
@@ -492,26 +675,6 @@ export function Admin() {
       )}
       </div>
       {saved && !draft && <p class="muted">{t.saved}</p>}
-      {!draft && (
-        <div class="default-play">
-          <span>{t.ifEmpty}</span>
-          <div class="field">
-            <input
-              value={schedule.fallbackFolder}
-              placeholder={t.folderPlaceholder}
-              onInput={(event) => {
-                const fallbackFolder = (event.target as HTMLInputElement).value;
-                setSchedule((current) => ({ ...current, fallbackFolder }));
-                setSaved(false);
-              }}
-              onBlur={() => void commitFallback()}
-            />
-            <button type="button" onClick={() => void chooseFallback()} disabled={picking === "fallback"}>
-              {picking === "fallback" ? t.choosing : t.change}
-            </button>
-          </div>
-        </div>
-      )}
     </section>
   );
 }

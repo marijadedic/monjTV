@@ -9,6 +9,10 @@ function folderName(filePath: string): string {
   return parts[parts.length - 2]!;
 }
 
+function isMovies(filePath: string): boolean {
+  return folderName(filePath).toLowerCase() === "movies";
+}
+
 function hmToSec(hm: string): number | null {
   const [hRaw, mRaw] = hm.split(":");
   const h = Number(hRaw);
@@ -41,6 +45,7 @@ export function Today() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
+  const [missed, setMissed] = useState<Record<string, true>>({});
 
   async function refresh() {
     const [nextToday, nextStatus] = await Promise.all([api.today(), api.status()]);
@@ -87,6 +92,14 @@ export function Today() {
   }
 
   const current = today?.items.find((item) => item.id === status?.currentItemId) ?? null;
+  const idleItem =
+    current || status?.fallbackTitle || status?.waitingUntil ? null : (today?.items[0] ?? null);
+  const stripItem = current ?? idleItem;
+  const stripStill = stripItem && isMovies(stripItem.path) && !missed[stripItem.id] ? stripItem : null;
+
+  function hideStill(id: string) {
+    setMissed((currentMissed) => ({ ...currentMissed, [id]: true }));
+  }
   const sec = nowSec(now);
   const fraction = current ? progressOf(current, sec) : 0;
   const modeLabel = (mode: RundownItem["mode"]) =>
@@ -105,7 +118,15 @@ export function Today() {
       )}
       {today && (today.items.length > 0 || status?.fallbackTitle) && (
         <>
-          <div class="now-strip">
+          <div class={`now-strip${stripStill ? " has-still" : ""}`}>
+            {stripStill && (
+              <img
+                class="still"
+                src={`/api/today/items/${stripStill.id}/still`}
+                alt=""
+                onError={() => hideStill(stripStill.id)}
+              />
+            )}
             <div>
               {current ? (
                 <>
@@ -152,10 +173,20 @@ export function Today() {
           </div>
           {today.items.length > 0 && (
             <div class="rail">
-              {today.items.map((item) => (
+              {today.items.map((item) => {
+                const cardStill = isMovies(item.path) && !missed[item.id];
+                return (
                 <div key={item.id} class={`rail-item ${item.status}`}>
                   <i class="dot" />
-                  <article class={`card ${item.status}`}>
+                  <article class={`card ${item.status}${cardStill ? " has-still" : ""}`}>
+                    {cardStill && (
+                      <img
+                        class="still"
+                        src={`/api/today/items/${item.id}/still`}
+                        alt=""
+                        onError={() => hideStill(item.id)}
+                      />
+                    )}
                     <div class="time">
                       {item.start}–{item.end}
                     </div>
@@ -181,7 +212,8 @@ export function Today() {
                     </div>
                   </article>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </>

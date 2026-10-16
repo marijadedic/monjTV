@@ -6,12 +6,13 @@ import path from "node:path";
 import { Hono } from "hono";
 import type { Schedule } from "../shared/types.ts";
 import { PORT } from "../shared/constants.ts";
-import { browse, pickFolder } from "./files.ts";
+import { browse, pickFolder, suggestFolders } from "./files.ts";
 import { clientDir } from "./paths.ts";
 import { getStatus, startPlayer } from "./player.ts";
 import { loadProgress } from "./progress.ts";
 import { ensureToday, loadToday, rebuildTodayPreservingPlayback, shuffleItem } from "./rundown.ts";
 import { assertFolder, loadSchedule, saveSchedule } from "./schedule.ts";
+import { frameOf, isMoviesFile } from "./still.ts";
 
 const app = new Hono();
 
@@ -44,6 +45,20 @@ app.get("/api/today", async (c) => {
   return c.json(await ensureToday());
 });
 
+// Serve one cached frame for a movies rundown item.
+app.get("/api/today/items/:id/still", async (c) => {
+  const today = await ensureToday();
+  const item = today.items.find((entry) => entry.id === c.req.param("id"));
+  if (!item || !isMoviesFile(item.path)) return c.notFound();
+  const file = await frameOf(item.path);
+  if (!file) return c.notFound();
+  const bytes = await readFile(file);
+  return c.body(bytes, 200, {
+    "Content-Type": "image/jpeg",
+    "Cache-Control": "private, max-age=86400",
+  });
+});
+
 // Swap one random rundown item for another file.
 app.post("/api/today/items/:id/shuffle", async (c) => {
   try {
@@ -53,13 +68,18 @@ app.post("/api/today/items/:id/shuffle", async (c) => {
   }
 });
 
-// Open the macOS folder picker and return the chosen path.
+// Open the system folder picker and return the chosen path.
 app.post("/api/browse/pick", async (c) => {
   try {
     return c.json({ path: await pickFolder() });
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
   }
+});
+
+// Child folders that match a path being typed.
+app.get("/api/browse/suggest", async (c) => {
+  return c.json({ dirs: await suggestFolders(c.req.query("path") ?? "") });
 });
 
 // List folders and videos for the folder picker.

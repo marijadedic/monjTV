@@ -30,6 +30,8 @@ export const api = {
     req<TodayRundown>(`/api/today/items/${id}/shuffle`, { method: "POST" }),
   browse: (path?: string) =>
     req<BrowseResult>(`/api/browse${path ? `?path=${encodeURIComponent(path)}` : ""}`),
+  suggestFolders: (path: string) =>
+    req<{ dirs: BrowseResult["dirs"] }>(`/api/browse/suggest?path=${encodeURIComponent(path)}`),
   pickFolder: () => req<{ path: string | null }>("/api/browse/pick", { method: "POST" }),
   startPlayer: () => req<PlayerStatus>("/api/player/start", { method: "POST" }),
   status: () => req<PlayerStatus>("/api/player/status"),

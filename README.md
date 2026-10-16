@@ -1,14 +1,14 @@
 # monjTV
 
-monjTV is a weekly TV schedule for a screen you already have. One long-lived [mpv](https://mpv.io/) window is the television: fullscreen, on the machine plugged into the HDMI display (a Raspberry Pi, a monitor, or a laptop). The browser is the remote. **Today** shows what is on, and **Admin** is where you build the week. Playback is an mpv window, so a phone or another computer on the LAN can run the remote while the picture stays on the TV.
+monjTV is a weekly TV schedule for a screen you already have. One long-lived [mpv](https://mpv.io/) window is the television. The browser is the remote. **Today** shows what is on, and **Admin** is where you build the week. Playback is an mpv window, so a phone or another computer on the LAN can run the remote while the picture stays on the TV.
 
-The server keeps one mpv process idle and swaps the current file when the wall clock says the next one should start. It does not build an mpv playlist for the day.
+The server keeps one mpv process idle and swaps the current file when the wall clock says the next one should start.
 
 ## What you need
 
 | Tool | Why |
 | --- | --- |
-| Node.js `^20.19.0` or `>=22.12.0` | Vite 8 will not start on older Node. `node -v` should print v20.19+ or v22.12+. npm comes with Node. |
+| Node.js `^20.19.0` or `>=22.12.0` | Vite 8 will not start on older Node. `node -v` should print v20.19+ or v22.12+.|
 | mpv on `PATH` | The picture. `mpv --version` should print a version. |
 | ffprobe on `PATH` | Comes with FFmpeg. Used to measure each file when the day's rundown is built. `ffprobe -version` should print a version. |
 | A graphical session | mpv opens a fullscreen window on the machine running the server. A headless SSH session with no display will start the API and then fail to show video. |
@@ -21,20 +21,31 @@ Install the system tools, then clone.
 brew install node mpv ffmpeg
 ```
 
-**Debian, Ubuntu, Raspberry Pi OS:**
+**Debian and Ubuntu:**
 
 ```bash
 sudo apt update
 sudo apt install mpv ffmpeg
 ```
 
-Raspberry Pi OS often ships a Node that is too old for this repo. Install Node 22 from [nodejs.org](https://nodejs.org/) or with [nvm](https://github.com/nvm-sh/nvm), then check `node -v`.
-
 **Fedora:**
 
 ```bash
 sudo dnf install mpv ffmpeg nodejs
 ```
+
+**Raspberry Pi OS** (64-bit with desktop, Debian 13 / Trixie):
+
+The Pi is the machine plugged into the TV. Use a terminal on the desktop so mpv opens on the HDMI screen.
+
+```bash
+sudo apt update
+sudo apt install nodejs npm mpv ffmpeg
+```
+
+`node -v` should print v20.19 or newer. That is the Node package in Trixie. Bookworm images include Node 18, which is too old for this app, so use the current Raspberry Pi OS image.
+
+On Linux, **Browse** opens `zenity`, `kdialog`, `qarma`, or `yad` when one of those is already installed. It does not install one. Otherwise type the folder path.
 
 Confirm the three binaries before continuing:
 
@@ -83,7 +94,7 @@ curl -X POST http://127.0.0.1:3000/api/player/start
 
 ## Run it for the TV
 
-Build the UI once, then start the API. After a build, port 3000 serves `dist/client` and the API. This is the process that should run on the machine attached to the screen.
+Build the UI once, then start the API. After a build, port 3000 serves `dist/client` and the API. This is the process that should run on the machine.
 
 ```bash
 npm run build
@@ -119,7 +130,7 @@ lsof -nP -iTCP:3000 -sTCP:LISTEN
 kill <pid>
 ```
 
-Run `scripts/start.sh` from a terminal inside the graphical session, so mpv inherits the display. On a Raspberry Pi, that means a terminal on the desktop, or an SSH session that can see it:
+Run `scripts/start.sh` from a terminal inside the graphical session on the machine, so mpv inherits the display:
 
 ```bash
 echo "$DISPLAY"          # X11, often :0
@@ -130,11 +141,11 @@ echo "$WAYLAND_DISPLAY"  # Wayland
 
 ## First session
 
-1. Put at least one video in a folder the server can read. On a Pi, that folder has to be on the Pi (or a drive mounted there). The path you save is the path the server opens.
+1. Put at least one video in a folder the server can read. That folder has to be on the machine (or a drive mounted there). The path you save is the path the server opens.
 2. Start the app (`npm run dev`, or `npm start` after a build).
 3. Open **Admin**.
 4. Click an empty stretch of a day column. A ghost of that slice stays on the hour, and the form opens over the week.
-5. Set the days, start, end, folder, and mode, then commit the form. On macOS, **Browse** opens the system folder picker. On Linux, type the absolute path (`/home/pi/videos/cartoons`). The folder must already exist.
+5. Set the days, start, end, folder, and mode, then commit the form. **Browse** opens a folder dialog on the machine running the server, which is the machine with the screen. macOS uses the system picker. On Linux, Browse opens `zenity`, `kdialog`, `qarma`, or `yad` when one of those is already installed, on the machine running the server. Otherwise type an absolute path (`/home/you/videos/cartoons`). Existing folders on the server are listed under the field as you type. The folder must already exist.
 6. Open **Today** and press **Start TV**. mpv goes fullscreen and loads whatever fits right now.
 
 Blocks on the same day cannot overlap, and a block ends the same day it starts (`18:00`–`19:30` is valid; `22:00`–`01:00` is not). Saving the schedule rebuilds today and keeps items that are already playing or finished.
@@ -186,11 +197,11 @@ A schedule with one weekday block looks like this:
       "days": ["mon", "tue", "wed", "thu", "fri"],
       "start": "16:00",
       "end": "18:00",
-      "folder": "/home/pi/videos/cartoons",
+      "folder": "/home/you/videos/cartoons",
       "mode": "next-episode"
     }
   ],
-  "fallbackFolder": "/home/pi/videos/music"
+  "fallbackFolder": "/home/you/videos/music"
 }
 ```
 
@@ -219,12 +230,12 @@ A healthy server returns `{"ok":true}`.
 
 **`mpv is not installed or not on PATH`.** The Start TV request returns this when `spawn("mpv")` cannot find the binary. Install mpv and open a new terminal so `PATH` includes it. `which mpv` should print a path.
 
-**`mpv IPC socket did not appear`.** mpv started and the server could not connect to its socket within 8 seconds. On a Pi this is usually a missing display: run the server from the desktop session. `logs/monjtv.log` has the mpv stderr when you used `scripts/start.sh`.
+**`mpv IPC socket did not appear`.** mpv started and the server could not connect to its socket within 8 seconds. This is usually a missing display: run the server from the desktop session on the machine. `logs/monjtv.log` has the mpv stderr when you used `scripts/start.sh`.
 
-**Browse says the folder picker is only available on macOS.** Type the absolute folder path into the form. The picker uses `osascript` and only runs on macOS.
+**Browse on Linux asks you to type the path.** None of `zenity`, `kdialog`, `qarma`, or `yad` is installed. The path field takes an absolute path. When one of those programs is already installed, the dialog opens on the server's screen.
 
 **The rail is empty.** Today is built from blocks whose days include today. A Monday-only block does not appear on Thursday. An empty schedule, or a folder with no recognized videos, also leaves the rail empty. Outside every block, a fallback folder still plays in mpv and shows its title in the on-air strip.
 
-**Another computer cannot open the UI.** Use `npm run build` and `npm start`, then `http://<tv-machine-ip>:3000`. Port 5173 is the dev UI on the TV machine. If the page does not load, allow inbound TCP 3000 on the TV machine's firewall.
+**Another computer cannot open the UI.** Use `npm run build` and `npm start`, then `http://<machine-ip>:3000`. Port 5173 is the dev UI on the machine. If the page does not load, allow inbound TCP 3000 on the machine's firewall.
 
 **Durations are all about 45 minutes.** `ffprobe` is missing or could not read the files. Install FFmpeg, delete `data/today.json`, and save the schedule again so the rundown is probed once more.

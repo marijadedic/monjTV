@@ -50,6 +50,8 @@ type Copy = {
   nextHint: string;
   alsoOn: string;
   ifEmpty: string;
+  lounge: string;
+  none: string;
   change: string;
   clickFirst: string;
   dayWord: string;
@@ -117,6 +119,8 @@ const en: Copy = {
   nextHint: "Walks the folder in order.",
   alsoOn: "Also on",
   ifEmpty: "If nothing is scheduled",
+  lounge: "Lounge",
+  none: "None",
   change: "Change",
   clickFirst: "Click to add the first slot",
   dayWord: "Day",
@@ -153,7 +157,9 @@ const hrDay: Record<Day, string> = {
 };
 
 const hrExact: Record<string, string> = {
-  "The folder picker is only available on macOS.": "Odabir mape dostupan je samo na macOS-u.",
+  "The folder picker is only available on macOS and Linux.":
+    "Odabir mape dostupan je samo na macOS-u i Linuxu.",
+  "Type the folder path.": "Upišite putanju mape.",
   "Item not found": "Stavka nije pronađena.",
   "Only random items can be shuffled": "Promiješati se mogu samo nasumične stavke.",
   "Cannot shuffle a playing or finished item": "Stavka koja svira ili je gotova ne može se promiješati.",
@@ -245,6 +251,8 @@ const hr: Copy = {
   nextHint: "Ide redom kroz mapu.",
   alsoOn: "Također",
   ifEmpty: "Ako ništa nije zakazano",
+  lounge: "Predah",
+  none: "Nema",
   change: "Promijeni",
   clickFirst: "Klikni za prvi termin",
   dayWord: "Dan",
