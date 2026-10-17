@@ -134,7 +134,7 @@ export function Today() {
       {error && <p class="error">{t.error(error)}</p>}
       {today && today.items.length === 0 && !status?.fallbackTitle && (
         <div class="empty">
-          <p>{t.noBlocks}</p>
+          <p>{t.noSlots}</p>
           <a href="/admin">{t.addInAdmin}</a>
         </div>
       )}

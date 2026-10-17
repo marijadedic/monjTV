@@ -708,286 +708,290 @@ export function Admin() {
         </p>
       )}
       <div class={draft ? "week-wrap drafting" : "week-wrap"}>
-      {!draft && intermissionOpen && (
-        <div class="intermission-open" ref={intermissionPanelRef}>
-          <span>{t.ifEmpty}</span>
-          {fallbackName && <p class="folder-name">{fallbackName}</p>}
-          <FolderPath
-            kind="folder"
-            value={schedule.fallbackFolder}
-            placeholder={t.folderPlaceholder}
-            actionLabel={picking === "fallback" ? t.choosing : t.browse}
-            actionBusy={picking === "fallback"}
-            listLabel={t.folder}
-            onChange={(fallbackFolder) => {
-              setSchedule((current) => ({ ...current, fallbackFolder }));
-              setSaved(false);
-            }}
-            onAction={() => void chooseFallback()}
-            onBlur={() => void commitFallback()}
-          />
-          <span>
-            {t.nextHint} {t.intermissionCut}
-          </span>
-        </div>
-      )}
-      <div class="week-scale">
-        <div class="hours" aria-hidden="true">
-          {["00", "04", "08", "12", "16", "20", "24"].map((hour) => (
-            <span key={hour}>{hour}</span>
-          ))}
-        </div>
-        {DAYS.map((day) => {
-          const pieces = piecesFor(day, schedule.blocks);
-          const emptyDay = pieces.length === 1 && pieces[0]?.kind === "gap";
-          const editing = draft?.origin === day;
-          return (
-            <div key={day} class={`day${day === today ? " on" : ""}${editing ? " editing" : ""}`}>
-              <span class="name">{t.day[day]}</span>
-              <div class="track">
-                {pieces.map((piece) => {
-                  const span = piece.end - piece.start;
-                  if (piece.kind === "gap") {
-                    const long = span >= 120;
+        {!draft && intermissionOpen && (
+          <div class="intermission-open" ref={intermissionPanelRef}>
+            <span>{t.ifEmpty}</span>
+            {fallbackName && <p class="folder-name">{fallbackName}</p>}
+            <FolderPath
+              kind="folder"
+              value={schedule.fallbackFolder}
+              placeholder={t.folderPlaceholder}
+              actionLabel={picking === "fallback" ? t.choosing : t.browse}
+              actionBusy={picking === "fallback"}
+              listLabel={t.folder}
+              onChange={(fallbackFolder) => {
+                setSchedule((current) => ({ ...current, fallbackFolder }));
+                setSaved(false);
+              }}
+              onAction={() => void chooseFallback()}
+              onBlur={() => void commitFallback()}
+            />
+            <span>
+              {t.nextHint} {t.intermissionCut}
+            </span>
+          </div>
+        )}
+        <div class="week-scale">
+          <div class="hours" aria-hidden="true">
+            {["00", "04", "08", "12", "16", "20", "24"].map((hour) => (
+              <span key={hour}>{hour}</span>
+            ))}
+          </div>
+          {DAYS.map((day) => {
+            const pieces = piecesFor(day, schedule.blocks);
+            const emptyDay = pieces.length === 1 && pieces[0]?.kind === "gap";
+            const editing = draft?.origin === day;
+            return (
+              <div key={day} class={`day${day === today ? " on" : ""}${editing ? " editing" : ""}`}>
+                <span class="name">{t.day[day]}</span>
+                <div class="track">
+                  {pieces.map((piece) => {
+                    const span = piece.end - piece.start;
+                    if (piece.kind === "gap") {
+                      const long = span >= 120;
+                      return (
+                        <button
+                          key={`gap-${piece.start}`}
+                          type="button"
+                          class={`gap${long ? " long" : ""}${emptyDay ? " first" : ""}`}
+                          style={{ flexGrow: span }}
+                          onClick={(event) => {
+                            const rect = (event.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                            const ratio = rect.height
+                              ? Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height))
+                              : 0;
+                            const at = piece.start + ratio * (piece.end - piece.start);
+                            openGap(day, piece.start, piece.end, at);
+                          }}
+                        >
+                          {long && fallbackName && <b>{fallbackName}</b>}
+                          {emptyDay && <i>{t.clickFirst}</i>}
+                        </button>
+                      );
+                    }
+                    const placed = windowOn(piece.block, day);
+                    const draftTime = draft ? startOnDraft(draft, day) : "";
+                    const picked = draft?.id === piece.block.id && draftTime === placed.start;
                     return (
                       <button
-                        key={`gap-${piece.start}`}
+                        key={piece.block.id}
                         type="button"
-                        class={`gap${long ? " long" : ""}${emptyDay ? " first" : ""}`}
+                        class={`slot${slotKind(piece.block)}${picked ? " pick" : ""}`}
                         style={{ flexGrow: span }}
-                        onClick={(event) => {
-                          const rect = (event.currentTarget as HTMLButtonElement).getBoundingClientRect();
-                          const ratio = rect.height
-                            ? Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height))
-                            : 0;
-                          const at = piece.start + ratio * (piece.end - piece.start);
-                          openGap(day, piece.start, piece.end, at);
-                        }}
+                        title={piece.block.file ?? piece.block.folder}
+                        onClick={() => openSlot(piece.block, day)}
                       >
-                        {long && fallbackName && <b>{fallbackName}</b>}
-                        {emptyDay && <i>{t.clickFirst}</i>}
+                        <b>{slotLabel(piece.block)}</b>
+                        <i>
+                          {clockFace(piece.start)}–{clockFace(piece.end)} · {t.lengthOf(piece.end - piece.start)}
+                        </i>
                       </button>
                     );
-                  }
-                  const placed = windowOn(piece.block, day);
-                  const draftTime = draft ? startOnDraft(draft, day) : "";
-                  const picked = draft?.id === piece.block.id && draftTime === placed.start;
-                  return (
-                    <button
-                      key={piece.block.id}
-                      type="button"
-                      class={`slot${slotKind(piece.block)}${picked ? " pick" : ""}`}
-                      style={{ flexGrow: span }}
-                      title={piece.block.file ?? piece.block.folder}
-                      onClick={() => openSlot(piece.block, day)}
+                  })}
+                  {editing && ghost && (
+                    <span
+                      class={`ghost${slotKind(draft)}`}
+                      style={{
+                        top: `${(ghost.start / DAY_MINUTES) * 100}%`,
+                        height: `${((ghost.end - ghost.start) / DAY_MINUTES) * 100}%`,
+                      }}
                     >
-                      <b>{slotLabel(piece.block)}</b>
-                      <i>
-                        {clockFace(piece.start)}–{clockFace(piece.end)} · {t.lengthOf(piece.end - piece.start)}
-                      </i>
-                    </button>
-                  );
-                })}
-                {editing && ghost && (
-                  <span
-                    class={`ghost${slotKind(draft)}`}
-                    style={{
-                      top: `${(ghost.start / DAY_MINUTES) * 100}%`,
-                      height: `${((ghost.end - ghost.start) / DAY_MINUTES) * 100}%`,
-                    }}
-                  >
-                    <b>
-                      {clockFace(ghost.start)}–{clockFace(ghost.end)}
-                    </b>
-                  </span>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      {draft && <div class="scrim" />}
-      {draft && (
-        <form
-          ref={formRef}
-          class="add-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void commit();
-          }}
-        >
-          <header>
-            <b>{draft.id ? t.editSlot(t.dayName[draft.origin]) : t.newSlot(t.dayName[draft.origin])}</b>
-          </header>
-          {fieldError.form && <p class="field-error">{t.error(fieldError.form)}</p>}
-          <div class="pick-mode">
-            <span class="k">{t.playHow}</span>
-            <div class="modes" role="radiogroup" aria-label={t.playHow}>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={draft.mode === "random-file"}
-                class={draft.mode === "random-file" ? "mode on movie" : "mode"}
-                onClick={() => chooseMode("random-file")}
-              >
-                <b>{t.randomFile}</b>
-                <span>{t.randomHint}</span>
-              </button>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={draft.mode === "next-episode"}
-                class={draft.mode === "next-episode" ? "mode on shows" : "mode"}
-                onClick={() => chooseMode("next-episode")}
-              >
-                <b>{t.nextEpisode}</b>
-                <span>{t.nextHint}</span>
-              </button>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={draft.mode === "specific-file"}
-                class={draft.mode === "specific-file" ? "mode on film" : "mode"}
-                onClick={() => chooseMode("specific-file")}
-              >
-                <b>{t.oneVideo}</b>
-                <span>{t.oneHint}</span>
-              </button>
-            </div>
-          </div>
-          <div class="folder-block">
-            <span class="k">{draft.mode === "specific-file" ? t.chooseVideo : t.chooseFolder}</span>
-            <FolderPath
-              key={draft.mode}
-              kind={draft.mode === "specific-file" ? "video" : "folder"}
-              value={draft.mode === "specific-file" ? draft.file : draft.folder}
-              placeholder={draft.mode === "specific-file" ? t.videoPlaceholder : t.folderPlaceholder}
-              invalid={Boolean(fieldError.folder)}
-              actionLabel={picking === "draft" ? t.choosing : t.browse}
-              actionBusy={picking === "draft"}
-              listLabel={draft.mode === "specific-file" ? t.video : t.folder}
-              onChange={(value) => {
-                setDraft(
-                  draft.mode === "specific-file"
-                    ? { ...draft, file: value, folder: parentDir(value) }
-                    : { ...draft, folder: value },
-                );
-                setFieldError((current) => ({ ...current, folder: undefined }));
-              }}
-              onAction={() => void choosePath()}
-            />
-            {fieldError.folder && <p class="field-error">{t.error(fieldError.folder)}</p>}
-            {draft.mode === "random-file" && length ? (
-              <div class="picked">
-                <div>
-                  <span class="k">{t.slotDuration}</span>
-                  <span class="value">{t.slotDurationOf(lengthMins)}</span>
-                </div>
-                <div>
-                  <span class="k">{t.longestVideo}</span>
-                  <span class="value">{length.title}</span>
+                      <b>
+                        {clockFace(ghost.start)}–{clockFace(ghost.end)}
+                      </b>
+                    </span>
+                  )}
                 </div>
               </div>
-            ) : (
-              <div class="picked one">
-                <div>
-                  <span class="k">{t.slotDuration}</span>
-                  <span class={length || (measuring && pathChosen) ? "value" : "value dash"}>
-                    {length ? t.slotDurationOf(lengthMins) : measuring && pathChosen ? t.measuring : "—"}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-          <div class="also">
-            <span class="k">{t.alsoOn}</span>
-            <div class="days">
-              {DAYS.map((item) => (
+            );
+          })}
+        </div>
+        {draft && <div class="scrim" />}
+        {draft && (
+          <form
+            ref={formRef}
+            class="add-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void commit();
+            }}
+          >
+            <header>
+              <b>{draft.id ? t.editSlot(t.dayName[draft.origin]) : t.newSlot(t.dayName[draft.origin])}</b>
+            </header>
+            {fieldError.form && <p class="field-error">{t.error(fieldError.form)}</p>}
+            <div class="pick-mode">
+              <span class="k">{t.playHow}</span>
+              <div class="modes" role="radiogroup" aria-label={t.playHow}>
                 <button
-                  key={item}
                   type="button"
-                  class={`chip${draft.days.includes(item) ? " on" : ""}`}
-                  aria-pressed={draft.days.includes(item)}
-                  aria-disabled={item === draft.origin}
-                  onClick={() => toggleDay(item)}
+                  role="radio"
+                  aria-checked={draft.mode === "random-file"}
+                  class={draft.mode === "random-file" ? "mode on movie" : "mode"}
+                  onClick={() => chooseMode("random-file")}
                 >
-                  {t.day[item]}
+                  <b>{t.randomFile}</b>
+                  <span>{t.randomHint}</span>
                 </button>
-              ))}
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={draft.mode === "next-episode"}
+                  class={draft.mode === "next-episode" ? "mode on shows" : "mode"}
+                  onClick={() => chooseMode("next-episode")}
+                >
+                  <b>{t.nextEpisode}</b>
+                  <span>{t.nextHint}</span>
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={draft.mode === "specific-file"}
+                  class={draft.mode === "specific-file" ? "mode on film" : "mode"}
+                  onClick={() => chooseMode("specific-file")}
+                >
+                  <b>{t.oneVideo}</b>
+                  <span>{t.oneHint}</span>
+                </button>
+              </div>
             </div>
-          </div>
-          <div class="day-times">
-            {selectedDays(draft).map((day) => {
-              const start = startOnDraft(draft, day);
-              const clash = clashes
-                .filter((item) => item.day === day)
-                .sort((a, b) => toMin(a.start) - toMin(b.start))[0];
-              const spills = Boolean(length && spillsPastDay(start, length.durationSec));
-              const next = nextOnDay(day, start, schedule.blocks, draft.id);
-              const note = clash
-                ? t.runsInto(clash.end, clash.title, clash.start)
-                : spills
-                  ? t.pastMidnight
-                  : next
-                    ? t.nextSlotAt(windowOn(next, day).start, slotLabel(next))
-                    : t.noLaterSlot;
-              const warn = Boolean(clash || spills);
-              return (
-                <div class="day-start" key={day}>
-                  <span class="day-name">{t.day[day]}</span>
-                  <input
-                    class="time"
-                    type="time"
-                    value={start}
-                    aria-label={`${t.dayName[day]} ${t.start}`}
-                    onInput={(event) => {
-                      const value = (event.target as HTMLInputElement).value;
-                      setDraft((current) => {
-                        if (!current) return current;
-                        if (day === current.origin) {
-                          const known =
-                            measured && measured.key === measureKey(current) ? measured.length : null;
-                          const end = known ? endFromDuration(value, known.durationSec) : current.end;
-                          return { ...current, start: value, end };
-                        }
-                        return { ...current, starts: { ...current.starts, [day]: value } };
-                      });
-                      setFieldError((current) => ({ ...current, time: undefined }));
-                    }}
-                  />
-                  <span class={warn ? "note warn" : "note"} role="status">
-                    {note}
-                  </span>
+            <div class="folder-block">
+              <span class="k">{draft.mode === "specific-file" ? t.chooseVideo : t.chooseFolder}</span>
+              <FolderPath
+                key={draft.mode}
+                kind={draft.mode === "specific-file" ? "video" : "folder"}
+                value={draft.mode === "specific-file" ? draft.file : draft.folder}
+                placeholder={draft.mode === "specific-file" ? t.videoPlaceholder : t.folderPlaceholder}
+                invalid={Boolean(fieldError.folder)}
+                actionLabel={picking === "draft" ? t.choosing : t.browse}
+                actionBusy={picking === "draft"}
+                listLabel={draft.mode === "specific-file" ? t.video : t.folder}
+                onChange={(value) => {
+                  setDraft(
+                    draft.mode === "specific-file"
+                      ? { ...draft, file: value, folder: parentDir(value) }
+                      : { ...draft, folder: value },
+                  );
+                  setFieldError((current) => ({ ...current, folder: undefined }));
+                }}
+                onAction={() => void choosePath()}
+              />
+              {fieldError.folder && <p class="field-error">{t.error(fieldError.folder)}</p>}
+              {draft.mode === "random-file" && length ? (
+                <div class="picked">
+                  <div>
+                    <span class="k">{t.slotDuration}</span>
+                    <span class="value">{t.slotDurationOf(lengthMins)}</span>
+                  </div>
+                  <div>
+                    <span class="k">{t.longestVideo}</span>
+                    <span class="value">{length.title}</span>
+                  </div>
                 </div>
-              );
-            })}
-          </div>
-          {!measuring && pathChosen && matched && !length && !matched.error && (
-            <p class="field-error">{t.noVideo}</p>
-          )}
-          {matched?.error && <p class="field-error">{t.error(matched.error)}</p>}
-          {fieldError.time && <p class="field-error">{t.error(fieldError.time)}</p>}
-          <div class="actions">
-            {draft.id && (
-              <button type="button" class="quiet" onClick={() => void removeDraft()}>
-                {t.remove}
-              </button>
+              ) : (
+                <div class="picked one">
+                  <div>
+                    <span class="k">{t.slotDuration}</span>
+                    <span class={length || (measuring && pathChosen) ? "value" : "value dash"}>
+                      {length ? t.slotDurationOf(lengthMins) : measuring && pathChosen ? t.measuring : "—"}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div class="also">
+              <span class="k">{t.alsoOn}</span>
+              <div class="days">
+                {DAYS.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    class={`chip${draft.days.includes(item) ? " on" : ""}`}
+                    aria-pressed={draft.days.includes(item)}
+                    aria-disabled={item === draft.origin}
+                    onClick={() => toggleDay(item)}
+                  >
+                    {t.day[item]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div class="day-times">
+              {selectedDays(draft).map((day) => {
+                const start = startOnDraft(draft, day);
+                const clash = clashes
+                  .filter((item) => item.day === day)
+                  .sort((a, b) => toMin(a.start) - toMin(b.start))[0];
+                const spills = Boolean(length && spillsPastDay(start, length.durationSec));
+                const next = nextOnDay(day, start, schedule.blocks, draft.id);
+                const end = length?.durationSec ? endFromDuration(start, length?.durationSec) : undefined;
+                const endNote = end ? t.endNote(end) : undefined;
+                const note = clash
+                  ? t.runsInto(clash.end, clash.title, clash.start)
+                  : spills
+                    ? t.pastMidnight
+                    : next
+                      ? t.nextSlotAt(windowOn(next, day).start, slotLabel(next))
+                      : t.noLaterSlot;
+                const warn = Boolean(clash || spills);
+                return (
+                  <div class="day-start" key={day}>
+                    <span class="day-name">{t.day[day]}</span>
+                    <input
+                      class="time"
+                      type="time"
+                      value={start}
+                      aria-label={`${t.dayName[day]} ${t.start}`}
+                      onInput={(event) => {
+                        const value = (event.target as HTMLInputElement).value;
+                        setDraft((current) => {
+                          if (!current) return current;
+                          if (day === current.origin) {
+                            const known =
+                              measured && measured.key === measureKey(current) ? measured.length : null;
+                            const end = known ? endFromDuration(value, known.durationSec) : current.end;
+                            return { ...current, start: value, end };
+                          }
+                          return { ...current, starts: { ...current.starts, [day]: value } };
+                        });
+                        setFieldError((current) => ({ ...current, time: undefined }));
+                      }}
+                    />
+                    <div class={warn ? "note warn" : "note"} role="status">
+                      {endNote && <span class="end-note">{endNote} </span>}
+                      {note}
+                      <hr /> 
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {!measuring && pathChosen && matched && !length && !matched.error && (
+              <p class="field-error">{t.noVideo}</p>
             )}
-            <button
-              type="button"
-              onClick={() => {
-                setDraft(null);
-                setFieldError({});
-              }}
-            >
-              {t.cancel}
-            </button>
-            <button type="submit" class="primary">
-              {draft.id ? t.save : t.add}
-            </button>
-          </div>
-        </form>
-      )}
+            {matched?.error && <p class="field-error">{t.error(matched.error)}</p>}
+            {fieldError.time && <p class="field-error">{t.error(fieldError.time)}</p>}
+            <div class="actions">
+              {draft.id && (
+                <button type="button" class="quiet" onClick={() => void removeDraft()}>
+                  {t.remove}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setDraft(null);
+                  setFieldError({});
+                }}
+              >
+                {t.cancel}
+              </button>
+              <button type="submit" class="primary">
+                {draft.id ? t.save : t.add}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
       {saved && !draft && <p class="muted">{t.saved}</p>}
     </section>

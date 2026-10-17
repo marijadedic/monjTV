@@ -18,7 +18,7 @@ type Copy = {
   language: string;
   english: string;
   croatian: string;
-  noBlocks: string;
+  noSlots: string;
   addInAdmin: string;
   onAir: string;
   waiting: string;
@@ -97,6 +97,7 @@ type Copy = {
   followsVideo: string;
   until: (time: string) => string;
   noVideo: string;
+  endNote: (time: string) => string;
 };
 
 const en: Copy = {
@@ -111,11 +112,11 @@ const en: Copy = {
   language: "Language",
   english: "English",
   croatian: "Croatian",
-  noBlocks: "No blocks for today.",
+  noSlots: "No slots queued for today.",
   addInAdmin: "Add some in Admin",
   onAir: "On air",
   waiting: "Waiting",
-  nextAt: (time) => `Next block at ${time}`,
+  nextAt: (time) => `Next slot starts at ${time}`,
   nothingOn: "Nothing is on right now.",
   willStart: "Will start",
   scheduled: "Scheduled",
@@ -158,7 +159,7 @@ const en: Copy = {
     if (h) return `${h}h`;
     return `${m}min`;
   },
-  longestVideo: "The longest video",
+  longestVideo: "The longest video in the folder",
   newSlot: (day) => `New slot · ${day}`,
   editSlot: (day) => `Edit slot · ${day}`,
   folder: "Folder",
@@ -204,8 +205,8 @@ const en: Copy = {
     `The next episode, ${title}, is ${length}. This slot can play up to ${limit}, so it will not play.`,
   wontFitFolder: (title, length, limit) =>
     `The shortest video, ${title}, is ${length}. This slot can play up to ${limit}, so nothing will play.`,
-  nextSlotAt: (time, title) => `Next slot at ${time} · ${title}`,
-  noLaterSlot: "Nothing else is scheduled after this start.",
+  nextSlotAt: (time) => `Next slot starts at ${time}`,
+  noLaterSlot: "Nothing else is scheduled today after this slot.",
   runsInto: (end, title, start) =>
     `This runs until ${end} and into ${title}, which starts at ${start}.`,
   runsIntoOn: (day, end, title, start) =>
@@ -215,6 +216,7 @@ const en: Copy = {
   followsVideo: "Follows the video",
   until: (time) => `Until ${time}`,
   noVideo: "No video found there.",
+  endNote: (time) => `Ends at ${time}.`,
 };
 
 function runLength(sec: number, hr: boolean): string {
@@ -247,16 +249,16 @@ const hrExact: Record<string, string> = {
   "Item not found": "Stavka nije pronađena.",
   "Only random items can be shuffled": "Promiješati se mogu samo nasumične stavke.",
   "Cannot shuffle a playing or finished item": "Stavka koja svira ili je gotova ne može se promiješati.",
-  "Block missing from schedule": "Blok nedostaje u rasporedu.",
+  "Slot missing from schedule": "Blok nedostaje u rasporedu.",
   "No other files in this folder": "U ovoj mapi nema drugih datoteka.",
-  "Schedule must have a blocks array": "Raspored mora sadržavati blokove.",
-  "Invalid block": "Neispravan blok.",
-  "Each block needs at least one day": "Svaki blok treba barem jedan dan.",
+  "Schedule must have a slot array": "Raspored mora sadržavati blokove.",
+  "Invalid slot": "Neispravan blok.",
+  "Each slot needs at least one day": "Svaki blok treba barem jedan dan.",
   "start and end must be HH:mm": "Početak i kraj moraju biti u obliku HH:mm.",
   "mode must be next-episode, random-file, or specific-file":
     "Način mora biti sljedeća epizoda, nasumična datoteka ili jedan video.",
-  "Each specific-file block needs a video": "Blok s jednim videom treba odabranu datoteku.",
-  "Each block needs a folder": "Svaki blok treba mapu.",
+  "Each specific-file slot needs a video": "Blok s jednim videom treba odabranu datoteku.",
+  "Each slot needs a folder": "Svaki blok treba mapu.",
   "Type the video path.": "Upišite putanju videa.",
   "The file picker is only available on macOS and Linux.":
     "Odabir datoteke dostupan je samo na macOS-u i Linuxu.",
@@ -288,10 +290,10 @@ function hrError(message: string): string {
     return `Odabir datoteke nije uspio. Upišite putanju videa.${match[1] ? ` ${match[1]}` : ""}`;
   }
 
-  match = /^Block (.+) must end after it starts \(same day\)$/.exec(message);
+  match = /^Slot (.+) must end after it starts \(same day\)$/.exec(message);
   if (match) return `Blok ${match[1]} mora završiti nakon početka (isti dan).`;
 
-  match = /^Overlapping blocks on (\w+): (.+)$/.exec(message);
+  match = /^Overlapping slots on (\w+): (.+)$/.exec(message);
   if (match) {
     const day = match[1] as Day;
     const label = hrDay[day] ?? match[1];
@@ -316,11 +318,11 @@ const hr: Copy = {
   language: "Jezik",
   english: "English",
   croatian: "Hrvatski",
-  noBlocks: "Nema blokova za danas.",
+  noSlots: "Nema blokova za danas.",
   addInAdmin: "Dodaj ih u Adminu",
   onAir: "U eteru",
   waiting: "Čeka",
-  nextAt: (time) => `Sljedeći blok u ${time}`,
+  nextAt: (time) => `Sljedeći blok počinje u ${time}`,
   nothingOn: "Trenutno se ništa ne emitira.",
   willStart: "Počet će",
   scheduled: "Na rasporedu",
@@ -363,7 +365,7 @@ const hr: Copy = {
     if (h) return `${h} h`;
     return `${m} min`;
   },
-  longestVideo: "Najdulji video",
+  longestVideo: "Najdulji video u mapi",
   newSlot: (day) => `Novi blok · ${day}`,
   editSlot: (day) => `Uredi blok · ${day}`,
   folder: "Mapa",
@@ -409,8 +411,8 @@ const hr: Copy = {
     `Sljedeća epizoda, ${title}, traje ${length}. U ovaj blok stane najviše ${limit}, pa se neće pustiti.`,
   wontFitFolder: (title, length, limit) =>
     `Najkraći video, ${title}, traje ${length}. U ovaj blok stane najviše ${limit}, pa se ništa neće pustiti.`,
-  nextSlotAt: (time, title) => `Sljedeći blok u ${time} · ${title}`,
-  noLaterSlot: "Nakon ovog početka nema drugog bloka.",
+  nextSlotAt: (time) => `Sljedeći blok počinje u ${time}`,
+  noLaterSlot: "Nakon ovog bloka danas nema ništa zakazano.",
   runsInto: (end, title, start) =>
     `Ovo traje do ${end} i preklapa se s ${title}, koji počinje u ${start}.`,
   runsIntoOn: (day, end, title, start) =>
@@ -420,6 +422,7 @@ const hr: Copy = {
   followsVideo: "Slijedi video",
   until: (time) => `Do ${time}`,
   noVideo: "Tamo nema videa.",
+  endNote: (time) => `Blok završava u ${time}.`,
 };
 
 const copy: Record<Lang, Copy> = { en, hr };
