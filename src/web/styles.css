@@ -100,6 +100,27 @@ body {
   font: 20px/1.45 system-ui, sans-serif;
 }
 
+@media (min-width: 2400px) and (min-height: 1350px) {
+  html,
+  body {
+    font-size: 27px;
+  }
+}
+
+@media (min-width: 3000px) and (min-height: 1700px) {
+  html,
+  body {
+    font-size: 32px;
+  }
+}
+
+@media (min-width: 3600px) and (min-height: 2000px) {
+  html,
+  body {
+    font-size: 40px;
+  }
+}
+
 html[data-theme="dusk"] body {
   font-family: Palatino, "Palatino Linotype", "Iowan Old Style", Georgia, serif;
   background: #e4edf2;
@@ -127,8 +148,21 @@ a {
 
 .shell.wide {
   max-width: none;
+  height: 100dvh;
+  min-height: 1080px;
+  display: flex;
+  flex-direction: column;
   padding-left: 32px;
   padding-right: 32px;
+}
+
+.shell.wide main,
+.shell.wide main > section,
+.shell.wide .week-wrap {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .top {
@@ -777,16 +811,26 @@ html[data-theme="dusk"] .today button.primary {
 }
 
 .week-scale {
-  --day-h: 576px;
+  --name-h: 1.15rem;
+  --name-gap: 4px;
   display: grid;
-  grid-template-columns: 32px repeat(7, minmax(0, 1fr));
+  grid-template-columns: auto repeat(7, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1fr);
   gap: 10px;
   margin-bottom: 16px;
 }
 
+.shell.wide .week-scale {
+  flex: 1 1 auto;
+  min-height: 30rem;
+}
+
 .day {
   position: relative;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  min-height: 0;
 }
 
 .day.editing {
@@ -797,8 +841,8 @@ html[data-theme="dusk"] .today button.primary {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  margin-top: 26px;
-  height: var(--day-h);
+  margin-top: calc(var(--name-h) + var(--name-gap));
+  min-height: 0;
   color: var(--muted);
   font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
@@ -806,11 +850,11 @@ html[data-theme="dusk"] .today button.primary {
 
 .day .name {
   display: block;
-  height: 22px;
-  margin: 0 0 4px;
+  height: var(--name-h);
+  margin: 0 0 var(--name-gap);
   color: var(--muted);
   font-size: 0.8rem;
-  line-height: 22px;
+  line-height: var(--name-h);
   text-transform: capitalize;
 }
 
@@ -820,7 +864,9 @@ html[data-theme="dusk"] .today button.primary {
 
 .week-scale .track {
   position: relative;
-  height: var(--day-h);
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 0;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--line);
@@ -844,7 +890,9 @@ html[data-theme="dusk"] .week-scale button.gap:hover {
 .week-scale button.gap,
 .week-scale button.slot {
   appearance: none;
-  flex: none;
+  flex-grow: 1;
+  flex-shrink: 1;
+  flex-basis: 0;
   width: 100%;
   margin: 0;
   border: 0;
@@ -911,7 +959,7 @@ html[data-theme="dusk"] .week-scale button.gap:hover {
   display: none;
 }
 
-@container (min-height: 36px) {
+@container (min-height: 1.8rem) {
   .week-scale button.slot i {
     display: block;
   }
@@ -1089,11 +1137,11 @@ html[data-theme="light"] .week-wrap .scrim {
   top: 50%;
   transform: translate(-50%, -50%);
   display: grid;
-  gap: 22px;
-  width: min(560px, calc(100% - 48px));
+  gap: 1rem;
+  width: min(28rem, calc(100% - 48px));
   max-height: calc(100vh - 32px);
   overflow: auto;
-  padding: 12px 14px;
+  padding: 1rem 1.5rem;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -1300,7 +1348,8 @@ html[data-theme="dusk"] .path-suggest {
 }
 
 .add-form .mode {
-  display: block;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   padding: 12px 14px;
   text-align: left;
@@ -1485,7 +1534,7 @@ html[data-theme="dusk"] .intermission.on {
   top: 0;
   right: 0;
   z-index: 4;
-  width: min(100%, 420px);
+  width: min(100%, 21rem);
   display: grid;
   gap: 6px;
   padding: 10px;
@@ -1676,7 +1725,11 @@ html[data-theme="teletext"] .add-form .mode.on.movie {
 }
 
 html[data-theme="teletext"] .add-form .mode span {
-  font-size: 0.85rem;
+  font-size: 0.80rem;
+}
+
+html[data-theme="teletext"] .add-form .mode b {
+  font-size: 0.90rem;
 }
 
 html[data-theme="teletext"] .add-form .mode.on.shows {

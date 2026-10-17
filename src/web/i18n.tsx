@@ -169,7 +169,7 @@ const en: Copy = {
   video: "Video",
   videoPlaceholder: "/path/to/video.mp4",
   alsoOn: "Also play on",
-  playHow: "Choose how it plays",
+  playHow: "Select the type of playback",
   ifEmpty: "Plays if nothing is scheduled",
   intermission: "Intermission",
   intermissionCut: "A new slot cuts it off.",
@@ -263,7 +263,7 @@ const hrExact: Record<string, string> = {
   "mpv is not installed or not on PATH": "mpv nije instaliran ili nije na PATH-u.",
   "mpv is not running": "mpv nije pokrenut.",
   "Choose a video or folder to set the length.":
-    "Odaberite video ili mapu da bi termin dobio trajanje.",
+    "Odaberite video ili mapu da bi blok dobio trajanje.",
   "Still measuring the video.": "Video se još mjeri.",
 };
 
@@ -355,7 +355,7 @@ const hr: Copy = {
   },
   chooseFolder: "Odaberi mapu",
   chooseVideo: "Odaberi video",
-  slotDuration: "Trajanje termina",
+  slotDuration: "Trajanje",
   slotDurationOf: (mins) => {
     const h = Math.floor(mins / 60);
     const m = mins % 60;
@@ -364,8 +364,8 @@ const hr: Copy = {
     return `${m} min`;
   },
   longestVideo: "Najdulji video",
-  newSlot: (day) => `Novi termin · ${day}`,
-  editSlot: (day) => `Uredi termin · ${day}`,
+  newSlot: (day) => `Novi blok · ${day}`,
+  editSlot: (day) => `Uredi blok · ${day}`,
   folder: "Mapa",
   randomHint: "Bira mapu. Preskače nedavno puštene datoteke.",
   nextHint: "Ide redom kroz mapu.",
@@ -374,13 +374,13 @@ const hr: Copy = {
   video: "Video",
   videoPlaceholder: "/putanja/do/videa.mp4",
   alsoOn: "Pusti i na",
-  playHow: "Odaberi kako se pušta",
+  playHow: "Odaberi tip reprodukcije",
   ifEmpty: "Reproducira se ako ništa nije zakazano",
   intermission: "Pauza",
-  intermissionCut: "Novi termin prekida reprodukciju.",
+  intermissionCut: "Novi blok prekida reprodukciju.",
   none: "nije odabrano",
   change: "Promijeni",
-  clickFirst: "Klikni za prvi termin",
+  clickFirst: "Klikni za dodati prvi blok",
   dayWord: "Dan",
   dayName: {
     mon: "Ponedjeljak",
@@ -404,13 +404,13 @@ const hr: Copy = {
   error: hrError,
   runLength: (sec) => runLength(sec, true),
   wontFitVideo: (title, length, limit) =>
-    `${title} traje ${length}. U ovaj termin stane najviše ${limit}, pa se neće pustiti.`,
+    `${title} traje ${length}. U ovaj blok stane najviše ${limit}, pa se neće pustiti.`,
   wontFitEpisode: (title, length, limit) =>
-    `Sljedeća epizoda, ${title}, traje ${length}. U ovaj termin stane najviše ${limit}, pa se neće pustiti.`,
+    `Sljedeća epizoda, ${title}, traje ${length}. U ovaj blok stane najviše ${limit}, pa se neće pustiti.`,
   wontFitFolder: (title, length, limit) =>
-    `Najkraći video, ${title}, traje ${length}. U ovaj termin stane najviše ${limit}, pa se ništa neće pustiti.`,
-  nextSlotAt: (time, title) => `Sljedeći termin u ${time} · ${title}`,
-  noLaterSlot: "Nakon ovog početka nema drugog termina.",
+    `Najkraći video, ${title}, traje ${length}. U ovaj blok stane najviše ${limit}, pa se ništa neće pustiti.`,
+  nextSlotAt: (time, title) => `Sljedeći blok u ${time} · ${title}`,
+  noLaterSlot: "Nakon ovog početka nema drugog bloka.",
   runsInto: (end, title, start) =>
     `Ovo traje do ${end} i preklapa se s ${title}, koji počinje u ${start}.`,
   runsIntoOn: (day, end, title, start) =>

@@ -13,7 +13,6 @@ import { api } from "../api.ts";
 import { useI18n } from "../i18n.tsx";
 
 const DAY_MINUTES = 24 * 60;
-const HOUR_PX = 24;
 
 const WEEKDAY: Day[] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
@@ -747,15 +746,15 @@ export function Admin() {
               <span class="name">{t.day[day]}</span>
               <div class="track">
                 {pieces.map((piece) => {
-                  const hours = (piece.end - piece.start) / 60;
+                  const span = piece.end - piece.start;
                   if (piece.kind === "gap") {
-                    const long = piece.end - piece.start >= 120;
+                    const long = span >= 120;
                     return (
                       <button
                         key={`gap-${piece.start}`}
                         type="button"
                         class={`gap${long ? " long" : ""}${emptyDay ? " first" : ""}`}
-                        style={{ height: `${hours * HOUR_PX}px` }}
+                        style={{ flexGrow: span }}
                         onClick={(event) => {
                           const rect = (event.currentTarget as HTMLButtonElement).getBoundingClientRect();
                           const ratio = rect.height
@@ -778,7 +777,7 @@ export function Admin() {
                       key={piece.block.id}
                       type="button"
                       class={`slot${slotKind(piece.block)}${picked ? " pick" : ""}`}
-                      style={{ height: `${hours * HOUR_PX}px` }}
+                      style={{ flexGrow: span }}
                       title={piece.block.file ?? piece.block.folder}
                       onClick={() => openSlot(piece.block, day)}
                     >
