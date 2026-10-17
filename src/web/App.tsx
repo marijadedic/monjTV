@@ -5,15 +5,15 @@ import { Today } from "./pages/Today.tsx";
 import { Admin } from "./pages/Admin.tsx";
 import { useI18n, type Lang } from "./i18n.tsx";
 
-type Theme = "dark" | "dusk" | "light";
+type Theme = "dark" | "dusk" | "light" | "teletext";
 
-const THEMES: Theme[] = ["dark", "dusk", "light"];
+const THEMES: Theme[] = ["dark", "dusk", "light", "teletext"];
 const LANGS: Lang[] = ["en", "hr"];
 
 function readTheme(): Theme {
   try {
     const stored = localStorage.getItem("monjtv-theme");
-    if (stored === "dark" || stored === "dusk" || stored === "light") return stored;
+    if (stored === "dark" || stored === "dusk" || stored === "light" || stored === "teletext") return stored;
   } catch {
     /* private mode */
   }
@@ -43,7 +43,12 @@ export function App() {
   const [now, setNow] = useState(() => new Date());
   const [off, setOff] = useState(false);
   const prefsRef = useRef<HTMLDetailsElement>(null);
-  const themeLabel: Record<Theme, string> = { dark: t.dark, dusk: t.meadow, light: t.light };
+  const themeLabel: Record<Theme, string> = {
+    dark: t.dark,
+    dusk: t.meadow,
+    light: t.light,
+    teletext: t.teletext,
+  };
   const langLabel: Record<Lang, string> = { en: "EN", hr: "HR" };
   const langName: Record<Lang, string> = { en: t.english, hr: t.croatian };
 

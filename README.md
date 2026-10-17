@@ -178,7 +178,7 @@ Linux and the Pi use the same `.desktop` file. The icon runs `scripts/start.sh` 
 
 Blocks on the same day cannot overlap, and a block ends the same day it starts (`18:00`–`19:30` is valid; `22:00`–`01:00` is not). Saving the schedule rebuilds today and keeps items that are already playing or finished.
 
-**Options** in the header holds language (English or Croatian), theme (Dark, Meadow, Light), and **Shut down**. Language and theme stay in the browser. **Shut down** is a filled red stop. In Croatian the label is **Ugasi monjTV**. It quits mpv, closes the monjTV browser tab on this machine, and exits the server.
+**Options** in the header holds language (English or Croatian), theme (Dark, Meadow, Light, or Teletext), and **Shut down**. Language and theme stay in the browser. **Shut down** is a filled red stop. In Croatian the label is **Ugasi monjTV**. It quits mpv, closes the monjTV browser tab on this machine, and exits the server.
 
 ## How a day plays
 
@@ -204,7 +204,7 @@ If `ffprobe` is missing or cannot read a file, that file is treated as 45 minute
 
 **Today** (`/`) is a time rail with no page title. The date sits to the right of the clock as `DD.MM.YYYY`. The current show is in the on-air strip and again on the rail. **Start TV** starts mpv if it is not running and joins the show at the current minute. **Shuffle** replaces one planned random-file item. A random-file item and a one-video item show a cached frame from the file.
 
-**Admin** (`/admin`) is a clock of day columns under a quiet Weekly schedule heading. A next-episode block is rose, a random-file block is blue, and a one-video block is clay, or copper in Meadow. Each fades from a light top. A new slot is a click on empty time. The form saves when it is committed. Mode is first, then browse, then the other days, and a clock at the bottom sets the start. The length follows the video that will play. The selected mode uses that block’s color.
+**Admin** (`/admin`) is a clock of day columns under a quiet Weekly schedule heading. A next-episode block is rose, a random-file block is blue, and a one-video block is clay, or copper in Meadow. Each fades from a light top. In Teletext those blocks are flat: magenta, blue, and yellow. A new slot is a click on empty time. The form saves when it is committed. Mode is first, then browse, then the other days, and a clock at the bottom sets the start. The length follows the video that will play. The selected mode uses that block’s color.
 
 ## Data
 

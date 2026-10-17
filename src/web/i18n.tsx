@@ -14,6 +14,7 @@ type Copy = {
   dark: string;
   meadow: string;
   light: string;
+  teletext: string;
   language: string;
   english: string;
   croatian: string;
@@ -106,6 +107,7 @@ const en: Copy = {
   dark: "Dark",
   meadow: "Meadow",
   light: "Light",
+  teletext: "Teletext",
   language: "Language",
   english: "English",
   croatian: "Croatian",
@@ -310,6 +312,7 @@ const hr: Copy = {
   dark: "Tamno",
   meadow: "Livada",
   light: "Svijetlo",
+  teletext: "Teletekst",
   language: "Jezik",
   english: "English",
   croatian: "Hrvatski",
