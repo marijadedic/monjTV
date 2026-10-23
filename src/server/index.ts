@@ -17,6 +17,7 @@ import {
   rebuildTodayPreservingPlayback,
   shuffleItem,
   slotLength,
+  videoCount,
 } from "./rundown.ts";
 import { assertFolder, changedBlocks, loadSchedule, saveSchedule } from "./schedule.ts";
 import { frameOf } from "./still.ts";
@@ -55,6 +56,10 @@ app.put("/api/schedule", async (c) => {
 });
 
 // Length of the video a slot will play. A random folder uses its longest video.
+app.get("/api/video-count", async (c) => {
+  return c.json({ count: await videoCount(c.req.query("folder") ?? "") });
+});
+
 app.get("/api/slot-length", async (c) => {
   const mode = c.req.query("mode");
   if (mode !== "next-episode" && mode !== "random-file" && mode !== "specific-file") {

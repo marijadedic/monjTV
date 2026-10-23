@@ -248,17 +248,32 @@ export async function slotLength(opts: {
   }
 
   let longest: { file: string; durationSec: number } | null = null;
+  let shortest: { file: string; durationSec: number } | null = null;
   for (const file of files) {
     const durationSec = await probeDuration(file);
     if (!longest || durationSec > longest.durationSec) longest = { file, durationSec };
+    if (!shortest || durationSec < shortest.durationSec) shortest = { file, durationSec };
   }
-  if (!longest) return null;
+  if (!longest || !shortest) return null;
   return {
     title: titleFromPath(longest.file),
     path: longest.file,
     durationSec: longest.durationSec,
     kind: "random",
+    fileCount: files.length,
+    shortest: {
+      title: titleFromPath(shortest.file),
+      path: shortest.file,
+      durationSec: shortest.durationSec,
+    },
   };
+}
+
+// How many videos a folder holds, without timing them.
+export async function videoCount(folder: string): Promise<number> {
+  const trimmed = folder.trim();
+  if (!trimmed || !(await isDir(trimmed))) return 0;
+  return (await videosIn(trimmed)).length;
 }
 
 // Why a saved block cannot start a file, for blocks that were just added or edited.

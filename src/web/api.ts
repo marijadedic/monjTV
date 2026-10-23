@@ -39,6 +39,8 @@ export const api = {
     ),
   pickFolder: () => req<{ path: string | null }>("/api/browse/pick", { method: "POST" }),
   pickFile: () => req<{ path: string | null }>("/api/browse/pick-file", { method: "POST" }),
+  videoCount: (folder: string) =>
+    req<{ count: number }>(`/api/video-count?folder=${encodeURIComponent(folder)}`),
   slotLength: (mode: BlockMode, folder: string, file = "") =>
     req<{ length: SlotLength | null }>(
       `/api/slot-length?mode=${encodeURIComponent(mode)}&folder=${encodeURIComponent(folder)}&file=${encodeURIComponent(file)}`,

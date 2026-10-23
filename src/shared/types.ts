@@ -58,6 +58,8 @@ export interface SlotLength {
   path: string;
   durationSec: number;
   kind: "video" | "episode" | "random";
+  shortest?: { title: string; path: string; durationSec: number };
+  fileCount?: number;
 }
 
 export interface PlayerStatus {

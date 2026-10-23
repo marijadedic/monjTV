@@ -54,6 +54,23 @@ type Copy = {
   slotDuration: string;
   slotDurationOf: (mins: number) => string;
   longestVideo: string;
+  shortestVideo: string;
+  fixedLength: string;
+  standardSlot: string;
+  longestFile: string;
+  findLongest: string;
+  chooseLength: string;
+  customLength: string;
+  minutes: (n: number) => string;
+  minutesUnit: string;
+  durationTip: Record<"30" | "60" | "90" | "120" | "260" | "custom", string>;
+  aboutLength: (label: string) => string;
+  measuringVideos: string;
+  elapsed: (clock: string) => string;
+  whySlow: string;
+  probeCache: string;
+  manyFiles: string;
+  needMinutes: string;
   newSlot: (day: string) => string;
   editSlot: (day: string) => string;
   folder: string;
@@ -159,7 +176,32 @@ const en: Copy = {
     if (h) return `${h}h`;
     return `${m}min`;
   },
-  longestVideo: "The longest video in the folder",
+  longestVideo: "Longest video",
+  shortestVideo: "Shortest video",
+  fixedLength: "Fixed length",
+  standardSlot: "Standard TV timeslot",
+  longestFile: "Longest file",
+  findLongest: "Find the longest running video in the folder",
+  chooseLength: "Choose a length",
+  customLength: "Custom",
+  minutes: (n) => `${n} min`,
+  minutesUnit: "min",
+  durationTip: {
+    "30": "Sitcom, news bulletin, cartoon.",
+    "60": "Drama hour, talk show, documentary.",
+    "90": "TV movie, long documentary.",
+    "120": "Feature film.",
+    "260": "4h 20m. A double feature, a long sports broadcast, or a marathon block.",
+    custom: "Any length you type, in minutes.",
+  },
+  aboutLength: (label) => `What a ${label} slot usually holds`,
+  measuringVideos: "Measuring the duration of videos",
+  elapsed: (clock) => `Elapsed ${clock}`,
+  whySlow: "Why measuring can take a while",
+  probeCache:
+    "Each file is timed with ffprobe. Lengths already timed in this server run are remembered in memory, so a second open of the same folder is quick. A restart times them again.",
+  manyFiles: "This folder has a lot of videos. The first timing can take a while.",
+  needMinutes: "Type a length of at least 1 minute.",
   newSlot: (day) => `New slot · ${day}`,
   editSlot: (day) => `Edit slot · ${day}`,
   folder: "Folder",
@@ -365,7 +407,32 @@ const hr: Copy = {
     if (h) return `${h} h`;
     return `${m} min`;
   },
-  longestVideo: "Najdulji video u mapi",
+  longestVideo: "Najdulji video",
+  shortestVideo: "Najkraći video",
+  fixedLength: "Fiksno trajanje",
+  standardSlot: "Standardni TV termin",
+  longestFile: "Najdulja datoteka",
+  findLongest: "Pronađi najdulji video u mapi",
+  chooseLength: "Odaberi trajanje",
+  customLength: "Proizvoljno",
+  minutes: (n) => `${n} min`,
+  minutesUnit: "min",
+  durationTip: {
+    "30": "Sitcom, vijesti, crtić.",
+    "60": "Dramska serija, talk show, dokumentarac.",
+    "90": "TV film, dulji dokumentarac.",
+    "120": "Cjelovečernji film.",
+    "260": "4 h 20 min. Dvostruka projekcija, duga sportska emisija ili maraton.",
+    custom: "Bilo koje trajanje koje upišete, u minutama.",
+  },
+  aboutLength: (label) => `Što obično ide u termin od ${label}`,
+  measuringVideos: "Mjerenje trajanja videa",
+  elapsed: (clock) => `Proteklo ${clock}`,
+  whySlow: "Zašto mjerenje može potrajati",
+  probeCache:
+    "Svaka se datoteka mjeri pomoću ffprobe. Trajanja izmjerena u ovom pokretanju poslužitelja pamte se u memoriji, pa je drugi otvor iste mape brz. Nakon ponovnog pokretanja mjerenje kreće ispočetka.",
+  manyFiles: "U ovoj mapi ima puno videa. Prvo mjerenje može potrajati.",
+  needMinutes: "Upišite trajanje od barem 1 minute.",
   newSlot: (day) => `Novi blok · ${day}`,
   editSlot: (day) => `Uredi blok · ${day}`,
   folder: "Mapa",
