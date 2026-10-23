@@ -63,22 +63,12 @@ app.get("/api/slot-length", async (c) => {
       400,
     );
   }
-  try {
-    const length = await slotLength(
-      {
-        mode,
-        folder: c.req.query("folder") ?? "",
-        file: c.req.query("file") ?? "",
-      },
-      c.req.raw.signal,
-    );
-    return c.json({ length });
-  } catch (err) {
-    if (c.req.raw.signal.aborted || (err instanceof Error && err.name === "AbortError")) {
-      return c.json({ length: null });
-    }
-    throw err;
-  }
+  const length = await slotLength({
+    mode,
+    folder: c.req.query("folder") ?? "",
+    file: c.req.query("file") ?? "",
+  });
+  return c.json({ length });
 });
 
 // Return today's rundown, building it if the date changed.

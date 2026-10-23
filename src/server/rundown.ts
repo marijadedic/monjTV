@@ -12,7 +12,7 @@ import type {
 } from "../shared/types.ts";
 import { windowOn } from "../shared/window.ts";
 import { dateKey, formatHm, parseHm, weekday } from "./clock.ts";
-import { probeDuration, probeDurations } from "./duration.ts";
+import { probeDuration } from "./duration.ts";
 import { isDir, isVideoFile, titleFromPath } from "./files.ts";
 import { todayPath } from "./paths.ts";
 import { nextEpisode, randomFile, videosIn } from "./picker.ts";
@@ -214,14 +214,11 @@ export function maxPlayableSec(slotSec: number): number {
 }
 
 // Length of the file a new slot will play. A random folder uses its longest video.
-export async function slotLength(
-  opts: {
-    mode: BlockMode;
-    folder: string;
-    file?: string;
-  },
-  signal?: AbortSignal,
-): Promise<SlotLength | null> {
+export async function slotLength(opts: {
+  mode: BlockMode;
+  folder: string;
+  file?: string;
+}): Promise<SlotLength | null> {
   if (opts.mode === "specific-file") {
     const file = opts.file?.trim() ?? "";
     if (!file || !(await isVideoFile(file))) return null;
@@ -235,12 +232,7 @@ export async function slotLength(
 
   const folder = opts.folder.trim();
   if (!folder || !(await isDir(folder))) return null;
-  const files = await videosIn(folder, signal);
-  if (signal?.aborted) {
-    const err = new Error("The measure was cancelled");
-    err.name = "AbortError";
-    throw err;
-  }
+  const files = await videosIn(folder);
   if (files.length === 0) return null;
 
   if (opts.mode === "next-episode") {
@@ -255,11 +247,9 @@ export async function slotLength(
     };
   }
 
-  const durations = await probeDurations(files, signal);
   let longest: { file: string; durationSec: number } | null = null;
   for (const file of files) {
-    const durationSec = durations.get(file);
-    if (durationSec == null) continue;
+    const durationSec = await probeDuration(file);
     if (!longest || durationSec > longest.durationSec) longest = { file, durationSec };
   }
   if (!longest) return null;

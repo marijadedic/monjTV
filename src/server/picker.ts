@@ -3,8 +3,8 @@ import { isVideoFile, listVideos } from "./files.ts";
 import { loadProgress } from "./progress.ts";
 
 // Sorted video paths in a folder.
-export async function videosIn(folder: string, signal?: AbortSignal): Promise<string[]> {
-  return listVideos(folder, signal);
+export async function videosIn(folder: string): Promise<string[]> {
+  return listVideos(folder);
 }
 
 // File after the last completed one, wrapping to the start.

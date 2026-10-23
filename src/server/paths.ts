@@ -10,4 +10,3 @@ export const clientDir = path.join(rootDir, "dist/client");
 export const schedulePath = path.join(dataDir, "schedule.json");
 export const progressPath = path.join(dataDir, "progress.json");
 export const todayPath = path.join(dataDir, "today.json");
-export const durationsPath = path.join(dataDir, "durations.json");
