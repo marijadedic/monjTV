@@ -261,10 +261,16 @@ function spillsPastDay(start: string, durationSec: number): boolean {
   return toMin(start) + Math.max(1, Math.ceil(durationSec / 60)) >= DAY_MINUTES;
 }
 
+const lengthCache = new Map<string, SlotLength | null>();
+
 function measureKey(draft: Draft): string {
   return draft.mode === "specific-file"
     ? `video:${draft.file.trim()}`
     : `${draft.mode}:${draft.folder.trim()}`;
+}
+
+function isAbort(err: unknown): boolean {
+  return err instanceof Error && err.name === "AbortError";
 }
 
 function nextOnDay(
@@ -343,6 +349,7 @@ export function Admin() {
   } | null>(null);
   const [measuring, setMeasuring] = useState(false);
   const savedFallback = useRef("");
+  const measuredPath = useRef("");
   const formRef = useRef<HTMLFormElement>(null);
   const intermissionButtonRef = useRef<HTMLButtonElement>(null);
   const intermissionPanelRef = useRef<HTMLDivElement>(null);
@@ -389,37 +396,61 @@ export function Admin() {
 
   useEffect(() => {
     if (!draft) {
+      measuredPath.current = "";
       setMeasured(null);
       setMeasuring(false);
       return;
     }
     const key = measureKey(draft);
-    const empty = draft.mode === "specific-file" ? !draft.file.trim() : !draft.folder.trim();
-    if (empty) {
+    const path = draft.mode === "specific-file" ? draft.file.trim() : draft.folder.trim();
+    const previous = measuredPath.current;
+    measuredPath.current = path;
+    if (!path) {
       setMeasured({ key, length: null });
       setMeasuring(false);
       return;
     }
+    const cached = lengthCache.get(key);
+    if (cached !== undefined) {
+      setMeasured({ key, length: cached });
+      setMeasuring(false);
+    } else {
+      setMeasuring(true);
+    }
+    const typing =
+      path.length <= 1 ||
+      (previous.length > 0 &&
+        Math.abs(path.length - previous.length) <= 1 &&
+        (path.startsWith(previous) || previous.startsWith(path)));
     let cancel = false;
-    setMeasuring(true);
+    const controller = new AbortController();
     const timer = setTimeout(() => {
       api
-        .slotLength(draft.mode, draft.folder, draft.file)
+        .slotLength(draft.mode, draft.folder, draft.file, controller.signal)
         .then((res) => {
           if (cancel) return;
-          setMeasured({ key, length: res.length });
+          lengthCache.set(key, res.length);
+          setMeasured((current) => {
+            const same =
+              current?.key === key &&
+              current.length?.durationSec === res.length?.durationSec &&
+              current.length?.path === res.length?.path &&
+              !current.error;
+            return same ? current : { key, length: res.length };
+          });
           setMeasuring(false);
         })
         .catch((err: unknown) => {
-          if (cancel) return;
+          if (cancel || isAbort(err)) return;
           const message = err instanceof Error ? err.message : String(err);
           setMeasured({ key, length: null, error: message });
           setMeasuring(false);
         });
-    }, 250);
+    }, typing ? 250 : 0);
     return () => {
       cancel = true;
       clearTimeout(timer);
+      controller.abort();
     };
   }, [draft?.mode, draft?.folder, draft?.file, panelToken]);
 

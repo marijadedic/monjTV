@@ -39,9 +39,10 @@ export const api = {
     ),
   pickFolder: () => req<{ path: string | null }>("/api/browse/pick", { method: "POST" }),
   pickFile: () => req<{ path: string | null }>("/api/browse/pick-file", { method: "POST" }),
-  slotLength: (mode: BlockMode, folder: string, file = "") =>
+  slotLength: (mode: BlockMode, folder: string, file = "", signal?: AbortSignal) =>
     req<{ length: SlotLength | null }>(
       `/api/slot-length?mode=${encodeURIComponent(mode)}&folder=${encodeURIComponent(folder)}&file=${encodeURIComponent(file)}`,
+      { signal },
     ),
   startPlayer: () => req<PlayerStatus>("/api/player/start", { method: "POST" }),
   status: () => req<PlayerStatus>("/api/player/status"),

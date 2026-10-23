@@ -16,16 +16,24 @@ export function titleFromPath(filePath: string): string {
   return path.basename(filePath, path.extname(filePath));
 }
 
+// Raised when a folder walk is no longer needed.
+function cancelled(): Error {
+  const err = new Error("The measure was cancelled");
+  err.name = "AbortError";
+  return err;
+}
+
 // Video files under a folder, sorted by path.
-export async function listVideos(folder: string): Promise<string[]> {
+export async function listVideos(folder: string, signal?: AbortSignal): Promise<string[]> {
   const out: string[] = [];
-  await walk(folder, 0, out);
+  await walk(folder, 0, out, signal);
   out.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
   return out;
 }
 
 // Collect videos, stopping at the depth and count limits.
-async function walk(dir: string, depth: number, out: string[]): Promise<void> {
+async function walk(dir: string, depth: number, out: string[], signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) throw cancelled();
   if (depth > MAX_DEPTH || out.length >= MAX_VIDEOS) return;
   let entries;
   try {
@@ -35,10 +43,11 @@ async function walk(dir: string, depth: number, out: string[]): Promise<void> {
   }
   entries.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   for (const entry of entries) {
+    if (signal?.aborted) throw cancelled();
     if (entry.name.startsWith(".")) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      await walk(full, depth + 1, out);
+      await walk(full, depth + 1, out, signal);
     } else if (VIDEO_EXT.has(path.extname(entry.name).toLowerCase())) {
       out.push(full);
       if (out.length >= MAX_VIDEOS) return;
