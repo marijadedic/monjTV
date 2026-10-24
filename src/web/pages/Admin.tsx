@@ -1288,6 +1288,24 @@ export function Admin() {
                       ))}
                       <option value="custom">{t.customLength}</option>
                     </select>
+                    {draft.lengthChoice === "custom" && (
+                      <label class="custom">
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={1}
+                          step={1}
+                          value={draft.customMin}
+                          placeholder="45"
+                          aria-label={t.customLength}
+                          onInput={(event) => {
+                            const value = (event.target as HTMLInputElement).value;
+                            setDraft((current) => (current ? { ...current, customMin: value } : current));
+                          }}
+                        />
+                        <em>{t.minutesUnit}</em>
+                      </label>
+                    )}
                     <span class="cloud-host" onMouseEnter={placeCloud}>
                       <button
                         type="button"
@@ -1304,25 +1322,6 @@ export function Admin() {
                       </span>
                     </span>
                   </div>
-                  {draft.lengthChoice === "custom" && (
-                    <label class="custom">
-                      <span class="k">{t.customLength}</span>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        min={1}
-                        step={1}
-                        value={draft.customMin}
-                        placeholder="45"
-                        aria-label={t.customLength}
-                        onInput={(event) => {
-                          const value = (event.target as HTMLInputElement).value;
-                          setDraft((current) => (current ? { ...current, customMin: value } : current));
-                        }}
-                      />
-                      <em>{t.minutesUnit}</em>
-                    </label>
-                  )}
                   {draft.lengthChoice === "custom" && draft.customMin.trim() !== "" && fixedMin === null && (
                     <p class="field-error">{t.needMinutes}</p>
                   )}
