@@ -93,6 +93,8 @@ type Copy = {
   intermission: string;
   intermissionCut: string;
   intermissionPlaceholder: string;
+  intermissionFrom: string;
+  intermissionYoutubeInFolder: string;
   none: string;
   change: string;
   clickFirst: string;
@@ -236,6 +238,8 @@ const en: Copy = {
   intermission: "Intermission",
   intermissionCut: "A new slot cuts it off.",
   intermissionPlaceholder: "/path/to/folder or a YouTube URL",
+  intermissionFrom: "Source",
+  intermissionYoutubeInFolder: "That is a YouTube link. Choose YouTube, then Save.",
   none: "None",
   change: "Change",
   clickFirst: "Click to add the first slot",
@@ -485,6 +489,8 @@ const hr: Copy = {
   intermission: "Pauza",
   intermissionCut: "Novi blok prekida reprodukciju.",
   intermissionPlaceholder: "/putanja/do/mape ili YouTube URL",
+  intermissionFrom: "Izvor",
+  intermissionYoutubeInFolder: "To je YouTube poveznica. Odaberite YouTube, pa Spremi.",
   none: "nije odabrano",
   change: "Promijeni",
   clickFirst: "Klikni za dodati prvi blok",

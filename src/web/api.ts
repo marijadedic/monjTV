@@ -47,6 +47,11 @@ export const api = {
   pickFile: () => req<{ path: string | null }>("/api/browse/pick-file", { method: "POST" }),
   videoCount: (folder: string) =>
     req<{ count: number }>(`/api/video-count?folder=${encodeURIComponent(folder)}`),
+  youtubeTitles: (urls: string[]) =>
+    req<{ titles: Record<string, string> }>("/api/youtube/titles", {
+      method: "POST",
+      body: JSON.stringify({ urls }),
+    }),
   slotLength: (mode: BlockMode, folder: string, file = "") =>
     req<{ length: SlotLength | null }>(
       `/api/slot-length?mode=${encodeURIComponent(mode)}&folder=${encodeURIComponent(folder)}&file=${encodeURIComponent(file)}`,

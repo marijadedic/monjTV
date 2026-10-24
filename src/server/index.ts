@@ -20,7 +20,7 @@ import {
   videoCount,
 } from "./rundown.ts";
 import { assertFallback, assertFolder, changedBlocks, loadSchedule, saveSchedule } from "./schedule.ts";
-import { assertYoutubeVideo } from "./youtube.ts";
+import { assertYoutubeVideo, youtubeTitles } from "./youtube.ts";
 import { frameOf } from "./still.ts";
 import { closeAppTabs, portsFrom } from "./tabs.ts";
 
@@ -55,6 +55,15 @@ app.put("/api/schedule", async (c) => {
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
   }
+});
+
+// Titles for the YouTube links on the timetable.
+app.post("/api/youtube/titles", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const urls = Array.isArray(body?.urls)
+    ? body.urls.filter((url: unknown): url is string => typeof url === "string").slice(0, 40)
+    : [];
+  return c.json({ titles: await youtubeTitles(urls) });
 });
 
 // Length of the video a slot will play. A random folder uses its longest video.

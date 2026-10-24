@@ -24,6 +24,7 @@ import { useI18n } from "../i18n.tsx";
 
 const PRESETS = [30, 60, 90, 120, 260] as const;
 const MANY_FILES = 20;
+const BUSY_SPIN_MS = 400;
 
 type PresetMin = (typeof PRESETS)[number];
 type LengthChoice = "longest" | PresetMin | "custom";
@@ -127,6 +128,8 @@ type FieldError = {
   form?: string;
 };
 
+type SlotOp = "save" | "remove";
+
 function toMin(hm: string): number {
   const [hRaw, mRaw] = hm.split(":");
   const h = Number(hRaw);
@@ -168,15 +171,85 @@ function fileTitle(file: string): string {
   return base.slice(0, dot);
 }
 
-function slotLabel(block: { folder: string; file?: string; mode: BlockMode }): string {
-  if (block.mode === "youtube" && block.file) return youtubeLabel(block.file);
+function slotLabel(
+  block: { folder: string; file?: string; mode: BlockMode },
+  titles: Readonly<Record<string, string>> = {},
+): string {
+  if (block.mode === "youtube" && block.file) {
+    const url = parseYoutubeUrl(block.file);
+    if (url && titles[url]) return titles[url];
+    return youtubeLabel(block.file);
+  }
   if (block.mode === "specific-file" && block.file) return fileTitle(block.file);
   return folderLabel(block.folder);
 }
 
-function fallbackLabel(source: string): string {
-  if (isYoutubeUrl(source)) return youtubeLabel(source);
+function slotHover(
+  block: { folder: string; file?: string; mode: BlockMode },
+  titles: Readonly<Record<string, string>>,
+): string {
+  if (block.mode === "youtube" && block.file) {
+    const url = parseYoutubeUrl(block.file);
+    const title = url ? titles[url] : "";
+    if (title && url) return `${title}\n${url}`;
+    return block.file;
+  }
+  return block.file ?? block.folder;
+}
+
+function fallbackLabel(source: string, titles: Readonly<Record<string, string>> = {}): string {
+  const url = parseYoutubeUrl(source);
+  if (url) return titles[url] || youtubeLabel(source);
   return folderLabel(source);
+}
+
+function youtubeScheduleKey(schedule: Schedule): string {
+  const urls = new Set<string>();
+  const fallback = parseYoutubeUrl(schedule.fallbackFolder);
+  if (fallback) urls.add(fallback);
+  for (const block of schedule.blocks) {
+    if (block.mode !== "youtube") continue;
+    const url = parseYoutubeUrl(block.file ?? "");
+    if (url) urls.add(url);
+  }
+  return [...urls].sort().join("\n");
+}
+
+type IntermissionKind = "folder" | "youtube";
+
+function readIntermission(source: string): {
+  kind: IntermissionKind;
+  folder: string;
+  youtube: string;
+} {
+  if (isYoutubeUrl(source)) {
+    return { kind: "youtube", folder: "", youtube: parseYoutubeUrl(source) ?? source };
+  }
+  return { kind: "folder", folder: source, youtube: "" };
+}
+
+function sameFallback(saved: string, pending: string): boolean {
+  const savedUrl = parseYoutubeUrl(saved);
+  const pendingUrl = parseYoutubeUrl(pending);
+  if (savedUrl || pendingUrl) return savedUrl === pendingUrl && pendingUrl !== null;
+  return saved === pending;
+}
+
+function intermissionPending(
+  kind: IntermissionKind,
+  folder: string,
+  youtube: string,
+): { value: string; error: "youtube" | "folder-has-youtube" | null } {
+  if (kind === "youtube") {
+    const trimmed = youtube.trim();
+    if (!trimmed) return { value: "", error: null };
+    const parsed = parseYoutubeUrl(trimmed);
+    if (!parsed) return { value: trimmed, error: "youtube" };
+    return { value: parsed, error: null };
+  }
+  const trimmed = folder.trim();
+  if (isYoutubeUrl(trimmed)) return { value: trimmed, error: "folder-has-youtube" };
+  return { value: trimmed, error: null };
 }
 
 type FolderHit = { name: string; path: string };
@@ -313,6 +386,28 @@ function slotKind(block: { folder: string; mode: BlockMode }): string {
   if (block.mode === "specific-file") return " film";
   if (block.mode === "youtube") return " tube";
   return "";
+}
+
+function nextSlotStart(pieces: Piece[], index: number): number {
+  for (let i = index + 1; i < pieces.length; i++) {
+    const piece = pieces[i];
+    if (piece?.kind === "slot") return piece.start;
+  }
+  return DAY_MINUTES;
+}
+
+function bandStyle(start: number, end: number, roomEnd?: number): Record<string, string> {
+  const span = Math.max(0, end - start);
+  const natural = `${(span / DAY_MINUTES) * 100}%`;
+  const style: Record<string, string> = {
+    top: `${(start / DAY_MINUTES) * 100}%`,
+    height: natural,
+  };
+  if (roomEnd === undefined) return style;
+  const room = Math.max(span, roomEnd - start);
+  style.height = `max(${natural}, var(--slot-read))`;
+  style.maxHeight = `${(room / DAY_MINUTES) * 100}%`;
+  return style;
 }
 
 function piecesFor(day: Day, blocks: ScheduleBlock[]): Piece[] {
@@ -471,6 +566,7 @@ function dayClashes(
   draft: Draft,
   blocks: ScheduleBlock[],
   durationSec: number,
+  titles: Readonly<Record<string, string>> = {},
 ): { day: Day; title: string; start: string; end: string }[] {
   const clashes: { day: Day; title: string; start: string; end: string }[] = [];
   const draftSegs = segmentsOf(draftAsBlock(draft, durationSec));
@@ -482,7 +578,7 @@ function dayClashes(
         if (mine.start < other.end && other.start < mine.end) {
           clashes.push({
             day: mine.day,
-            title: slotLabel(block),
+            title: slotLabel(block, titles),
             start: clockOf(other.start),
             end: clockOf(other.end),
           });
@@ -501,13 +597,21 @@ export function Admin() {
   const { t } = useI18n();
   const today = WEEKDAY[new Date().getDay()]!;
   const [schedule, setSchedule] = useState<Schedule>(emptySchedule);
+  const [youtubeTitles, setYoutubeTitles] = useState<Record<string, string>>({});
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fieldError, setFieldError] = useState<FieldError>({});
+  const [slotOp, setSlotOp] = useState<SlotOp | null>(null);
+  const [slotOpSlow, setSlotOpSlow] = useState(false);
   const [saved, setSaved] = useState(false);
   const [fitMiss, setFitMiss] = useState<SlotMiss | null>(null);
   const [picking, setPicking] = useState<"draft" | "fallback" | null>(null);
   const [intermissionOpen, setIntermissionOpen] = useState(false);
+  const [intermissionKind, setIntermissionKind] = useState<IntermissionKind>("folder");
+  const [folderDraft, setFolderDraft] = useState("");
+  const [youtubeDraft, setYoutubeDraft] = useState("");
+  const [intermissionError, setIntermissionError] = useState<string | null>(null);
+  const [intermissionSaving, setIntermissionSaving] = useState(false);
   const [panelToken, setPanelToken] = useState(0);
   const [measured, setMeasured] = useState<{
     key: string;
@@ -517,8 +621,18 @@ export function Admin() {
   const [measuring, setMeasuring] = useState(false);
   const [fileCount, setFileCount] = useState(0);
   const [elapsedSec, setElapsedSec] = useState(0);
-  const savedFallback = useRef("");
+  const scheduleRef = useRef(schedule);
+  const intermissionKindRef = useRef<IntermissionKind>("folder");
+  const folderDraftRef = useRef("");
+  const youtubeDraftRef = useRef("");
+  const intermissionEdited = useRef(false);
+  scheduleRef.current = schedule;
+  intermissionKindRef.current = intermissionKind;
+  folderDraftRef.current = folderDraft;
+  youtubeDraftRef.current = youtubeDraft;
   const formRef = useRef<HTMLFormElement>(null);
+  const formErrorRef = useRef<HTMLParagraphElement>(null);
+  const slotOpRef = useRef<SlotOp | null>(null);
   const intermissionButtonRef = useRef<HTMLButtonElement>(null);
   const intermissionPanelRef = useRef<HTMLDivElement>(null);
 
@@ -527,11 +641,32 @@ export function Admin() {
       .schedule()
       .then((loaded) => {
         const next = { ...emptySchedule(), ...loaded, blocks: loaded.blocks ?? [] };
-        savedFallback.current = next.fallbackFolder;
         setSchedule(next);
+        if (!intermissionEdited.current) {
+          const read = readIntermission(next.fallbackFolder);
+          setIntermissionKind(read.kind);
+          setFolderDraft(read.folder);
+          setYoutubeDraft(read.youtube);
+        }
       })
       .catch((e: Error) => setError(e.message));
   }, []);
+
+  const titleKey = youtubeScheduleKey(schedule);
+  useEffect(() => {
+    const urls = titleKey ? titleKey.split("\n") : [];
+    if (urls.length === 0) return;
+    let cancel = false;
+    api
+      .youtubeTitles(urls)
+      .then((res) => {
+        if (!cancel) setYoutubeTitles((current) => ({ ...current, ...res.titles }));
+      })
+      .catch(() => {});
+    return () => {
+      cancel = true;
+    };
+  }, [titleKey]);
 
   useEffect(() => {
     if (draft) setIntermissionOpen(false);
@@ -554,7 +689,7 @@ export function Admin() {
     if (!draft) return;
     formRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
     function onKey(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
+      if (event.key !== "Escape" || slotOpRef.current) return;
       setDraft(null);
       setFieldError({});
     }
@@ -616,6 +751,20 @@ export function Admin() {
   }, [draft?.mode, draft?.folder, draft?.file, draft?.lengthChoice, panelToken]);
 
   useEffect(() => {
+    if (!slotOp) {
+      setSlotOpSlow(false);
+      return;
+    }
+    const id = window.setTimeout(() => setSlotOpSlow(true), BUSY_SPIN_MS);
+    return () => window.clearTimeout(id);
+  }, [slotOp]);
+
+  useEffect(() => {
+    if (!fieldError.form) return;
+    formErrorRef.current?.scrollIntoView({ block: "nearest" });
+  }, [fieldError.form]);
+
+  useEffect(() => {
     if (!measuring) {
       setElapsedSec(0);
       return;
@@ -658,7 +807,6 @@ export function Admin() {
   async function persist(next: Schedule) {
     setError(null);
     const res = await api.saveSchedule(next);
-    savedFallback.current = res.schedule.fallbackFolder;
     setSchedule(res.schedule);
     setSaved(true);
     return res;
@@ -795,28 +943,82 @@ export function Admin() {
     }
   }
 
+  function editFolderDraft(value: string) {
+    intermissionEdited.current = true;
+    folderDraftRef.current = value;
+    setFolderDraft(value);
+    setIntermissionError(null);
+    setSaved(false);
+  }
+
+  function editYoutubeDraft(value: string) {
+    intermissionEdited.current = true;
+    youtubeDraftRef.current = value;
+    setYoutubeDraft(value);
+    setIntermissionError(null);
+    setSaved(false);
+  }
+
+  function chooseIntermissionKind(kind: IntermissionKind) {
+    intermissionEdited.current = true;
+    intermissionKindRef.current = kind;
+    setIntermissionKind(kind);
+    setIntermissionError(null);
+  }
+
   async function chooseFallback() {
     setPicking("fallback");
-    setError(null);
+    setIntermissionError(null);
     try {
       const picked = await api.pickFolder();
       if (!picked.path) return;
-      await persist({ ...schedule, fallbackFolder: picked.path });
+      chooseIntermissionKind("folder");
+      editFolderDraft(picked.path);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setIntermissionError(e instanceof Error ? e.message : String(e));
     } finally {
       setPicking(null);
     }
   }
 
-  async function commitFallback() {
-    const fallbackFolder = schedule.fallbackFolder.trim();
-    if (fallbackFolder === savedFallback.current) return;
-    try {
-      await persist({ ...schedule, fallbackFolder });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+  async function saveIntermission() {
+    const pending = intermissionPending(
+      intermissionKindRef.current,
+      folderDraftRef.current,
+      youtubeDraftRef.current,
+    );
+    if (pending.error) {
+      setIntermissionError(pending.error);
+      return;
     }
+    const current = scheduleRef.current;
+    if (sameFallback(current.fallbackFolder, pending.value)) return;
+    setIntermissionSaving(true);
+    setIntermissionError(null);
+    try {
+      const res = await persist({ ...current, fallbackFolder: pending.value });
+      const stored = res.schedule.fallbackFolder;
+      if (stored) {
+        const read = readIntermission(stored);
+        setIntermissionKind(read.kind);
+        setFolderDraft(read.folder);
+        setYoutubeDraft(read.youtube);
+      } else if (intermissionKindRef.current === "youtube") {
+        setYoutubeDraft("");
+      } else {
+        setFolderDraft("");
+      }
+    } catch (e) {
+      setIntermissionError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setIntermissionSaving(false);
+    }
+  }
+
+  function intermissionErrorText(error: string): string {
+    if (error === "youtube") return t.error("Not a YouTube video URL");
+    if (error === "folder-has-youtube") return t.intermissionYoutubeInFolder;
+    return t.error(error);
   }
 
   async function commit() {
@@ -854,6 +1056,7 @@ export function Admin() {
       setFieldError(next);
       return;
     }
+    if (slotOpRef.current) return;
     const file = youtube ? (parseYoutubeUrl(draft.file) ?? draft.file.trim()) : draft.file.trim();
     const sec = chosenSeconds(draft, measured);
     const slotMin = sec ? Math.max(1, Math.ceil(sec / 60)) : 0;
@@ -877,6 +1080,7 @@ export function Admin() {
     const blocks = draft.id
       ? schedule.blocks.map((item) => (item.id === draft.id ? block : item))
       : [...schedule.blocks, block];
+    beginSlotOp("save");
     try {
       const res = await persist({ ...schedule, blocks });
       setFitMiss(res.misses.find((miss) => miss.blockId === block.id) ?? null);
@@ -884,11 +1088,25 @@ export function Admin() {
       setFieldError({});
     } catch (e) {
       setFieldError({ form: e instanceof Error ? e.message : String(e) });
+    } finally {
+      endSlotOp();
     }
   }
 
+  function beginSlotOp(op: SlotOp) {
+    slotOpRef.current = op;
+    setSlotOp(op);
+    setFieldError((current) => ({ ...current, form: undefined }));
+  }
+
+  function endSlotOp() {
+    slotOpRef.current = null;
+    setSlotOp(null);
+  }
+
   async function removeDraft() {
-    if (!draft?.id) return;
+    if (!draft?.id || slotOpRef.current) return;
+    beginSlotOp("remove");
     try {
       await persist({
         ...schedule,
@@ -898,6 +1116,8 @@ export function Admin() {
       setFieldError({});
     } catch (e) {
       setFieldError({ form: e instanceof Error ? e.message : String(e) });
+    } finally {
+      endSlotOp();
     }
   }
 
@@ -913,7 +1133,27 @@ export function Admin() {
     setFieldError((current) => ({ ...current, time: undefined }));
   }
 
-  const fallbackName = schedule.fallbackFolder ? fallbackLabel(schedule.fallbackFolder) : "";
+  const fallbackName = schedule.fallbackFolder
+    ? fallbackLabel(schedule.fallbackFolder, youtubeTitles)
+    : "";
+  const pendingIntermission = intermissionPending(intermissionKind, folderDraft, youtubeDraft);
+  const savedIsYoutube = isYoutubeUrl(schedule.fallbackFolder);
+  const sameIntermissionKind =
+    (intermissionKind === "youtube" && savedIsYoutube) ||
+    (intermissionKind === "folder" && !savedIsYoutube);
+  const intermissionDirty = pendingIntermission.error
+    ? true
+    : sameIntermissionKind
+      ? !sameFallback(schedule.fallbackFolder, pendingIntermission.value)
+      : pendingIntermission.value !== "";
+  const intermissionPreview =
+    intermissionKind === "youtube"
+      ? parseYoutubeUrl(youtubeDraft)
+        ? fallbackLabel(youtubeDraft, youtubeTitles)
+        : ""
+      : folderDraft.trim()
+        ? folderLabel(folderDraft)
+        : "";
   const matched = draft && measured?.key === measureKey(draft) ? measured : null;
   const length = matched?.length ?? null;
   const lengthMins = length ? Math.ceil(length.durationSec / 60) : 0;
@@ -926,7 +1166,7 @@ export function Admin() {
     : false;
   const activeSec = draft ? (chosenSeconds(draft, matched) ?? 0) : 0;
   const fixedMin = draft && draft.lengthChoice !== "longest" ? fixedMinutes(draft) : null;
-  const clashes = draft && activeSec ? dayClashes(draft, schedule.blocks, activeSec) : [];
+  const clashes = draft && activeSec ? dayClashes(draft, schedule.blocks, activeSec, youtubeTitles) : [];
   const lengthLabels = [...PRESETS.map((mins) => t.minutes(mins)), t.customLength];
   const lengthCh = Math.max(...lengthLabels.map((label) => label.length));
   const addDisabled = !draft
@@ -948,6 +1188,7 @@ export function Admin() {
             type="button"
             class={intermissionOpen ? "intermission on" : "intermission"}
             aria-expanded={intermissionOpen}
+            title={fallbackName || undefined}
             onClick={() => setIntermissionOpen((open) => !open)}
           >
             {t.intermission} · <b>{fallbackName || t.none}</b>
@@ -969,25 +1210,70 @@ export function Admin() {
         {!draft && intermissionOpen && (
           <div class="intermission-open" ref={intermissionPanelRef}>
             <span>{t.ifEmpty}</span>
-            {fallbackName && <p class="folder-name">{fallbackName}</p>}
-            <FolderPath
-              kind="folder"
-              value={schedule.fallbackFolder}
-              placeholder={t.intermissionPlaceholder}
-              actionLabel={picking === "fallback" ? t.choosing : t.browse}
-              actionBusy={picking === "fallback"}
-              listLabel={t.folder}
-              onChange={(fallbackFolder) => {
-                setSchedule((current) => ({ ...current, fallbackFolder }));
-                setSaved(false);
-              }}
-              onAction={() => void chooseFallback()}
-              onBlur={() => void commitFallback()}
-            />
+            <div class="seg intermission-kind" role="radiogroup" aria-label={t.intermissionFrom}>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={intermissionKind === "folder"}
+                class={intermissionKind === "folder" ? "on" : ""}
+                onClick={() => chooseIntermissionKind("folder")}
+              >
+                {t.folder}
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={intermissionKind === "youtube"}
+                class={intermissionKind === "youtube" ? "on" : ""}
+                onClick={() => chooseIntermissionKind("youtube")}
+              >
+                {t.youtube}
+              </button>
+            </div>
+            {intermissionKind === "folder" ? (
+              <FolderPath
+                kind="folder"
+                value={folderDraft}
+                placeholder={t.folderPlaceholder}
+                invalid={intermissionError === "folder-has-youtube"}
+                actionLabel={picking === "fallback" ? t.choosing : t.browse}
+                actionBusy={picking === "fallback"}
+                listLabel={t.folder}
+                onChange={editFolderDraft}
+                onAction={() => void chooseFallback()}
+              />
+            ) : (
+              <div class="path-field">
+                <div class="field">
+                  <input
+                    value={youtubeDraft}
+                    placeholder={t.youtubePlaceholder}
+                    aria-invalid={intermissionError === "youtube" ? "true" : undefined}
+                    onInput={(event) => editYoutubeDraft((event.target as HTMLInputElement).value)}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter") return;
+                      event.preventDefault();
+                      void saveIntermission();
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+            {intermissionPreview && <p class="folder-name">{intermissionPreview}</p>}
+            {intermissionError && <p class="field-error">{intermissionErrorText(intermissionError)}</p>}
             <span>
-              {isYoutubeUrl(schedule.fallbackFolder) ? t.youtubeIntermission : t.nextHint}{" "}
-              {t.intermissionCut}
+              {intermissionKind === "youtube" ? t.youtubeIntermission : t.nextHint} {t.intermissionCut}
             </span>
+            <div class="intermission-actions">
+              <button
+                type="button"
+                class="primary"
+                disabled={!intermissionDirty || intermissionSaving}
+                onClick={() => void saveIntermission()}
+              >
+                {t.save}
+              </button>
+            </div>
           </div>
         )}
         <div class="week-scale">
@@ -1004,7 +1290,7 @@ export function Admin() {
               <div key={day} class={`day${day === today ? " on" : ""}${editing ? " editing" : ""}`}>
                 <span class="name">{t.day[day]}</span>
                 <div class="track">
-                  {pieces.map((piece) => {
+                  {pieces.map((piece, index) => {
                     const span = piece.end - piece.start;
                     if (piece.kind === "gap") {
                       const long = span >= 120;
@@ -1013,7 +1299,8 @@ export function Admin() {
                           key={`gap-${piece.start}`}
                           type="button"
                           class={`gap${long ? " long" : ""}${emptyDay ? " first" : ""}`}
-                          style={{ flexGrow: span }}
+                          style={bandStyle(piece.start, piece.end)}
+                          title={long && fallbackName ? fallbackName : undefined}
                           onClick={(event) => {
                             const rect = (event.currentTarget as HTMLButtonElement).getBoundingClientRect();
                             const ratio = rect.height
@@ -1040,11 +1327,11 @@ export function Admin() {
                         key={`${piece.block.id}-${piece.origin}-${piece.start}`}
                         type="button"
                         class={`slot${slotKind(piece.block)}${picked ? " pick" : ""}${spill ? " spill" : ""}`}
-                        style={{ flexGrow: span }}
-                        title={piece.block.file ?? piece.block.folder}
+                        style={bandStyle(piece.start, piece.end, nextSlotStart(pieces, index))}
+                        title={slotHover(piece.block, youtubeTitles)}
                         onClick={() => openSlot(piece.block, piece.origin)}
                       >
-                        <b>{slotLabel(piece.block)}</b>
+                        <b>{slotLabel(piece.block, youtubeTitles)}</b>
                         <i>
                           {clockFace(piece.start)}–{clockFace(piece.end)} · {t.lengthOf(piece.end - piece.start)}
                           {spill ? ` · ${t.day[piece.origin]}` : ""}
@@ -1057,10 +1344,7 @@ export function Admin() {
                     <span
                       key={`ghost-${ghost.start}-${ghost.end}`}
                       class={`ghost${slotKind(draft)}`}
-                      style={{
-                        top: `${(ghost.start / DAY_MINUTES) * 100}%`,
-                        height: `${((ghost.end - ghost.start) / DAY_MINUTES) * 100}%`,
-                      }}
+                      style={bandStyle(ghost.start, ghost.end, DAY_MINUTES)}
                     >
                       <b>
                         {clockFace(ghost.start)}–{clockFace(ghost.end)}
@@ -1077,6 +1361,7 @@ export function Admin() {
           <form
             ref={formRef}
             class="add-form"
+            aria-busy={slotOp ? "true" : undefined}
             onSubmit={(event) => {
               event.preventDefault();
               void commit();
@@ -1085,7 +1370,6 @@ export function Admin() {
             <header>
               <b>{draft.id ? t.editSlot(t.dayName[draft.origin]) : t.newSlot(t.dayName[draft.origin])}</b>
             </header>
-            {fieldError.form && <p class="field-error">{t.error(fieldError.form)}</p>}
             <div class="pick-mode">
               <span class="k">{t.playHow}</span>
               <div class="modes" role="radiogroup" aria-label={t.playHow}>
@@ -1428,12 +1712,19 @@ export function Admin() {
             {fieldError.time && <p class="field-error">{t.error(fieldError.time)}</p>}
             <div class="actions">
               {draft.id && (
-                <button type="button" class="quiet" onClick={() => void removeDraft()}>
+                <button
+                  type="button"
+                  class={slotOp === "remove" ? "quiet working" : "quiet"}
+                  disabled={slotOp !== null}
+                  onClick={() => void removeDraft()}
+                >
+                  {slotOpSlow && slotOp === "remove" && <span class="spin" aria-hidden="true" />}
                   {t.remove}
                 </button>
               )}
               <button
                 type="button"
+                disabled={slotOp !== null}
                 onClick={() => {
                   setDraft(null);
                   setFieldError({});
@@ -1441,10 +1732,20 @@ export function Admin() {
               >
                 {t.cancel}
               </button>
-              <button type="submit" class="primary" disabled={addDisabled}>
+              <button
+                type="submit"
+                class={slotOp === "save" ? "primary working" : "primary"}
+                disabled={addDisabled || slotOp !== null}
+              >
+                {slotOpSlow && slotOp === "save" && <span class="spin" aria-hidden="true" />}
                 {draft.id ? t.save : t.add}
               </button>
             </div>
+            {fieldError.form && (
+              <p class="field-error" ref={formErrorRef} role="alert">
+                {t.error(fieldError.form)}
+              </p>
+            )}
           </form>
         )}
       </div>

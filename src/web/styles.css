@@ -813,6 +813,7 @@ html[data-theme="dusk"] .today button.primary {
 .week-scale {
   --name-h: 1.15rem;
   --name-gap: 4px;
+  --slot-read: 2.35rem;
   display: grid;
   grid-template-columns: auto repeat(7, minmax(0, 1fr));
   grid-template-rows: minmax(0, 1fr);
@@ -890,10 +891,10 @@ html[data-theme="dusk"] .week-scale button.gap:hover {
 .week-scale button.gap,
 .week-scale button.slot {
   appearance: none;
-  flex-grow: 1;
-  flex-shrink: 1;
-  flex-basis: 0;
-  width: 100%;
+  position: absolute;
+  left: 0;
+  right: 0;
+  width: auto;
   margin: 0;
   border: 0;
   border-radius: 0;
@@ -943,16 +944,22 @@ html[data-theme="dusk"] .week-scale button.gap:hover {
 }
 
 .week-scale button.slot {
+  z-index: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 1px;
-  padding: 3px 6px;
+  padding: 1px 6px;
   overflow: hidden;
+  line-height: 1.05;
   text-align: left;
   background: var(--primary);
   color: var(--on-primary);
   container-type: size;
+}
+
+.week-scale button.slot b {
+  font-size: min(0.8rem, 44cqh);
 }
 
 .week-scale button.slot.spill {
@@ -960,13 +967,9 @@ html[data-theme="dusk"] .week-scale button.gap:hover {
 }
 
 .week-scale button.slot i {
-  display: none;
-}
-
-@container (min-height: 1.8rem) {
-  .week-scale button.slot i {
-    display: block;
-  }
+  display: block;
+  font-size: min(0.68rem, 34cqh);
+  white-space: nowrap;
 }
 
 .week-scale button.slot.pick,
@@ -1114,14 +1117,14 @@ html[data-theme="dusk"] .week-scale .ghost.tube {
 }
 
 .shell.wide .week-scale button.slot b {
-  font-size: 0.95rem;
+  font-size: min(0.95rem, 44cqh);
 }
 
 .week-scale .ghost {
   position: absolute;
   left: 0;
   right: 0;
-  z-index: 1;
+  z-index: 2;
   display: flex;
   align-items: center;
   min-width: 0;
@@ -1773,9 +1776,30 @@ html[data-theme="light"] .add-form .chip.on {
   justify-content: flex-end;
 }
 
+.add-form .actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
 .add-form .actions .quiet {
   margin-right: auto;
   padding: 6px 4px;
+}
+
+.add-form .actions .spin,
+html[data-theme="dusk"] .add-form .actions .spin {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+  border-color: color-mix(in srgb, currentColor 35%, transparent);
+  border-top-color: currentColor;
+}
+
+.add-form .actions button.working:disabled {
+  opacity: 1;
+  cursor: progress;
 }
 
 .week-head {
@@ -1807,6 +1831,12 @@ html[data-theme="light"] .add-form .chip.on {
 }
 
 .intermission b {
+  display: inline-block;
+  max-width: 18rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
   font-weight: 650;
 }
 
@@ -1839,7 +1869,7 @@ html[data-theme="dusk"] .intermission.on {
   top: 0;
   right: 0;
   z-index: 4;
-  width: min(100%, 21rem);
+  width: min(100%, 26rem);
   display: grid;
   gap: 6px;
   padding: 10px;
@@ -1860,6 +1890,27 @@ html[data-theme="dusk"] .intermission.on {
 
 .intermission-open .folder-name {
   color: var(--text);
+}
+
+.intermission-kind {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+}
+
+.intermission-kind button {
+  text-align: center;
+}
+
+.intermission-open .path-field,
+.intermission-open .field {
+  width: 100%;
+  min-width: 0;
+}
+
+.intermission-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 html[data-theme="teletext"] body,

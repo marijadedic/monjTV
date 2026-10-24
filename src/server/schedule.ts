@@ -76,9 +76,11 @@ export function validateSchedule(input: Schedule): Schedule {
   return { blocks, fallbackFolder: fallbackFolderOf(input.fallbackFolder) };
 }
 
-// A folder path, or empty when no default is set.
+// A folder path, a canonical YouTube watch URL, or empty.
 function fallbackFolderOf(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  return parseYoutubeUrl(trimmed) ?? trimmed;
 }
 
 // Fill defaults and reject an invalid block.

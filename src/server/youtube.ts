@@ -88,6 +88,29 @@ export async function probeYoutube(
   return meta;
 }
 
+// Titles for timetable labels. A failed lookup is omitted so the id can stay.
+export async function youtubeTitles(raws: string[]): Promise<Record<string, string>> {
+  const urls = [
+    ...new Set(
+      raws
+        .map((raw) => parseYoutubeUrl(raw))
+        .filter((url): url is string => url !== null),
+    ),
+  ];
+  const titles: Record<string, string> = {};
+  await Promise.all(
+    urls.map(async (url) => {
+      try {
+        const meta = await probeYoutube(url, { allowLive: true });
+        if (meta.title) titles[url] = meta.title;
+      } catch {
+        /* keep the video id on the timetable */
+      }
+    }),
+  );
+  return titles;
+}
+
 // Throw unless this is a finished YouTube video with a readable length.
 export async function assertYoutubeVideo(raw: string): Promise<void> {
   const trimmed = raw.trim();
