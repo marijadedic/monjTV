@@ -151,6 +151,10 @@ vite.config.ts.timestamp-*
 # Data
 data/
 
+# Current yt-dlp binary, downloaded on first YouTube use
+tools/yt-dlp
+tools/yt-dlp.tmp
+
 # Lavish
 .lavish/
 

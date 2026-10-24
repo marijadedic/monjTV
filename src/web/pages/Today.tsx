@@ -1,5 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 import type { ItemStatus, PlayerStatus, RundownItem, TodayRundown } from "../../shared/types.ts";
+import { itemCoversNow, itemProgress } from "../../shared/window.ts";
 import { api } from "../api.ts";
 import { useI18n } from "../i18n.tsx";
 
@@ -17,31 +18,17 @@ function folderName(filePath: string): string {
   return parts[parts.length - 2]!;
 }
 
-function hmToSec(hm: string): number | null {
-  const [hRaw, mRaw] = hm.split(":");
-  const h = Number(hRaw);
-  const m = Number(mRaw);
-  if (!Number.isInteger(h) || !Number.isInteger(m)) return null;
-  return h * 3600 + m * 60;
-}
-
 function nowSec(d: Date): number {
   return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
 }
 
 function progressOf(item: RundownItem, sec: number): number {
-  const start = hmToSec(item.start);
-  const end = hmToSec(item.end);
-  if (start == null || end == null || end <= start) return 0;
-  return Math.min(1, Math.max(0, (sec - start) / (end - start)));
+  return itemProgress(item, sec);
 }
 
 function scheduledNow(items: RundownItem[], sec: number): RundownItem | null {
   for (const item of items) {
-    const start = hmToSec(item.start);
-    const end = hmToSec(item.end);
-    if (start == null || end == null || end <= start) continue;
-    if (sec >= start && sec < end) return item;
+    if (itemCoversNow(item, sec)) return item;
   }
   return null;
 }
@@ -125,8 +112,14 @@ export function Today() {
   const modeLabel = (mode: RundownItem["mode"]) => {
     if (mode === "next-episode") return t.nextEpisode;
     if (mode === "specific-file") return t.oneVideo;
+    if (mode === "youtube") return t.youtube;
     return t.random;
   };
+
+  function sourceLabel(item: RundownItem): string {
+    if (item.mode === "youtube") return t.youtube;
+    return folderName(item.path);
+  }
 
   return (
     <section class="today">
@@ -156,7 +149,7 @@ export function Today() {
                   <span class="pill playing">{t.onAir}</span>
                   <h2 class="strip-title">{current.title}</h2>
                   <div class="muted" title={current.path}>
-                    {current.start}–{current.end} · {modeLabel(current.mode)} · {folderName(current.path)}
+                    {current.start}–{current.end} · {modeLabel(current.mode)} · {sourceLabel(current)}
                   </div>
                   <div
                     class="track"
@@ -184,7 +177,7 @@ export function Today() {
                   <h2 class="strip-title">{willStart.title}</h2>
                   <div class="muted" title={willStart.path}>
                     {willStart.start}–{willStart.end} · {modeLabel(willStart.mode)} ·{" "}
-                    {folderName(willStart.path)}
+                    {sourceLabel(willStart)}
                   </div>
                   {held && <p class="muted strip-note">{t.missedStart(held.title, held.end)}</p>}
                 </>
@@ -198,7 +191,7 @@ export function Today() {
                   <span class="pill">{t.scheduled}</span>
                   <h2 class="strip-title">{held.title}</h2>
                   <div class="muted" title={held.path}>
-                    {held.start}–{held.end} · {modeLabel(held.mode)} · {folderName(held.path)}
+                    {held.start}–{held.end} · {modeLabel(held.mode)} · {sourceLabel(held)}
                   </div>
                   <p class="muted strip-note">{t.willNotStart}</p>
                 </>
@@ -245,7 +238,7 @@ export function Today() {
                         {wontStart && <span class="pill">{t.scheduled}</span>}
                       </div>
                       <div class="muted" title={item.path}>
-                        {modeLabel(item.mode)} · {folderName(item.path)}
+                        {modeLabel(item.mode)} · {sourceLabel(item)}
                         {wontStart ? ` · ${t.willNotStart}` : ""}
                       </div>
                     </div>

@@ -3,6 +3,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 mkdir -p logs
+export PATH="$ROOT/tools:$PATH"
 PORT="${PORT:-3000}"
 
 # Leave the desktop app's process. macOS ignores another click while that app is still running.

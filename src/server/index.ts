@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { Hono } from "hono";
-import type { Schedule } from "../shared/types.ts";
+import { isBlockMode, type Schedule } from "../shared/types.ts";
 import { PORT } from "../shared/constants.ts";
 import { assertVideo, browse, pickFile, pickFolder, suggestPaths } from "./files.ts";
 import { clientDir } from "./paths.ts";
@@ -19,7 +19,8 @@ import {
   slotLength,
   videoCount,
 } from "./rundown.ts";
-import { assertFolder, changedBlocks, loadSchedule, saveSchedule } from "./schedule.ts";
+import { assertFallback, assertFolder, changedBlocks, loadSchedule, saveSchedule } from "./schedule.ts";
+import { assertYoutubeVideo } from "./youtube.ts";
 import { frameOf } from "./still.ts";
 import { closeAppTabs, portsFrom } from "./tabs.ts";
 
@@ -42,9 +43,10 @@ app.put("/api/schedule", async (c) => {
   try {
     for (const block of body.blocks ?? []) {
       if (block.mode === "specific-file") await assertVideo(block.file ?? "");
+      else if (block.mode === "youtube") await assertYoutubeVideo(block.file ?? "");
       else await assertFolder(block.folder);
     }
-    if (body.fallbackFolder?.trim()) await assertFolder(body.fallbackFolder.trim());
+    if (body.fallbackFolder?.trim()) await assertFallback(body.fallbackFolder.trim());
     const previous = await loadSchedule();
     const saved = await saveSchedule(body);
     const today = await rebuildTodayPreservingPlayback();
@@ -62,18 +64,22 @@ app.get("/api/video-count", async (c) => {
 
 app.get("/api/slot-length", async (c) => {
   const mode = c.req.query("mode");
-  if (mode !== "next-episode" && mode !== "random-file" && mode !== "specific-file") {
+  if (!isBlockMode(mode)) {
     return c.json(
-      { error: "mode must be next-episode, random-file, or specific-file" },
+      { error: "mode must be next-episode, random-file, specific-file, or youtube" },
       400,
     );
   }
-  const length = await slotLength({
-    mode,
-    folder: c.req.query("folder") ?? "",
-    file: c.req.query("file") ?? "",
-  });
-  return c.json({ length });
+  try {
+    const length = await slotLength({
+      mode,
+      folder: c.req.query("folder") ?? "",
+      file: c.req.query("file") ?? "",
+    });
+    return c.json({ length });
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+  }
 });
 
 // Return today's rundown, building it if the date changed.
@@ -125,7 +131,11 @@ app.post("/api/browse/pick", async (c) => {
 // Child folders, or videos, that match a path being typed.
 app.get("/api/browse/suggest", async (c) => {
   const kind = c.req.query("kind") === "video" ? "video" : "folder";
-  return c.json(await suggestPaths(c.req.query("path") ?? "", kind));
+  try {
+    return c.json(await suggestPaths(c.req.query("path") ?? "", kind));
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+  }
 });
 
 // List folders and videos for the folder picker.

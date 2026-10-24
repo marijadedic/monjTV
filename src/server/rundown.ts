@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { GRACE_SEC, MIN_REMAINING_SEC } from "../shared/constants.ts";
 import type {
   BlockMode,
+  Day,
   Progress,
   RundownItem,
   Schedule,
@@ -10,8 +11,18 @@ import type {
   SlotMiss,
   TodayRundown,
 } from "../shared/types.ts";
-import { windowOn } from "../shared/window.ts";
-import { dateKey, formatHm, parseHm, weekday } from "./clock.ts";
+import {
+  DAY_MINUTES,
+  DAY_SECONDS,
+  itemCoversNow,
+  itemJoinOffset,
+  leftoverMin,
+  lengthMinutes,
+  prevDay,
+  windowOn,
+} from "../shared/window.ts";
+import { parseYoutubeUrl } from "../shared/youtube.ts";
+import { dateKey, formatHm, nowSec, parseHm, weekday } from "./clock.ts";
 import { probeDuration } from "./duration.ts";
 import { isDir, isVideoFile, titleFromPath } from "./files.ts";
 import { todayPath } from "./paths.ts";
@@ -19,6 +30,7 @@ import { nextEpisode, randomFile, videosIn } from "./picker.ts";
 import { loadProgress } from "./progress.ts";
 import { blocksForDay, loadSchedule } from "./schedule.ts";
 import { readJson, writeJson } from "./store.ts";
+import { probeYoutube } from "./youtube.ts";
 
 // Empty rundown used when today's file is missing.
 const empty = (): TodayRundown => ({ date: "", items: [] });
@@ -38,9 +50,9 @@ export async function ensureToday(): Promise<TodayRundown> {
   const today = dateKey();
   const current = await loadToday();
   if (current.date === today) return current;
-  const built = await buildRundown(today);
-  await saveToday(built);
-  return built;
+  const result = await rollToToday(current);
+  await saveToday(result);
+  return result;
 }
 
 // Rebuild today while keeping items that are already playing or finished.
@@ -48,7 +60,12 @@ export async function rebuildTodayPreservingPlayback(): Promise<TodayRundown> {
   const today = dateKey();
   const current = await loadToday();
   const built = await buildRundown(today);
-  if (current.date !== today || !current.items.some((i) => i.status === "playing")) {
+  if (current.date !== today) {
+    const result = await rollToToday(current);
+    await saveToday(result);
+    return result;
+  }
+  if (!current.items.some((i) => i.status === "playing")) {
     await saveToday(built);
     return built;
   }
@@ -63,20 +80,28 @@ export async function rebuildTodayPreservingPlayback(): Promise<TodayRundown> {
 
   const merged: RundownItem[] = [];
   const schedule = await loadSchedule();
+  const overnightLocked = current.items.filter((item) => item.overnight && item.status !== "planned");
+  merged.push(...overnightLocked);
+  const overnightLockedBlocks = new Set(overnightLocked.map((item) => item.blockId));
   for (const block of blocksForDay(schedule, weekday())) {
-    const locked = lockedByBlock.get(block.id);
-    if (!locked) {
-      merged.push(...built.items.filter((i) => i.blockId === block.id));
+    const locked = (lockedByBlock.get(block.id) ?? []).filter((item) => !item.overnight);
+    if (!locked.length) {
+      merged.push(...built.items.filter((i) => i.blockId === block.id && !i.overnight));
       continue;
     }
     merged.push(...locked);
     if (locked.some((i) => i.status === "playing")) continue;
     const lockedPaths = new Set(locked.map((i) => i.path));
     merged.push(
-      ...built.items.filter((i) => i.blockId === block.id && !lockedPaths.has(i.path)),
+      ...built.items.filter((i) => i.blockId === block.id && !i.overnight && !lockedPaths.has(i.path)),
     );
   }
-  const result = { date: today, items: merged };
+  merged.push(
+    ...built.items.filter(
+      (item) => item.overnight && !overnightLockedBlocks.has(item.blockId),
+    ),
+  );
+  const result = { date: today, items: sortRundown(merged) };
   await saveToday(result);
   return result;
 }
@@ -86,65 +111,170 @@ export async function buildRundown(date = dateKey()): Promise<TodayRundown> {
   const schedule = await loadSchedule();
   const progress = await loadProgress();
   const day = weekday();
-  const blocks = blocksForDay(schedule, day);
   const items: RundownItem[] = [];
 
-  for (const block of blocks) {
+  for (const block of blocksForDay(schedule, day)) {
     const placed = windowOn(block, day);
-    const cursorStart = parseHm(placed.start);
-    const blockEnd = parseHm(placed.end);
+    items.push(
+      ...(await itemsForWindow(
+        block,
+        parseHm(placed.start),
+        parseHm(placed.start) + lengthMinutes(block) * 60,
+        progress,
+      )),
+    );
+  }
 
-    if (block.mode === "specific-file") {
-      const file = block.file;
-      if (!file || !(await isVideoFile(file))) continue;
-      const durationSec = await probeDuration(file);
-      if (!itemFits(durationSec, blockEnd - cursorStart)) continue;
-      items.push(makeItem(block, file, cursorStart, durationSec));
-      continue;
-    }
-
-    const files = await videosIn(block.folder);
-    if (files.length === 0) continue;
-    const used: string[] = [];
-    const passed = new Set<string>();
-    let lastCompleted = progress.lastCompleted[block.folder];
-    let cursor = cursorStart;
-
-    while (true) {
-      const remaining = blockEnd - cursor;
-      if (remaining <= 0) break;
-
-      let picked: string | null = null;
-      let durationSec = 0;
-      if (block.mode === "next-episode") {
-        const file = nextFrom(files, lastCompleted);
-        if (!file) break;
-        durationSec = await probeDuration(file);
-        if (!itemFits(durationSec, remaining)) break;
-        picked = file;
-      } else {
-        const recent = progress.recentRandom[block.folder] ?? [];
-        const pool = files.filter((candidate) => !passed.has(candidate) && !used.includes(candidate));
-        if (pool.length === 0) break;
-        const file = randomFile(pool, recent);
-        if (!file) break;
-        durationSec = await probeDuration(file);
-        if (!itemFits(durationSec, remaining)) {
-          passed.add(file);
-          continue;
-        }
-        picked = file;
-      }
-      if (!picked) break;
-
-      items.push(makeItem(block, picked, cursor, durationSec));
-      used.push(picked);
-      if (block.mode === "next-episode") lastCompleted = picked;
-      cursor += durationSec;
+  const yesterday = prevDay(day);
+  const now = nowSec();
+  for (const block of blocksForDay(schedule, yesterday)) {
+    const placed = windowOn(block, yesterday);
+    if (placed.endMin <= DAY_MINUTES) continue;
+    const leftoverEndSec = leftoverMin(placed) * 60;
+    const built = await itemsForWindow(
+      block,
+      parseHm(placed.start),
+      parseHm(placed.start) + lengthMinutes(block) * 60,
+      progress,
+    );
+    for (const item of built) {
+      const leftover = { ...item, overnight: true };
+      if (leftoverStillActive(leftover, now, leftoverEndSec)) items.push(leftover);
     }
   }
 
-  return { date, items };
+  return { date, items: sortRundown(items) };
+}
+
+async function itemsForWindow(
+  block: ScheduleBlock,
+  cursorStart: number,
+  blockEnd: number,
+  progress: Progress,
+): Promise<RundownItem[]> {
+  const items: RundownItem[] = [];
+
+  if (block.mode === "youtube") {
+    const url = parseYoutubeUrl(block.file ?? "");
+    if (!url) return items;
+    let meta;
+    try {
+      meta = await probeYoutube(url);
+    } catch {
+      return items;
+    }
+    if (!itemFits(meta.durationSec, blockEnd - cursorStart)) return items;
+    items.push(makeItem(block, meta.url, cursorStart, meta.durationSec, meta.title));
+    return items;
+  }
+
+  if (block.mode === "specific-file") {
+    const file = block.file;
+    if (!file || !(await isVideoFile(file))) return items;
+    const durationSec = await probeDuration(file);
+    if (!itemFits(durationSec, blockEnd - cursorStart)) return items;
+    items.push(makeItem(block, file, cursorStart, durationSec));
+    return items;
+  }
+
+  const files = await videosIn(block.folder);
+  if (files.length === 0) return items;
+  const used: string[] = [];
+  const passed = new Set<string>();
+  let lastCompleted = progress.lastCompleted[block.folder];
+  let cursor = cursorStart;
+
+  while (true) {
+    const remaining = blockEnd - cursor;
+    if (remaining <= 0) break;
+
+    let picked: string | null = null;
+    let durationSec = 0;
+    if (block.mode === "next-episode") {
+      const file = nextFrom(files, lastCompleted);
+      if (!file) break;
+      durationSec = await probeDuration(file);
+      if (!itemFits(durationSec, remaining)) break;
+      picked = file;
+    } else {
+      const recent = progress.recentRandom[block.folder] ?? [];
+      const pool = files.filter((candidate) => !passed.has(candidate) && !used.includes(candidate));
+      if (pool.length === 0) break;
+      const file = randomFile(pool, recent);
+      if (!file) break;
+      durationSec = await probeDuration(file);
+      if (!itemFits(durationSec, remaining)) {
+        passed.add(file);
+        continue;
+      }
+      picked = file;
+    }
+    if (!picked) break;
+
+    items.push(makeItem(block, picked, cursor, durationSec));
+    used.push(picked);
+    if (block.mode === "next-episode") lastCompleted = picked;
+    cursor += durationSec;
+  }
+
+  return items;
+}
+
+async function rollToToday(current: TodayRundown): Promise<TodayRundown> {
+  const built = await buildRundown(dateKey());
+  const schedule = await loadSchedule();
+  const carry = leftoverCarry(current.items, schedule, prevDay(weekday()), nowSec());
+  return { date: dateKey(), items: mergeOvernight(built.items, carry) };
+}
+
+function leftoverCarry(
+  items: RundownItem[],
+  schedule: Schedule,
+  yesterday: Day,
+  now: number,
+): RundownItem[] {
+  const out: RundownItem[] = [];
+  for (const item of items) {
+    if (item.status === "done" || item.status === "skipped") continue;
+    const block = schedule.blocks.find((entry) => entry.id === item.blockId);
+    if (!block?.days.includes(yesterday)) continue;
+    const placed = windowOn(block, yesterday);
+    if (placed.endMin <= DAY_MINUTES) continue;
+    const leftover = { ...item, overnight: true };
+    if (item.status === "playing" || leftoverStillActive(leftover, now, leftoverMin(placed) * 60)) {
+      out.push(leftover);
+    }
+  }
+  return out;
+}
+
+function mergeOvernight(built: RundownItem[], carry: RundownItem[]): RundownItem[] {
+  if (carry.length === 0) return built;
+  const carriedBlocks = new Set(carry.map((item) => item.blockId));
+  return sortRundown([
+    ...carry,
+    ...built.filter((item) => !item.overnight || !carriedBlocks.has(item.blockId)),
+  ]);
+}
+
+function leftoverStillActive(item: RundownItem, now: number, leftoverEndSec: number): boolean {
+  if (itemCoversNow(item, now)) return true;
+  const start = parseHm(item.start);
+  return start < leftoverEndSec && start > now;
+}
+
+function sortRundown(items: RundownItem[]): RundownItem[] {
+  return items.slice().sort((a, b) => {
+    const aOver = a.overnight ? 0 : 1;
+    const bOver = b.overnight ? 0 : 1;
+    if (aOver !== bOver) return aOver - bOver;
+    if (a.overnight && b.overnight) {
+      const aWrap = parseHm(a.start) + a.durationSec > DAY_SECONDS ? 0 : 1;
+      const bWrap = parseHm(b.start) + b.durationSec > DAY_SECONDS ? 0 : 1;
+      if (aWrap !== bWrap) return aWrap - bWrap;
+    }
+    return parseHm(a.start) - parseHm(b.start);
+  });
 }
 
 // Next file after the last completed one, wrapping to the start.
@@ -162,12 +292,13 @@ function makeItem(
   file: string,
   startSec: number,
   durationSec: number,
+  title = titleFromPath(file),
 ): RundownItem {
   return {
     id: randomUUID(),
     blockId: block.id,
     path: file,
-    title: titleFromPath(file),
+    title,
     mode: block.mode,
     start: formatHm(startSec),
     end: formatHm(startSec + durationSec),
@@ -178,8 +309,7 @@ function makeItem(
 
 // True when the clock is inside this file's planned window.
 export function coversNow(item: RundownItem, now: number): boolean {
-  const start = parseHm(item.start);
-  return now >= start && now < start + item.durationSec;
+  return itemCoversNow(item, now);
 }
 
 // Planned file the clock is inside. A later start wins when two windows overlap.
@@ -195,7 +325,7 @@ export function onAirItem(items: RundownItem[], now: number): RundownItem | null
 
 // Seconds from the start of the file to this clock time.
 export function joinOffset(item: RundownItem, now: number): number {
-  return Math.max(0, now - parseHm(item.start));
+  return itemJoinOffset(item, now);
 }
 
 // True when the file can start with this many seconds left in the block.
@@ -219,6 +349,18 @@ export async function slotLength(opts: {
   folder: string;
   file?: string;
 }): Promise<SlotLength | null> {
+  if (opts.mode === "youtube") {
+    const file = parseYoutubeUrl(opts.file ?? "");
+    if (!file) return null;
+    const meta = await probeYoutube(file);
+    return {
+      title: meta.title,
+      path: meta.url,
+      durationSec: meta.durationSec,
+      kind: "video",
+    };
+  }
+
   if (opts.mode === "specific-file") {
     const file = opts.file?.trim() ?? "";
     if (!file || !(await isVideoFile(file))) return null;
@@ -291,6 +433,19 @@ export async function missesForBlocks(blocks: ScheduleBlock[]): Promise<SlotMiss
 async function missForBlock(block: ScheduleBlock, progress: Progress): Promise<SlotMiss | null> {
   const slotSec = tightestSlotSec(block);
   const limitSec = maxPlayableSec(slotSec);
+  if (block.mode === "youtube") {
+    const url = parseYoutubeUrl(block.file ?? "");
+    if (!url) return null;
+    let meta;
+    try {
+      meta = await probeYoutube(url);
+    } catch {
+      return null;
+    }
+    if (itemFits(meta.durationSec, slotSec)) return null;
+    return { blockId: block.id, kind: "video", title: meta.title, durationSec: meta.durationSec, limitSec };
+  }
+
   if (block.mode === "specific-file") {
     const file = block.file;
     if (!file || !(await isVideoFile(file))) return null;
@@ -361,23 +516,29 @@ export async function shuffleItem(itemId: string): Promise<TodayRundown> {
 
 // Recalculate start and end times for every item in a block.
 function recomputeBlockTimes(rundown: TodayRundown, block: ScheduleBlock): void {
-  let cursor = parseHm(windowOn(block, weekday()).start);
-  for (const item of rundown.items.filter((i) => i.blockId === block.id)) {
-    item.start = formatHm(cursor);
-    item.end = formatHm(cursor + item.durationSec);
-    cursor += item.durationSec;
+  const overnight = rundown.items.filter((item) => item.blockId === block.id && item.overnight);
+  const todayItems = rundown.items.filter((item) => item.blockId === block.id && !item.overnight);
+  if (overnight.length) {
+    let cursor = parseHm(windowOn(block, prevDay(weekday())).start);
+    for (const item of overnight) {
+      item.start = formatHm(cursor);
+      item.end = formatHm(cursor + item.durationSec);
+      cursor += item.durationSec;
+    }
+  }
+  if (todayItems.length) {
+    let cursor = parseHm(windowOn(block, weekday()).start);
+    for (const item of todayItems) {
+      item.start = formatHm(cursor);
+      item.end = formatHm(cursor + item.durationSec);
+      cursor += item.durationSec;
+    }
   }
 }
 
-// Shortest window among the block's days, in seconds.
+// Window length in seconds. Every day uses the same stored length.
 function tightestSlotSec(block: ScheduleBlock): number {
-  let slotSec = 0;
-  for (const day of block.days) {
-    const placed = windowOn(block, day);
-    const span = parseHm(placed.end) - parseHm(placed.start);
-    if (slotSec === 0 || span < slotSec) slotSec = span;
-  }
-  return slotSec;
+  return lengthMinutes(block) * 60;
 }
 
 // Schedule block with the given id.

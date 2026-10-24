@@ -32,6 +32,9 @@ export async function pick(opts: {
   exclude?: string[];
   lastCompletedOverride?: string;
 }): Promise<string | null> {
+  if (opts.mode === "youtube") {
+    return opts.file?.trim() || null;
+  }
   if (opts.mode === "specific-file") {
     if (!opts.file || !(await isVideoFile(opts.file))) return null;
     return opts.file;

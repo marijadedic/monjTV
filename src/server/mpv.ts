@@ -4,6 +4,8 @@ import { unlink } from "node:fs/promises";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
+import { isYoutubeUrl } from "../shared/youtube.ts";
+import { ensureYtdlp } from "./ytdlp.ts";
 
 type MpvEvent = {
   event?: string;
@@ -82,6 +84,7 @@ export class Mpv {
   async start(): Promise<void> {
     if (this.running) return;
     await unlink(this.sockPath).catch(() => undefined);
+    const ytdlp = await ensureYtdlp();
     this.proc = spawn(
       "mpv",
       [
@@ -91,6 +94,9 @@ export class Mpv {
         "--force-window=yes",
         "--keep-open=no",
         "--no-terminal",
+        `--script-opts=ytdl_hook-ytdl_path=${ytdlp}`,
+        "--ytdl-format=bestvideo[height<=1080][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=1080][vcodec^=avc]+bestaudio/bestvideo[height<=1080]+bestaudio/best[height<=1080]/18/best",
+        "--ytdl-raw-options-append=no-playlist=",
         ...decodeArgs(),
       ],
       { stdio: ["ignore", "ignore", "inherit"] },
@@ -109,11 +115,12 @@ export class Mpv {
   // Replace the current file. A positive start seeks that many seconds in.
   async loadFile(filePath: string, startSec = 0): Promise<void> {
     const start = Math.floor(startSec);
+    const timeoutMs = isYoutubeUrl(filePath) ? 60_000 : 8_000;
     if (start > 0) {
-      await this.command(["loadfile", filePath, "replace", -1, { start: String(start) }]);
+      await this.command(["loadfile", filePath, "replace", -1, { start: String(start) }], timeoutMs);
       return;
     }
-    await this.command(["loadfile", filePath, "replace"]);
+    await this.command(["loadfile", filePath, "replace"], timeoutMs);
   }
 
   // Stop the current file without quitting mpv.
@@ -131,7 +138,7 @@ export class Mpv {
   }
 
   // Send an IPC command and wait for its reply.
-  private async command(args: unknown[]): Promise<unknown> {
+  private async command(args: unknown[], timeoutMs = 5000): Promise<unknown> {
     if (!this.sock) throw new Error("mpv is not running");
     const request_id = this.nextId++;
     const payload = JSON.stringify({ command: args, request_id }) + "\n";
@@ -148,7 +155,7 @@ export class Mpv {
           this.pending.delete(request_id);
           reject(new Error("mpv command timed out"));
         }
-      }, 5000);
+      }, timeoutMs);
     });
   }
 

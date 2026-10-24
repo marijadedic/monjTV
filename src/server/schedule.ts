@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { DAYS, type Day, type Schedule, type ScheduleBlock } from "../shared/types.ts";
-import { clockOf, minutesOf, windowOn } from "../shared/window.ts";
+import { DAYS, isBlockMode, type Day, type Schedule, type ScheduleBlock } from "../shared/types.ts";
+import { DAY_MINUTES, clockOf, minutesOf, segmentsOf, windowOn } from "../shared/window.ts";
+import { isYoutubeUrl, parseYoutubeUrl } from "../shared/youtube.ts";
 import { parseHm, isHm } from "./clock.ts";
 import { isDir } from "./files.ts";
 import { schedulePath } from "./paths.ts";
@@ -50,7 +51,7 @@ export function blocksForDay(schedule: Schedule, day: Day): ScheduleBlock[] {
     .sort((a, b) => parseHm(windowOn(a, day).start) - parseHm(windowOn(b, day).start));
 }
 
-// Normalize blocks and reject same-day overlaps.
+// Normalize blocks and reject overlaps, including leftovers that run past midnight.
 export function validateSchedule(input: Schedule): Schedule {
   if (!input || !Array.isArray(input.blocks)) {
     throw new Error("Schedule must have a blocks array");
@@ -58,21 +59,17 @@ export function validateSchedule(input: Schedule): Schedule {
   const blocks = input.blocks.map(normalizeBlock);
   for (const day of DAYS) {
     const ofDay = blocks
-      .filter((b) => b.days.includes(day))
-      .map((block) => windowOn(block, day))
-      .sort((a, b) => parseHm(a.start) - parseHm(b.start));
-    for (const window of ofDay) {
-      if (parseHm(window.end) <= parseHm(window.start)) {
-        throw new Error(`Block ${window.start}–${window.end} must end after it starts (same day)`);
-      }
-    }
+      .flatMap((block) =>
+        segmentsOf(block)
+          .filter((seg) => seg.day === day)
+          .map((seg) => ({ start: seg.start, end: seg.end, label: `${clockOf(seg.start)}–${clockOf(seg.end)}` })),
+      )
+      .sort((a, b) => a.start - b.start);
     for (let i = 1; i < ofDay.length; i++) {
       const prev = ofDay[i - 1]!;
       const cur = ofDay[i]!;
-      if (parseHm(cur.start) < parseHm(prev.end)) {
-        throw new Error(
-          `Overlapping blocks on ${day}: ${prev.start}–${prev.end} and ${cur.start}–${cur.end}`,
-        );
+      if (cur.start < prev.end) {
+        throw new Error(`Overlapping blocks on ${day}: ${prev.label} and ${cur.label}`);
       }
     }
   }
@@ -95,11 +92,26 @@ function normalizeBlock(raw: ScheduleBlock): ScheduleBlock {
   const starts = cleanStarts(days, raw.starts);
   const end = lengthMin ? clockOf(minutesOf(raw.start) + lengthMin) : raw.end;
   if (!isHm(end)) throw new Error("start and end must be HH:mm");
-  if (parseHm(end) <= parseHm(raw.start)) {
-    throw new Error(`Block ${raw.start}–${end} must end after it starts (same day)`);
+  if (!lengthMin && minutesOf(end) === minutesOf(raw.start)) {
+    throw new Error("Block must be shorter than 24 hours");
   }
-  if (raw.mode !== "next-episode" && raw.mode !== "random-file" && raw.mode !== "specific-file") {
-    throw new Error("mode must be next-episode, random-file, or specific-file");
+  if (!isBlockMode(raw.mode)) {
+    throw new Error("mode must be next-episode, random-file, specific-file, or youtube");
+  }
+  if (raw.mode === "youtube") {
+    const file = parseYoutubeUrl(raw.file ?? "") ?? "";
+    if (!file) throw new Error("Each YouTube slot needs a YouTube video URL");
+    return {
+      id,
+      days,
+      start: raw.start,
+      end,
+      ...(lengthMin ? { lengthMin } : {}),
+      ...(starts ? { starts } : {}),
+      folder: "",
+      file,
+      mode: raw.mode,
+    };
   }
   if (raw.mode === "specific-file") {
     const file = (raw.file ?? "").trim();
@@ -152,6 +164,7 @@ function cleanLength(raw: ScheduleBlock): number | undefined {
   if (typeof raw.lengthMin !== "number" || !Number.isInteger(raw.lengthMin) || raw.lengthMin < 1) {
     throw new Error("start and end must be HH:mm");
   }
+  if (raw.lengthMin >= DAY_MINUTES) throw new Error("Block must be shorter than 24 hours");
   return raw.lengthMin;
 }
 
@@ -177,4 +190,12 @@ export async function assertFolder(folder: string): Promise<void> {
   if (!(await isDir(folder))) {
     throw new Error(`Folder does not exist: ${folder}`);
   }
+}
+
+// A folder on disk, or a YouTube URL for intermission.
+export async function assertFallback(source: string): Promise<void> {
+  const trimmed = source.trim();
+  if (!trimmed) return;
+  if (isYoutubeUrl(trimmed)) return;
+  await assertFolder(trimmed);
 }

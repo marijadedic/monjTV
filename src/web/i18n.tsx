@@ -78,6 +78,13 @@ type Copy = {
   nextHint: string;
   oneVideo: string;
   oneHint: string;
+  youtube: string;
+  youtubeHint: string;
+  chooseYoutube: string;
+  youtubePlaceholder: string;
+  youtubeCaveat: string;
+  youtubeProbeCache: string;
+  youtubeIntermission: string;
   video: string;
   videoPlaceholder: string;
   alsoOn: string;
@@ -85,6 +92,7 @@ type Copy = {
   ifEmpty: string;
   intermission: string;
   intermissionCut: string;
+  intermissionPlaceholder: string;
   none: string;
   change: string;
   clickFirst: string;
@@ -115,6 +123,7 @@ type Copy = {
   until: (time: string) => string;
   noVideo: string;
   endNote: (time: string) => string;
+  endNoteNextDay: (time: string) => string;
 };
 
 const en: Copy = {
@@ -209,13 +218,24 @@ const en: Copy = {
   nextHint: "Walks the folder in order.",
   oneVideo: "One video",
   oneHint: "Plays a specific file.",
+  youtube: "YouTube",
+  youtubeHint: "Plays one YouTube video in mpv.",
+  chooseYoutube: "YouTube URL",
+  youtubePlaceholder: "https://www.youtube.com/watch?v=…",
+  youtubeCaveat:
+    "Use a finished YouTube video, not a live stream. This needs the internet and will not play as offline TV.",
+  youtubeProbeCache:
+    "The length comes from yt-dlp. Keep yt-dlp updated; YouTube changes often. This needs the internet.",
+  youtubeIntermission:
+    "A YouTube URL is fine here, including a live stream. Playback needs the internet.",
   video: "Video",
   videoPlaceholder: "/path/to/video.mp4",
   alsoOn: "Also play on",
   playHow: "Select the type of playback",
-  ifEmpty: "Plays if nothing is scheduled",
+  ifEmpty: "Plays when nothing is on, and after a slot’s video ends early.",
   intermission: "Intermission",
   intermissionCut: "A new slot cuts it off.",
+  intermissionPlaceholder: "/path/to/folder or a YouTube URL",
   none: "None",
   change: "Change",
   clickFirst: "Click to add the first slot",
@@ -253,12 +273,13 @@ const en: Copy = {
     `This runs until ${end} and into ${title}, which starts at ${start}.`,
   runsIntoOn: (day, end, title, start) =>
     `${day}: this runs until ${end} and into ${title}, which starts at ${start}.`,
-  pastMidnight: "This runs past the end of the day.",
+  pastMidnight: "This continues into the next day.",
   measuring: "Measuring…",
   followsVideo: "Follows the video",
   until: (time) => `Until ${time}`,
   noVideo: "No video found there.",
   endNote: (time) => `Ends at ${time}.`,
+  endNoteNextDay: (time) => `Ends at ${time} the next day.`,
 };
 
 function runLength(sec: number, hr: boolean): string {
@@ -297,18 +318,26 @@ const hrExact: Record<string, string> = {
   "Invalid slot": "Neispravan blok.",
   "Each slot needs at least one day": "Svaki blok treba barem jedan dan.",
   "start and end must be HH:mm": "Početak i kraj moraju biti u obliku HH:mm.",
-  "mode must be next-episode, random-file, or specific-file":
-    "Način mora biti sljedeća epizoda, nasumična datoteka ili jedan video.",
+  "mode must be next-episode, random-file, specific-file, or youtube":
+    "Način mora biti sljedeća epizoda, nasumična datoteka, jedan video ili YouTube.",
   "Each specific-file slot needs a video": "Blok s jednim videom treba odabranu datoteku.",
+  "Each YouTube slot needs a YouTube video URL": "YouTube blok treba YouTube URL videa.",
+  "Not a YouTube video URL": "To nije YouTube URL videa.",
+  "yt-dlp is not installed or not on PATH": "yt-dlp nije instaliran ili nije na PATH-u.",
+  "Could not read this YouTube video": "Ovaj YouTube video nije se mogao pročitati.",
+  "Could not read this YouTube video's length": "Trajanje ovog YouTube videa nije se moglo pročitati.",
+  "Live streams cannot be scheduled. Use a finished YouTube video, or put a live URL in Intermission.":
+    "Prijenosi uživo ne idu u raspored. Stavite gotov YouTube video, ili URL uživo u Pauzu.",
   "Each slot needs a folder": "Svaki blok treba mapu.",
   "Type the video path.": "Upišite putanju videa.",
   "The file picker is only available on macOS and Linux.":
     "Odabir datoteke dostupan je samo na macOS-u i Linuxu.",
   "mpv is not installed or not on PATH": "mpv nije instaliran ili nije na PATH-u.",
   "mpv is not running": "mpv nije pokrenut.",
-  "Choose a video or folder to set the length.":
-    "Odaberite video ili mapu da bi blok dobio trajanje.",
+  "Choose a video, folder, or YouTube URL to set the length.":
+    "Odaberite video, mapu ili YouTube URL da bi blok dobio trajanje.",
   "Still measuring the video.": "Video se još mjeri.",
+  "Block must be shorter than 24 hours": "Blok mora biti kraći od 24 sata.",
 };
 
 function hrError(message: string): string {
@@ -440,13 +469,24 @@ const hr: Copy = {
   nextHint: "Ide redom kroz mapu.",
   oneVideo: "Jedan video",
   oneHint: "Pušta određenu datoteku.",
+  youtube: "YouTube",
+  youtubeHint: "Pušta jedan YouTube video u mpv-u.",
+  chooseYoutube: "YouTube URL",
+  youtubePlaceholder: "https://www.youtube.com/watch?v=…",
+  youtubeCaveat:
+    "Stavite gotov YouTube video, ne prijenos uživo. Treba internet i neće raditi kao televizija bez mreže.",
+  youtubeProbeCache:
+    "Trajanje dolazi iz yt-dlp. Održavajte yt-dlp ažurnim; YouTube se često mijenja. Treba internet.",
+  youtubeIntermission:
+    "YouTube URL ovdje može, uključujući prijenos uživo. Reprodukcija treba internet.",
   video: "Video",
   videoPlaceholder: "/putanja/do/videa.mp4",
   alsoOn: "Pusti i na",
   playHow: "Odaberi tip reprodukcije",
-  ifEmpty: "Reproducira se ako ništa nije zakazano",
+  ifEmpty: "Reproducira se kad ništa nije na rasporedu, i kad video u bloku završi ranije.",
   intermission: "Pauza",
   intermissionCut: "Novi blok prekida reprodukciju.",
+  intermissionPlaceholder: "/putanja/do/mape ili YouTube URL",
   none: "nije odabrano",
   change: "Promijeni",
   clickFirst: "Klikni za dodati prvi blok",
@@ -490,6 +530,7 @@ const hr: Copy = {
   until: (time) => `Do ${time}`,
   noVideo: "Tamo nema videa.",
   endNote: (time) => `Blok završava u ${time}.`,
+  endNoteNextDay: (time) => `Blok završava u ${time} sljedećeg dana.`,
 };
 
 const copy: Record<Lang, Copy> = { en, hr };

@@ -8,11 +8,20 @@ import {
   type SlotLength,
   type SlotMiss,
 } from "../../shared/types.ts";
-import { windowOn } from "../../shared/window.ts";
+import {
+  DAY_MINUTES,
+  clockOf,
+  leftoverMin,
+  lengthMinutes,
+  nextDay,
+  prevDay,
+  segmentsOf,
+  windowOn,
+} from "../../shared/window.ts";
+import { isYoutubeUrl, parseYoutubeUrl, youtubeLabel } from "../../shared/youtube.ts";
 import { api } from "../api.ts";
 import { useI18n } from "../i18n.tsx";
 
-const DAY_MINUTES = 24 * 60;
 const PRESETS = [30, 60, 90, 120, 260] as const;
 const MANY_FILES = 20;
 
@@ -24,7 +33,7 @@ const WEEKDAY: Day[] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
 type Piece =
   | { kind: "gap"; start: number; end: number }
-  | { kind: "slot"; block: ScheduleBlock; start: number; end: number };
+  | { kind: "slot"; block: ScheduleBlock; start: number; end: number; origin: Day };
 
 type Draft = {
   id: string | null;
@@ -154,8 +163,14 @@ function fileTitle(file: string): string {
 }
 
 function slotLabel(block: { folder: string; file?: string; mode: BlockMode }): string {
+  if (block.mode === "youtube" && block.file) return youtubeLabel(block.file);
   if (block.mode === "specific-file" && block.file) return fileTitle(block.file);
   return folderLabel(block.folder);
+}
+
+function fallbackLabel(source: string): string {
+  if (isYoutubeUrl(source)) return youtubeLabel(source);
+  return folderLabel(source);
 }
 
 type FolderHit = { name: string; path: string };
@@ -189,7 +204,7 @@ function FolderPath({
   const listId = useRef(`folders-${Math.random().toString(36).slice(2)}`).current;
 
   useEffect(() => {
-    if (!open || !value.trim()) {
+    if (!open || !value.trim() || isYoutubeUrl(value)) {
       setDirs([]);
       setActive(-1);
       return;
@@ -290,53 +305,85 @@ function slotKind(block: { folder: string; mode: BlockMode }): string {
   const name = folderLabel(block.folder).toLowerCase();
   if (name === "shows" || block.mode === "next-episode") return " shows";
   if (block.mode === "specific-file") return " film";
+  if (block.mode === "youtube") return " tube";
   return "";
 }
 
 function piecesFor(day: Day, blocks: ScheduleBlock[]): Piece[] {
-  const mine = blocks
-    .filter((block) => block.days.includes(day))
-    .slice()
-    .sort((a, b) => toMin(windowOn(a, day).start) - toMin(windowOn(b, day).start));
+  const mine: { block: ScheduleBlock; start: number; end: number; origin: Day }[] = [];
+  for (const block of blocks) {
+    if (block.days.includes(day)) {
+      const placed = windowOn(block, day);
+      const end = Math.min(placed.endMin, DAY_MINUTES);
+      if (end > placed.startMin) mine.push({ block, start: placed.startMin, end, origin: day });
+    }
+    const prev = prevDay(day);
+    if (block.days.includes(prev)) {
+      const leftover = leftoverMin(windowOn(block, prev));
+      if (leftover > 0) mine.push({ block, start: 0, end: leftover, origin: prev });
+    }
+  }
+  mine.sort((a, b) => a.start - b.start);
   const out: Piece[] = [];
   let cursor = 0;
-  for (const block of mine) {
-    const placed = windowOn(block, day);
-    const start = toMin(placed.start);
-    const end = toMin(placed.end);
-    if (start > cursor) out.push({ kind: "gap", start: cursor, end: start });
-    if (end > start) out.push({ kind: "slot", block, start, end });
-    cursor = Math.max(cursor, end);
+  for (const piece of mine) {
+    if (piece.start > cursor) out.push({ kind: "gap", start: cursor, end: piece.start });
+    out.push({ kind: "slot", ...piece });
+    cursor = Math.max(cursor, piece.end);
   }
   if (cursor < DAY_MINUTES) out.push({ kind: "gap", start: cursor, end: DAY_MINUTES });
   return out;
 }
 
-function ghostRange(draft: Draft, blocks: ScheduleBlock[]): { start: number; end: number } | null {
-  if (!/^\d{2}:\d{2}$/.test(draft.start) || !/^\d{2}:\d{2}$/.test(draft.end)) return null;
+function draftSpanMin(draft: Draft): number {
+  const fixed = fixedMinutes(draft);
+  if (fixed) return fixed;
+  if (!/^\d{2}:\d{2}$/.test(draft.start) || !/^\d{2}:\d{2}$/.test(draft.end)) return 0;
+  const start = toMin(draft.start);
+  const end = toMin(draft.end);
+  if (end > start) return end - start;
+  if (end < start) return DAY_MINUTES - start + end;
+  return 0;
+}
+
+function ghostsOn(draft: Draft, day: Day, blocks: ScheduleBlock[]): { start: number; end: number }[] {
+  const span = draftSpanMin(draft);
+  if (span < 1) return [];
   const saved = draft.id ? blocks.find((block) => block.id === draft.id) : undefined;
-  const savedWindow = saved ? windowOn(saved, draft.origin) : null;
-  if (savedWindow && savedWindow.start === draft.start && savedWindow.end === draft.end) return null;
-  const start = Math.max(0, Math.min(toMin(draft.start), DAY_MINUTES));
-  const end = Math.max(0, Math.min(toMin(draft.end), DAY_MINUTES));
-  if (end <= start) return null;
-  return { start, end };
+  if (saved && windowOn(saved, draft.origin).start === draft.start && lengthMinutes(saved) === span) {
+    return [];
+  }
+  const out: { start: number; end: number }[] = [];
+  for (const air of draft.days) {
+    const start = toMin(startOnDraft(draft, air));
+    if (day === air) out.push({ start, end: Math.min(start + span, DAY_MINUTES) });
+    if (day === nextDay(air)) {
+      const leftover = start + span - DAY_MINUTES;
+      if (leftover > 0) out.push({ start: 0, end: leftover });
+    }
+  }
+  return out;
 }
 
 function endFromDuration(start: string, durationSec: number): string {
   const endMin = toMin(start) + Math.max(1, Math.ceil(durationSec / 60));
-  if (endMin >= DAY_MINUTES) return "23:59";
-  return inputTime(endMin);
+  return clockOf(endMin);
+}
+
+function endFace(start: string, durationSec: number): string {
+  const endMin = toMin(start) + Math.max(1, Math.ceil(durationSec / 60));
+  return clockFace(endMin);
 }
 
 function spillsPastDay(start: string, durationSec: number): boolean {
-  return toMin(start) + Math.max(1, Math.ceil(durationSec / 60)) >= DAY_MINUTES;
+  return toMin(start) + Math.max(1, Math.ceil(durationSec / 60)) > DAY_MINUTES;
 }
 
 function measureKey(draft: Draft): string {
-  return draft.mode === "specific-file"
-    ? `video:${draft.file.trim()}`
-    : `${draft.mode}:${draft.folder.trim()}`;
+  if (draft.mode === "specific-file" || draft.mode === "youtube") {
+    return `video:${draft.file.trim()}`;
+  }
+  return `${draft.mode}:${draft.folder.trim()}`;
 }
 
 function chosenSeconds(
@@ -379,25 +426,41 @@ function selectedDays(draft: Draft): Day[] {
   return [draft.origin, ...DAYS.filter((day) => day !== draft.origin && draft.days.includes(day))];
 }
 
+function draftAsBlock(draft: Draft, durationSec: number): ScheduleBlock {
+  const lengthMin = Math.max(1, Math.ceil(durationSec / 60));
+  return {
+    id: draft.id ?? "draft",
+    days: draft.days,
+    start: draft.start,
+    end: endFromDuration(draft.start, durationSec),
+    lengthMin,
+    starts: draft.starts,
+    folder: draft.folder,
+    file: draft.file,
+    mode: draft.mode,
+  };
+}
+
 function dayClashes(
   draft: Draft,
   blocks: ScheduleBlock[],
   durationSec: number,
 ): { day: Day; title: string; start: string; end: string }[] {
   const clashes: { day: Day; title: string; start: string; end: string }[] = [];
-  for (const day of draft.days) {
-    const start = startOnDraft(draft, day);
-    if (!/^\d{2}:\d{2}$/.test(start)) continue;
-    const end = endFromDuration(start, durationSec);
-    const startMin = toMin(start);
-    const endMin = toMin(end);
-    if (endMin <= startMin) continue;
-    for (const block of blocks) {
-      if (block.id === draft.id) continue;
-      if (!block.days.includes(day)) continue;
-      const placed = windowOn(block, day);
-      if (toMin(placed.start) < endMin && toMin(placed.end) > startMin) {
-        clashes.push({ day, title: slotLabel(block), start: placed.start, end });
+  const draftSegs = segmentsOf(draftAsBlock(draft, durationSec));
+  for (const block of blocks) {
+    if (block.id === draft.id) continue;
+    for (const other of segmentsOf(block)) {
+      for (const mine of draftSegs) {
+        if (mine.day !== other.day) continue;
+        if (mine.start < other.end && other.start < mine.end) {
+          clashes.push({
+            day: mine.day,
+            title: slotLabel(block),
+            start: clockOf(other.start),
+            end: clockOf(mine.end),
+          });
+        }
       }
     }
   }
@@ -481,7 +544,12 @@ export function Admin() {
       return;
     }
     const key = measureKey(draft);
-    const empty = draft.mode === "specific-file" ? !draft.file.trim() : !draft.folder.trim();
+    const empty =
+      draft.mode === "youtube"
+        ? !parseYoutubeUrl(draft.file)
+        : draft.mode === "specific-file"
+          ? !draft.file.trim()
+          : !draft.folder.trim();
     if (empty) {
       setMeasured({ key, length: null });
       setMeasuring(false);
@@ -617,7 +685,9 @@ export function Admin() {
       folder: block.folder,
       file: block.file ?? "",
       mode: block.mode,
-      ...choiceFromLength(block.lengthMin),
+      ...(block.mode === "youtube"
+        ? { lengthChoice: "longest" as const, customMin: "" }
+        : choiceFromLength(block.lengthMin)),
       freeEnd,
       gapStart: toMin(placed.start),
     });
@@ -643,6 +713,17 @@ export function Admin() {
   function chooseMode(mode: BlockMode) {
     setDraft((current) => {
       if (!current || current.mode === mode) return current;
+      if (mode === "youtube") {
+        const kept = isYoutubeUrl(current.file)
+          ? current.file
+          : isYoutubeUrl(current.folder)
+            ? current.folder
+            : "";
+        return { ...current, mode, file: kept, folder: "", lengthChoice: "longest" };
+      }
+      if (current.mode === "youtube") {
+        return { ...current, mode, file: "", folder: "" };
+      }
       if (mode === "specific-file") {
         const folder = current.folder.trim().replace(/[\\/]+$/, "");
         const kept = current.file && parentDir(current.file) === folder;
@@ -710,12 +791,13 @@ export function Admin() {
     if (measuring) {
       next.time = "Still measuring the video.";
     } else if (!draft.end) {
-      next.time = "Choose a video or folder to set the length.";
+      next.time = "Choose a video, folder, or YouTube URL to set the length.";
     } else if (!/^\d{2}:\d{2}$/.test(draft.start) || !/^\d{2}:\d{2}$/.test(draft.end)) {
       next.time = "start and end must be HH:mm";
-    } else if (toMin(draft.end) <= toMin(draft.start)) {
-      next.time = `Block ${draft.start}–${draft.end} must end after it starts (same day)`;
     } else {
+      const sec = chosenSeconds(draft, measured);
+      const slotMin = sec ? Math.max(1, Math.ceil(sec / 60)) : 0;
+      if (slotMin >= DAY_MINUTES) next.time = "Block must be shorter than 24 hours";
       for (const day of draft.days) {
         if (day === draft.origin) continue;
         const start = draft.starts[day] ?? draft.start;
@@ -723,18 +805,14 @@ export function Admin() {
           next.time = "start and end must be HH:mm";
           break;
         }
-        const sec = chosenSeconds(draft, measured);
-        if (!sec) continue;
-        const end = endFromDuration(start, sec);
-        if (toMin(end) <= toMin(start)) {
-          next.time = `Block ${start}–${end} must end after it starts (same day)`;
-          break;
-        }
       }
     }
     const video = draft.mode === "specific-file";
+    const youtube = draft.mode === "youtube";
     if (video) {
       if (!draft.file.trim()) next.folder = "Each specific-file block needs a video";
+    } else if (youtube) {
+      if (!parseYoutubeUrl(draft.file)) next.folder = "Each YouTube slot needs a YouTube video URL";
     } else if (!draft.folder.trim()) {
       next.folder = "Each block needs a folder";
     }
@@ -742,7 +820,7 @@ export function Admin() {
       setFieldError(next);
       return;
     }
-    const file = draft.file.trim();
+    const file = youtube ? (parseYoutubeUrl(draft.file) ?? draft.file.trim()) : draft.file.trim();
     const sec = chosenSeconds(draft, measured);
     const slotMin = sec ? Math.max(1, Math.ceil(sec / 60)) : 0;
     const days = draft.days.includes(draft.origin) ? draft.days : [draft.origin, ...draft.days];
@@ -758,8 +836,8 @@ export function Admin() {
       end: draft.end,
       ...(slotMin > 0 ? { lengthMin: slotMin } : {}),
       ...(Object.keys(starts).length > 0 ? { starts } : {}),
-      folder: video ? parentDir(file) : draft.folder.trim(),
-      ...(video ? { file } : {}),
+      folder: video ? parentDir(file) : youtube ? "" : draft.folder.trim(),
+      ...((video || youtube) ? { file } : {}),
       mode: draft.mode,
     };
     const blocks = draft.id
@@ -801,14 +879,16 @@ export function Admin() {
     setFieldError((current) => ({ ...current, time: undefined }));
   }
 
-  const fallbackName = schedule.fallbackFolder ? folderLabel(schedule.fallbackFolder) : "";
+  const fallbackName = schedule.fallbackFolder ? fallbackLabel(schedule.fallbackFolder) : "";
   const matched = draft && measured?.key === measureKey(draft) ? measured : null;
   const length = matched?.length ?? null;
   const lengthMins = length ? Math.ceil(length.durationSec / 60) : 0;
   const pathChosen = draft
-    ? draft.mode === "specific-file"
-      ? Boolean(draft.file.trim())
-      : Boolean(draft.folder.trim())
+    ? draft.mode === "youtube"
+      ? Boolean(parseYoutubeUrl(draft.file))
+      : draft.mode === "specific-file"
+        ? Boolean(draft.file.trim())
+        : Boolean(draft.folder.trim())
     : false;
   const activeSec = draft ? (chosenSeconds(draft, matched) ?? 0) : 0;
   const fixedMin = draft && draft.lengthChoice !== "longest" ? fixedMinutes(draft) : null;
@@ -820,7 +900,9 @@ export function Admin() {
     : draft.lengthChoice === "longest"
       ? measuring || !pathChosen || !length || Boolean(matched?.error)
       : !pathChosen || fixedMin === null;
-  const ghost = draft ? ghostRange(draft, schedule.blocks) : null;
+  const ghostsByDay = draft
+    ? Object.fromEntries(DAYS.map((day) => [day, ghostsOn(draft, day, schedule.blocks)]))
+    : null;
 
   return (
     <section>
@@ -857,7 +939,7 @@ export function Admin() {
             <FolderPath
               kind="folder"
               value={schedule.fallbackFolder}
-              placeholder={t.folderPlaceholder}
+              placeholder={t.intermissionPlaceholder}
               actionLabel={picking === "fallback" ? t.choosing : t.browse}
               actionBusy={picking === "fallback"}
               listLabel={t.folder}
@@ -869,7 +951,8 @@ export function Admin() {
               onBlur={() => void commitFallback()}
             />
             <span>
-              {t.nextHint} {t.intermissionCut}
+              {isYoutubeUrl(schedule.fallbackFolder) ? t.youtubeIntermission : t.nextHint}{" "}
+              {t.intermissionCut}
             </span>
           </div>
         )}
@@ -911,27 +994,34 @@ export function Admin() {
                         </button>
                       );
                     }
-                    const placed = windowOn(piece.block, day);
-                    const draftTime = draft ? startOnDraft(draft, day) : "";
-                    const picked = draft?.id === piece.block.id && draftTime === placed.start;
+                    const placed = windowOn(piece.block, piece.origin);
+                    const draftTime = draft ? startOnDraft(draft, piece.origin) : "";
+                    const picked =
+                      draft?.id === piece.block.id &&
+                      draft.origin === piece.origin &&
+                      draftTime === placed.start;
+                    const spill = piece.origin !== day;
                     return (
                       <button
-                        key={piece.block.id}
+                        key={`${piece.block.id}-${piece.origin}-${piece.start}`}
                         type="button"
-                        class={`slot${slotKind(piece.block)}${picked ? " pick" : ""}`}
+                        class={`slot${slotKind(piece.block)}${picked ? " pick" : ""}${spill ? " spill" : ""}`}
                         style={{ flexGrow: span }}
                         title={piece.block.file ?? piece.block.folder}
-                        onClick={() => openSlot(piece.block, day)}
+                        onClick={() => openSlot(piece.block, piece.origin)}
                       >
                         <b>{slotLabel(piece.block)}</b>
                         <i>
                           {clockFace(piece.start)}–{clockFace(piece.end)} · {t.lengthOf(piece.end - piece.start)}
+                          {spill ? ` · ${t.day[piece.origin]}` : ""}
                         </i>
                       </button>
                     );
                   })}
-                  {editing && ghost && (
+                  {draft &&
+                    ghostsByDay?.[day]?.map((ghost) => (
                     <span
+                      key={`ghost-${ghost.start}-${ghost.end}`}
                       class={`ghost${slotKind(draft)}`}
                       style={{
                         top: `${(ghost.start / DAY_MINUTES) * 100}%`,
@@ -942,7 +1032,7 @@ export function Admin() {
                         {clockFace(ghost.start)}–{clockFace(ghost.end)}
                       </b>
                     </span>
-                  )}
+                  ))}
                 </div>
               </div>
             );
@@ -995,30 +1085,68 @@ export function Admin() {
                   <b>{t.oneVideo}</b>
                   <span>{t.oneHint}</span>
                 </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={draft.mode === "youtube"}
+                  class={draft.mode === "youtube" ? "mode on tube" : "mode"}
+                  onClick={() => chooseMode("youtube")}
+                >
+                  <b>{t.youtube}</b>
+                  <span>{t.youtubeHint}</span>
+                </button>
               </div>
             </div>
             <div class="folder-block">
-              <span class="k">{draft.mode === "specific-file" ? t.chooseVideo : t.chooseFolder}</span>
-              <FolderPath
-                key={draft.mode}
-                kind={draft.mode === "specific-file" ? "video" : "folder"}
-                value={draft.mode === "specific-file" ? draft.file : draft.folder}
-                placeholder={draft.mode === "specific-file" ? t.videoPlaceholder : t.folderPlaceholder}
-                invalid={Boolean(fieldError.folder)}
-                actionLabel={picking === "draft" ? t.choosing : t.browse}
-                actionBusy={picking === "draft"}
-                listLabel={draft.mode === "specific-file" ? t.video : t.folder}
-                onChange={(value) => {
-                  setDraft(
-                    draft.mode === "specific-file"
-                      ? { ...draft, file: value, folder: parentDir(value) }
-                      : { ...draft, folder: value },
-                  );
-                  setFieldError((current) => ({ ...current, folder: undefined }));
-                }}
-                onAction={() => void choosePath()}
-              />
+              <span class="k">
+                {draft.mode === "youtube"
+                  ? t.chooseYoutube
+                  : draft.mode === "specific-file"
+                    ? t.chooseVideo
+                    : t.chooseFolder}
+              </span>
+              {draft.mode === "youtube" ? (
+                <div class="path-field">
+                  <div class="field">
+                    <input
+                      value={draft.file}
+                      placeholder={t.youtubePlaceholder}
+                      aria-invalid={fieldError.folder ? "true" : undefined}
+                      onInput={(event) => {
+                        setDraft({
+                          ...draft,
+                          file: (event.target as HTMLInputElement).value,
+                          folder: "",
+                        });
+                        setFieldError((current) => ({ ...current, folder: undefined }));
+                      }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <FolderPath
+                  key={draft.mode}
+                  kind={draft.mode === "specific-file" ? "video" : "folder"}
+                  value={draft.mode === "specific-file" ? draft.file : draft.folder}
+                  placeholder={draft.mode === "specific-file" ? t.videoPlaceholder : t.folderPlaceholder}
+                  invalid={Boolean(fieldError.folder)}
+                  actionLabel={picking === "draft" ? t.choosing : t.browse}
+                  actionBusy={picking === "draft"}
+                  listLabel={draft.mode === "specific-file" ? t.video : t.folder}
+                  onChange={(value) => {
+                    setDraft(
+                      draft.mode === "specific-file"
+                        ? { ...draft, file: value, folder: parentDir(value) }
+                        : { ...draft, folder: value },
+                    );
+                    setFieldError((current) => ({ ...current, folder: undefined }));
+                  }}
+                  onAction={() => void choosePath()}
+                />
+              )}
+              {draft.mode === "youtube" && <p class="mode-note">{t.youtubeCaveat}</p>}
               {fieldError.folder && <p class="field-error">{t.error(fieldError.folder)}</p>}
+              {draft.mode !== "youtube" && (
               <fieldset class="source">
                 <legend class="k">{t.slotDuration}</legend>
                 <div class="source-grid" role="radiogroup" aria-label={t.slotDuration}>
@@ -1044,7 +1172,8 @@ export function Admin() {
                   </button>
                 </div>
               </fieldset>
-              {draft.lengthChoice === "longest" ? (
+              )}
+              {draft.mode === "youtube" || draft.lengthChoice === "longest" ? (
                 measuring && pathChosen ? (
                   <div class="wait">
                     <div class="wait-line">
@@ -1060,7 +1189,7 @@ export function Admin() {
                           <InfoMark />
                         </button>
                         <span class="cloud" role="tooltip">
-                          {t.probeCache}
+                          {draft.mode === "youtube" ? t.youtubeProbeCache : t.probeCache}
                         </span>
                       </span>
                     </div>
@@ -1074,6 +1203,12 @@ export function Admin() {
                       <span class="k">{t.slotDuration}</span>
                       <span class="value">{t.slotDurationOf(lengthMins)}</span>
                     </div>
+                    {draft.mode === "youtube" && (
+                      <div>
+                        <span class="k">{t.youtube}</span>
+                        <span class="value">{length.title}</span>
+                      </div>
+                    )}
                     {length.kind === "random" && (
                       <div>
                         <span class="k">{t.longestVideo}</span>
@@ -1180,13 +1315,17 @@ export function Admin() {
             <div class="day-times">
               {selectedDays(draft).map((day) => {
                 const start = startOnDraft(draft, day);
-                const clash = clashes
-                  .filter((item) => item.day === day)
-                  .sort((a, b) => toMin(a.start) - toMin(b.start))[0];
                 const spills = Boolean(activeSec && spillsPastDay(start, activeSec));
+                const clash = clashes
+                  .filter((item) => item.day === day || (spills && item.day === nextDay(day)))
+                  .sort((a, b) => toMin(a.start) - toMin(b.start))[0];
                 const next = nextOnDay(day, start, schedule.blocks, draft.id);
-                const end = activeSec ? endFromDuration(start, activeSec) : undefined;
-                const endNote = end ? t.endNote(end) : undefined;
+                const end = activeSec ? endFace(start, activeSec) : undefined;
+                const endNote = end
+                  ? spills
+                    ? t.endNoteNextDay(end)
+                    : t.endNote(end)
+                  : undefined;
                 const note = clash
                   ? t.runsInto(clash.end, clash.title, clash.start)
                   : spills
@@ -1194,7 +1333,7 @@ export function Admin() {
                     : next
                       ? t.nextSlotAt(windowOn(next, day).start, slotLabel(next))
                       : t.noLaterSlot;
-                const warn = Boolean(clash || spills);
+                const warn = Boolean(clash);
                 return (
                   <div class="day-start" key={day}>
                     <span class="day-name">{t.day[day]}</span>

@@ -1,7 +1,12 @@
 export const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 export type Day = (typeof DAYS)[number];
 
-export type BlockMode = "next-episode" | "random-file" | "specific-file";
+export const BLOCK_MODES = ["next-episode", "random-file", "specific-file", "youtube"] as const;
+export type BlockMode = (typeof BLOCK_MODES)[number];
+
+export function isBlockMode(value: string | undefined): value is BlockMode {
+  return BLOCK_MODES.includes(value as BlockMode);
+}
 export type ItemStatus = "planned" | "playing" | "done" | "skipped";
 
 export interface ScheduleBlock {
@@ -38,6 +43,8 @@ export interface RundownItem {
   end: string;
   durationSec: number;
   status: ItemStatus;
+  /** Leftover of yesterday’s slot that is still on after midnight. */
+  overnight?: boolean;
 }
 
 export interface TodayRundown {

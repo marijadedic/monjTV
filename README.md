@@ -14,6 +14,7 @@ You have to provide your own local movie library. 😁
 | Node.js `^20.19.0` or `>=22.12.0` | Vite 8 will not start on older Node. `node -v` should print v20.19+ or v22.12+.                                                                         |
 | mpv on `PATH`                     | The picture. `mpv --version` should print a version.                                                                                                    |
 | ffprobe on `PATH`                 | Comes with FFmpeg. Used to measure each file when the day's rundown is built. `ffprobe -version` should print a version.                                |
+| yt-dlp (optional)                 | Needed only for YouTube slots and YouTube intermission. monjTV keeps a current binary in `tools/yt-dlp` and downloads one on first YouTube use. Distro packages are often too old for HD. |
 | A graphical session               | mpv opens a fullscreen window on the machine running the server. A headless SSH session with no display will start the API and then fail to show video. |
 
 
@@ -22,20 +23,20 @@ Install the system tools, then clone.
 **macOS** (Homebrew):
 
 ```bash
-brew install node mpv ffmpeg
+brew install node mpv ffmpeg yt-dlp
 ```
 
 **Debian and Ubuntu:**
 
 ```bash
 sudo apt update
-sudo apt install mpv ffmpeg
+sudo apt install mpv ffmpeg yt-dlp
 ```
 
 **Fedora:**
 
 ```bash
-sudo dnf install mpv ffmpeg nodejs
+sudo dnf install mpv ffmpeg nodejs yt-dlp
 ```
 
 **Raspberry Pi OS** (64-bit with desktop, Debian 13 / Trixie):
@@ -44,20 +45,23 @@ The Pi is the machine plugged into the TV. Use a terminal on the desktop so mpv 
 
 ```bash
 sudo apt update
-sudo apt install nodejs npm mpv ffmpeg
+sudo apt install nodejs npm mpv ffmpeg yt-dlp
 ```
 
 `node -v` should print v20.19 or newer. That is the Node package in Trixie. Bookworm images include Node 18, which is too old for this app, so use the current Raspberry Pi OS image.
 
 On Linux, **Browse** opens `zenity`, `kdialog`, `qarma`, or `yad` when one of those is already installed. It does not install one. Otherwise you will have to type the folder path when selecting a movie/show location folder.
 
-Confirm the three binaries before continuing:
+Confirm the binaries before continuing:
 
 ```bash
 node -v
 mpv --version
 ffprobe -version
+yt-dlp --version
 ```
+
+A current `yt-dlp` is only required if you will schedule YouTube videos or use a YouTube URL for intermission. You do not have to install it yourself: the first YouTube save or play downloads it into `tools/yt-dlp`. Apt and Homebrew copies are often too old to get more than 360p.
 
 
 
@@ -182,11 +186,14 @@ Blocks on the same day cannot overlap, and a block ends the same day it starts (
 
 ## How a day plays
 
-`schedule.json` is the weekly grid. Each block has days, a start, an end, a folder, and a mode. It may also store the length in minutes and a start time for each extra day. A day without its own start uses the block start, and ends the same length later, still on that day. A `specific-file` block also stores the video path in `file`.
+`schedule.json` is the weekly grid. Each block has days, a start, an end, a folder, and a mode. It may also store the length in minutes and a start time for each extra day. A day without its own start uses the block start, and ends the same length later, still on that day. A `specific-file` block also stores the video path in `file`. A `youtube` block stores the watch URL in `file`.
 
 - `next-episode` walks the folder in order and remembers the last file that finished. The next start continues after that file, and wraps to the beginning after the last file.
 - `random-file` picks a file and avoids the recent ones. Shuffle on Today only replaces a `random-file` item that is still `planned`.
-- `specific-file` plays one chosen video, once. Finishing it does not change episode progress. If the video ends before the block ends, the next block waits for its own start time.
+- `specific-file` plays one chosen video, once. Finishing it does not change episode progress.
+- `youtube` plays one finished YouTube video in the same mpv window, through yt-dlp. Do not put a live stream in this mode. It needs the internet at play time and will not work as offline TV. The Admin form says so when this mode is selected. Playback aims for H.264 up to 1080p. After changing that, quit with **Shut down** and press **Start TV** again so mpv is spawned with the new flags.
+
+If a scheduled video ends before its slot does, intermission fills the leftover time until the next slot starts. The next block does not start early.
 
 `today.json` is that date's rundown: concrete files, planned times, and a status of `planned`, `playing`, `done`, or `skipped`. The UI shows this list. mpv plays one file at a time from it. It is not an mpv playlist.
 
@@ -196,15 +203,15 @@ A file is placed on the rundown only when it fits the block. It can end by the b
 
 Progress updates when a file reaches the end (`eof`). Stopping mpv puts a `playing` item back to `planned`, and puts back to `planned` any item that this start marked `skipped`.
 
-If the clock is outside every block and an intermission folder is set, mpv walks that folder in order, the same way a next-episode block does. A scheduled block cuts that file off when the block starts. An intermission file does not have to finish. Those plays are not rundown items. A file that reaches the end on its own remembers its place in that folder. A file cut off by the next block does not, so the next gap starts it again from the beginning. Set that folder from the Intermission chip above the day columns. The chip is Pauza in Croatian, and nije odabrano when no folder is chosen. The panel says it plays if nothing is scheduled, and that a new slot cuts the file off. Browse opens the same folder dialog as a slot, and a typed path lists folders on the server.
+If nothing is on — outside every block, or after a slot’s video has ended early — and an intermission source is set, mpv fills the gap. A local folder is walked in order, the same way a next-episode block does. A YouTube URL, including a live stream, plays instead of a folder. A scheduled slot cuts that off when it starts. An intermission file does not have to finish. Those plays are not rundown items. A local file that reaches the end on its own remembers its place in that folder. A file cut off by the next slot does not, so the next gap starts it again from the beginning. A YouTube intermission that ends or drops is started again. Set the source from the Intermission chip above the day columns. The chip is Pauza in Croatian, and nije odabrano when nothing is chosen. Browse opens the same folder dialog as a slot, or paste a YouTube URL.
 
 If `ffprobe` is missing or cannot read a file, that file is treated as 45 minutes long, and the rundown times drift. Install FFmpeg if the rails look wrong.
 
 ## Pages
 
-**Today** (`/`) is a time rail with no page title. The date sits to the right of the clock as `DD.MM.YYYY`. The current show is in the on-air strip and again on the rail. **Start TV** starts mpv if it is not running and joins the show at the current minute. **Shuffle** replaces one planned random-file item. A random-file item and a one-video item show a cached frame from the file.
+**Today** (`/`) is a time rail with no page title. The date sits to the right of the clock as `DD.MM.YYYY`. The current show is in the on-air strip and again on the rail. **Start TV** starts mpv if it is not running and joins the show at the current minute. **Shuffle** replaces one planned random-file item. A random-file item and a one-video item show a cached frame from the file. YouTube items do not.
 
-**Admin** (`/admin`) is a clock of day columns under a quiet Weekly schedule heading. A next-episode block is rose, a random-file block is blue, and a one-video block is clay, or copper in Meadow. Each fades from a light top. In Teletext those blocks are flat: magenta, blue, and yellow. A new slot is a click on empty time. The form saves when it is committed. Mode is first, then browse, then the other days, and a clock at the bottom sets the start. The length follows the video that will play. The selected mode uses that block’s color.
+**Admin** (`/admin`) is a clock of day columns under a quiet Weekly schedule heading. A next-episode block is rose, a random-file block is blue, a one-video block is clay (copper in Meadow), and a YouTube block is red. Each fades from a light top. In Teletext those blocks are flat: magenta, blue, yellow, and cyan. A new slot is a click on empty time. The form saves when it is committed. Mode is first, then browse or a YouTube URL, then the other days, and a clock at the bottom sets the start. The length follows the video that will play. The selected mode uses that block’s color.
 
 ## Data
 
@@ -271,7 +278,15 @@ A healthy server returns `{"ok":true}`.
 
 **Browse on Linux asks you to type the path.** None of `zenity`, `kdialog`, `qarma`, or `yad` is installed. The path field takes an absolute path. When one of those programs is already installed, the dialog opens on the server's screen.
 
-**The rail is empty.** Today is built from blocks whose days include today. A Monday-only block does not appear on Thursday. An empty schedule, or a folder with no recognized videos, also leaves the rail empty. Outside every block, a fallback folder still plays in mpv and shows its title in the on-air strip.
+**The rail is empty.** Today is built from blocks whose days include today. A Monday-only block does not appear on Thursday. An empty schedule, or a folder with no recognized videos, also leaves the rail empty. Outside every block, or after a slot ends early, a fallback folder or YouTube URL still plays in mpv and shows its title in the on-air strip.
+
+`yt-dlp is not installed or not on PATH`**.** A YouTube slot was saved, or its length was measured, and `tools/yt-dlp` could not be downloaded and no yt-dlp was on `PATH`. Check internet access, or put a current yt-dlp binary at `tools/yt-dlp`. Distro copies from apt are often too old.
+
+**Could not read this YouTube video.** yt-dlp reached YouTube but could not extract the page. Delete `tools/yt-dlp` and save the slot again so monjTV downloads a current copy. YouTube breaks old extractors often.
+
+**YouTube looks like 360p.** mpv was started with an old yt-dlp, or with the Android muxed-MP4 fallback. Quit with **Shut down**, confirm `tools/yt-dlp --version` prints a 2026 date or later, then **Start TV**. monjTV asks for H.264 up to 1080p.
+
+**A YouTube slot will not save a live URL.** Live streams belong in Intermission. Use a finished video for a scheduled YouTube slot. That mode also needs the internet at play time.
 
 **Another computer cannot open the UI.** Use `npm start`, then `http://<machine-ip>:3000`. Port 5173 is the dev UI on the machine. If the page does not load, allow inbound TCP 3000 on the machine's firewall.
 

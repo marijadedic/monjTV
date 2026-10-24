@@ -1,12 +1,14 @@
-import type { Day, PlayerStatus, RundownItem, ScheduleBlock, TodayRundown } from "../shared/types.ts";
+import type { PlayerStatus, RundownItem, TodayRundown } from "../shared/types.ts";
 import { formatHm, msUntil, nowSec, parseHm, weekday } from "./clock.ts";
 import { titleFromPath } from "./files.ts";
 import { Mpv } from "./mpv.ts";
 import { pick } from "./picker.ts";
 import { markEpisodeDone, markRandomPlayed } from "./progress.ts";
 import { ensureToday, joinOffset, loadToday, onAirItem, saveToday } from "./rundown.ts";
-import { windowOn } from "../shared/window.ts";
+import { DAY_SECONDS, windowOn } from "../shared/window.ts";
+import { isYoutubeUrl, parseYoutubeUrl, youtubeLabel } from "../shared/youtube.ts";
 import { blocksForDay, loadSchedule } from "./schedule.ts";
+import { cachedYoutube, probeYoutube } from "./youtube.ts";
 
 const mpv = new Mpv();
 let waitingUntil: string | null = null;
@@ -16,6 +18,8 @@ let handlingEnd = false;
 let replacing = false;
 let stopping = false;
 let fallbackPlay: { folder: string; path: string } | null = null;
+let fallbackRetry: ReturnType<typeof setTimeout> | null = null;
+let playEpoch = 0;
 let provisionalSkips: string[] = [];
 
 mpv.onEndFile = (reason) => {
@@ -26,6 +30,7 @@ mpv.onExit = () => {
   waitingUntil = null;
   fallbackPlay = null;
   clearWait();
+  clearFallbackRetry();
   void releaseQuit();
 };
 
@@ -41,7 +46,7 @@ export async function getStatus(): Promise<PlayerStatus> {
     error: lastError,
     currentItemId: current?.id ?? null,
     willStartItemId,
-    fallbackTitle: current || !fallbackPlay ? null : titleFromPath(fallbackPlay.path),
+    fallbackTitle: current || !fallbackPlay ? null : fallbackTitleOf(fallbackPlay.path),
   };
 }
 
@@ -66,7 +71,9 @@ export async function startPlayer(): Promise<PlayerStatus> {
 export async function shutdownPlayer(): Promise<void> {
   stopping = true;
   replacing = true;
+  playEpoch += 1;
   clearWait();
+  clearFallbackRetry();
   waitingUntil = null;
   fallbackPlay = null;
   await mpv.quit();
@@ -115,7 +122,12 @@ async function onEndFile(reason: string): Promise<void> {
     return;
   }
   if (replacing || handlingEnd) return;
-  if (reason !== "eof") return;
+  if (reason !== "eof") {
+    if (fallbackPlay && isYoutubeUrl(fallbackPlay.path) && reason !== "quit") {
+      retryYoutubeIntermission(fallbackPlay.path);
+    }
+    return;
+  }
   handlingEnd = true;
   try {
     provisionalSkips = [];
@@ -135,7 +147,10 @@ async function onEndFile(reason: string): Promise<void> {
         }
       }
     } else if (finishedIntermission) {
-      await markEpisodeDone(finishedIntermission.folder, finishedIntermission.path);
+      if (!isYoutubeUrl(finishedIntermission.path)) {
+        await markEpisodeDone(finishedIntermission.folder, finishedIntermission.path);
+      }
+      fallbackPlay = null;
     }
     await playNow();
   } finally {
@@ -157,7 +172,7 @@ async function playNow(): Promise<void> {
   let changed = false;
   for (const item of today.items) {
     if (item.status !== "planned" || item.id === air?.id) continue;
-    if (now < parseHm(item.start)) continue;
+    if (!hasStarted(item, now)) continue;
     item.status = "skipped";
     provisionalSkips.push(item.id);
     changed = true;
@@ -172,35 +187,21 @@ async function playNow(): Promise<void> {
     }
   }
 
-  const currentBlock = dayBlocks.find((block) => {
-    const placed = windowOn(block, day);
-    return parseHm(placed.start) <= now && now < parseHm(placed.end);
-  });
-  if (currentBlock) {
-    await stopIntermission();
-    const wake = nextPlannedStart(today, now);
-    const blockEnd = windowOn(currentBlock, day).end;
-    if (wake != null && wake < parseHm(blockEnd)) {
-      armWaitUntil(wake);
-      return;
-    }
-    armWaitForNext(dayBlocks, day, blockEnd);
-    return;
-  }
-
-  const next = dayBlocks.find((block) => parseHm(windowOn(block, day).start) > now);
-  if (next) {
-    const start = windowOn(next, day).start;
-    waitingUntil = start;
-    waitTimer = setTimeout(() => {
-      void playNow();
-    }, msUntil(parseHm(start)));
+  const wake = nextPlannedStart(today, now);
+  if (wake != null) {
+    armWaitUntil(wake);
+  } else {
+    const next = dayBlocks.find((block) => parseHm(windowOn(block, day).start) > now);
+    if (next) armWaitUntil(parseHm(windowOn(next, day).start));
   }
   if (schedule.fallbackFolder) await playFallback(schedule.fallbackFolder);
+  else await stopIntermission();
 }
 
 // Cut off an intermission file so the scheduled block has the screen.
 async function stopIntermission(): Promise<void> {
+  clearFallbackRetry();
+  playEpoch += 1;
   if (!fallbackPlay) return;
   fallbackPlay = null;
   replacing = true;
@@ -211,14 +212,36 @@ async function stopIntermission(): Promise<void> {
   }
 }
 
-// Play the next episode from the intermission folder. The next block cuts it off.
-async function playFallback(folder: string): Promise<void> {
+// Play a YouTube URL, or the next episode from the intermission folder.
+async function playFallback(source: string): Promise<void> {
+  const url = parseYoutubeUrl(source);
+  if (url) {
+    if (fallbackPlay?.path === url) return;
+    const epoch = ++playEpoch;
+    try {
+      fallbackPlay = { folder: url, path: url };
+      replacing = true;
+      void probeYoutube(url, { allowLive: true }).catch(() => undefined);
+      await mpv.loadFile(url);
+      if (epoch !== playEpoch) await restoreCurrentLoad();
+    } catch (err) {
+      if (epoch !== playEpoch) return;
+      lastError = err instanceof Error ? err.message : String(err);
+      fallbackPlay = null;
+    } finally {
+      replacing = false;
+    }
+    return;
+  }
   try {
-    const file = await pick({ folder, mode: "next-episode" });
+    const file = await pick({ folder: source, mode: "next-episode" });
     if (!file) return;
-    fallbackPlay = { folder, path: file };
+    if (fallbackPlay?.path === file) return;
+    const epoch = ++playEpoch;
+    fallbackPlay = { folder: source, path: file };
     replacing = true;
     await mpv.loadFile(file);
+    if (epoch !== playEpoch) await restoreCurrentLoad();
   } catch (err) {
     lastError = err instanceof Error ? err.message : String(err);
     fallbackPlay = null;
@@ -227,12 +250,60 @@ async function playFallback(folder: string): Promise<void> {
   }
 }
 
+async function restoreCurrentLoad(): Promise<void> {
+  if (stopping || !mpv.running) return;
+  const epoch = playEpoch;
+  const today = await loadToday();
+  const current = today.items.find((i) => i.status === "playing");
+  if (current) {
+    const offset = joinOffset(current, nowSec());
+    if (offset < current.durationSec) await mpv.loadFile(current.path, offset);
+    return;
+  }
+  if (fallbackPlay && epoch === playEpoch) {
+    await mpv.loadFile(fallbackPlay.path);
+    return;
+  }
+  if (epoch === playEpoch) await mpv.stopPlayback().catch(() => undefined);
+}
+
+function retryYoutubeIntermission(url: string): void {
+  clearFallbackRetry();
+  fallbackPlay = null;
+  fallbackRetry = setTimeout(() => {
+    fallbackRetry = null;
+    if (stopping || !mpv.running) return;
+    void playFallback(url);
+  }, 2000);
+}
+
+function clearFallbackRetry(): void {
+  if (!fallbackRetry) return;
+  clearTimeout(fallbackRetry);
+  fallbackRetry = null;
+}
+
+function fallbackTitleOf(filePath: string): string {
+  if (!isYoutubeUrl(filePath)) return titleFromPath(filePath);
+  return cachedYoutube(filePath)?.title ?? youtubeLabel(filePath);
+}
+
+function hasStarted(item: RundownItem, now: number): boolean {
+  const start = parseHm(item.start);
+  if (item.overnight) {
+    if (start + item.durationSec > DAY_SECONDS) return true;
+    return now >= start;
+  }
+  return now >= start;
+}
+
 // Clock time of the next planned file that has not started.
 function nextPlannedStart(today: TodayRundown, now: number): number | null {
   let wake: number | null = null;
   for (const item of today.items) {
     if (item.status !== "planned") continue;
     const start = parseHm(item.start);
+    if (item.overnight && start + item.durationSec > DAY_SECONDS) continue;
     if (start <= now) continue;
     if (wake == null || start < wake) wake = start;
   }
@@ -241,7 +312,9 @@ function nextPlannedStart(today: TodayRundown, now: number): number | null {
 
 // Load an item in mpv at the clock offset and mark it playing.
 async function playItem(item: RundownItem, offsetSec: number): Promise<void> {
+  clearFallbackRetry();
   fallbackPlay = null;
+  const epoch = ++playEpoch;
   const today = await loadToday();
   for (const row of today.items) {
     if (row.id === item.id) row.status = "playing";
@@ -251,9 +324,11 @@ async function playItem(item: RundownItem, offsetSec: number): Promise<void> {
   replacing = true;
   try {
     await mpv.loadFile(item.path, offsetSec);
+    if (epoch !== playEpoch) await restoreCurrentLoad();
   } catch (err) {
     lastError = err instanceof Error ? err.message : String(err);
     replacing = false;
+    if (epoch !== playEpoch) return;
     if (stopping || !mpv.running) {
       await releaseQuit();
       return;
@@ -277,17 +352,6 @@ function armWaitUntil(atSec: number): void {
   waitTimer = setTimeout(() => {
     void playNow();
   }, msUntil(atSec));
-}
-
-// Wake when this block ends. The label names the next block, which still waits for its start.
-function armWaitForNext(blocks: ScheduleBlock[], day: Day, afterEnd: string): void {
-  const endSec = parseHm(afterEnd);
-  if (endSec <= nowSec()) return;
-  const next = blocks.find((block) => parseHm(windowOn(block, day).start) >= endSec);
-  waitingUntil = next ? windowOn(next, day).start : null;
-  waitTimer = setTimeout(() => {
-    void playNow();
-  }, msUntil(endSec));
 }
 
 // Cancel the timer waiting for the next block.
