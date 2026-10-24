@@ -71,6 +71,12 @@ function choiceFromLength(lengthMin?: number): { lengthChoice: LengthChoice; cus
   return { lengthChoice: "longest", customMin: "" };
 }
 
+function fixedChoice(lengthMin?: number): { lengthChoice: LengthChoice; customMin: string } {
+  const choice = choiceFromLength(lengthMin);
+  if (choice.lengthChoice === "longest") return { lengthChoice: 60, customMin: "" };
+  return choice;
+}
+
 function elapsedClock(sec: number): string {
   const mins = Math.floor(sec / 60);
   const rest = sec % 60;
@@ -372,6 +378,7 @@ function endFromDuration(start: string, durationSec: number): string {
 
 function endFace(start: string, durationSec: number): string {
   const endMin = toMin(start) + Math.max(1, Math.ceil(durationSec / 60));
+  if (endMin > DAY_MINUTES) return clockOf(endMin);
   return clockFace(endMin);
 }
 
@@ -417,6 +424,25 @@ function nextOnDay(
   return next;
 }
 
+function prevOnDay(
+  day: Day,
+  start: string,
+  blocks: ScheduleBlock[],
+  exceptId: string | null,
+): ScheduleBlock | null {
+  if (!/^\d{2}:\d{2}$/.test(start)) return null;
+  const startMin = toMin(start);
+  let prev: ScheduleBlock | null = null;
+  for (const block of blocks) {
+    if (block.id === exceptId) continue;
+    if (!block.days.includes(day)) continue;
+    const placed = windowOn(block, day);
+    if (toMin(placed.start) >= startMin) continue;
+    if (!prev || toMin(placed.start) > toMin(windowOn(prev, day).start)) prev = block;
+  }
+  return prev;
+}
+
 function startOnDraft(draft: Draft, day: Day): string {
   if (day === draft.origin) return draft.start;
   return draft.starts[day] ?? draft.start;
@@ -458,7 +484,7 @@ function dayClashes(
             day: mine.day,
             title: slotLabel(block),
             start: clockOf(other.start),
-            end: clockOf(mine.end),
+            end: clockOf(other.end),
           });
         }
       }
@@ -687,7 +713,9 @@ export function Admin() {
       mode: block.mode,
       ...(block.mode === "youtube"
         ? { lengthChoice: "longest" as const, customMin: "" }
-        : choiceFromLength(block.lengthMin)),
+        : block.mode === "next-episode"
+          ? fixedChoice(block.lengthMin)
+          : choiceFromLength(block.lengthMin)),
       freeEnd,
       gapStart: toMin(placed.start),
     });
@@ -722,7 +750,10 @@ export function Admin() {
         return { ...current, mode, file: kept, folder: "", lengthChoice: "longest" };
       }
       if (current.mode === "youtube") {
-        return { ...current, mode, file: "", folder: "" };
+        const next = { ...current, mode, file: "", folder: "" };
+        return mode === "next-episode" && next.lengthChoice === "longest"
+          ? { ...next, lengthChoice: 60 }
+          : next;
       }
       if (mode === "specific-file") {
         const folder = current.folder.trim().replace(/[\\/]+$/, "");
@@ -733,7 +764,10 @@ export function Admin() {
         current.mode === "specific-file" && current.file
           ? parentDir(current.file) || current.folder
           : current.folder;
-      return { ...current, mode, folder };
+      const next = { ...current, mode, folder };
+      return mode === "next-episode" && next.lengthChoice === "longest"
+        ? { ...next, lengthChoice: 60 }
+        : next;
     });
     setFieldError((current) => ({ ...current, folder: undefined }));
   }
@@ -1146,7 +1180,7 @@ export function Admin() {
               )}
               {draft.mode === "youtube" && <p class="mode-note">{t.youtubeCaveat}</p>}
               {fieldError.folder && <p class="field-error">{t.error(fieldError.folder)}</p>}
-              {draft.mode !== "youtube" && (
+              {draft.mode !== "youtube" && draft.mode !== "next-episode" && (
               <fieldset class="source">
                 <legend class="k">{t.slotDuration}</legend>
                 <div class="source-grid" role="radiogroup" aria-label={t.slotDuration}>
@@ -1319,48 +1353,71 @@ export function Admin() {
                 const clash = clashes
                   .filter((item) => item.day === day || (spills && item.day === nextDay(day)))
                   .sort((a, b) => toMin(a.start) - toMin(b.start))[0];
+                const prev = prevOnDay(day, start, schedule.blocks, draft.id);
                 const next = nextOnDay(day, start, schedule.blocks, draft.id);
                 const end = activeSec ? endFace(start, activeSec) : undefined;
-                const endNote = end
-                  ? spills
-                    ? t.endNoteNextDay(end)
-                    : t.endNote(end)
-                  : undefined;
-                const note = clash
-                  ? t.runsInto(clash.end, clash.title, clash.start)
-                  : spills
-                    ? t.pastMidnight
-                    : next
-                      ? t.nextSlotAt(windowOn(next, day).start, slotLabel(next))
-                      : t.noLaterSlot;
-                const warn = Boolean(clash);
+                const facts: { key: string; label: string; time?: string }[] = clash
+                  ? []
+                  : !prev && !next
+                    ? [{ key: "only", label: t.onlySlot }]
+                    : [
+                        ...(prev
+                          ? [{ key: "prev", label: t.prevSlotEnds, time: windowOn(prev, day).end }]
+                          : []),
+                        ...(next
+                          ? [{ key: "next", label: t.nextSlotBegins, time: windowOn(next, day).start }]
+                          : [{ key: "after", label: t.noSlotsAfter }]),
+                      ];
                 return (
                   <div class="day-start" key={day}>
-                    <span class="day-name">{t.day[day]}</span>
-                    <input
-                      class="time"
-                      type="time"
-                      value={start}
-                      aria-label={`${t.dayName[day]} ${t.start}`}
-                      onInput={(event) => {
-                        const value = (event.target as HTMLInputElement).value;
-                        setDraft((current) => {
-                          if (!current) return current;
-                          if (day === current.origin) {
-                            const sec = chosenSeconds({ ...current, start: value }, measured);
-                            const end = sec ? endFromDuration(value, sec) : current.end;
-                            return { ...current, start: value, end };
-                          }
-                          return { ...current, starts: { ...current.starts, [day]: value } };
-                        });
-                        setFieldError((current) => ({ ...current, time: undefined }));
-                      }}
-                    />
-                    <div class={warn ? "note warn" : "note"} role="status">
-                      {endNote && <span class="end-note">{endNote} </span>}
-                      {note}
-                      <hr /> 
+                    <span class="day-name">{t.dayName[day]}</span>
+                    <div class="start-field">
+                      <span class="k">{t.startTime}</span>
+                      <div class="start-row">
+                        <input
+                          class="time"
+                          type="time"
+                          value={start}
+                          aria-label={`${t.dayName[day]} ${t.startTime}`}
+                          onInput={(event) => {
+                            const value = (event.target as HTMLInputElement).value;
+                            setDraft((current) => {
+                              if (!current) return current;
+                              if (day === current.origin) {
+                                const sec = chosenSeconds({ ...current, start: value }, measured);
+                                const nextEnd = sec ? endFromDuration(value, sec) : current.end;
+                                return { ...current, start: value, end: nextEnd };
+                              }
+                              return { ...current, starts: { ...current.starts, [day]: value } };
+                            });
+                            setFieldError((current) => ({ ...current, time: undefined }));
+                          }}
+                        />
+                        {end && (
+                          <span class="end">
+                            {t.slotEnds} <b>{end}</b>
+                            {spills && <em> {t.day[nextDay(day)]}</em>}
+                          </span>
+                        )}
+                      </div>
                     </div>
+                    <p class={clash ? "facts warn" : "facts"} role="status">
+                      {clash ? (
+                        <>
+                          <span>{t.overlaps}</span>
+                          <span>
+                            {clash.start}–{clash.end}
+                          </span>
+                        </>
+                      ) : (
+                        facts.map((fact) => (
+                          <span key={fact.key}>
+                            {fact.label}
+                            {fact.time && <b> {fact.time}</b>}
+                          </span>
+                        ))
+                      )}
+                    </p>
                   </div>
                 );
               })}

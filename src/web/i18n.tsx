@@ -113,17 +113,17 @@ type Copy = {
   wontFitVideo: (title: string, length: string, limit: string) => string;
   wontFitEpisode: (title: string, length: string, limit: string) => string;
   wontFitFolder: (title: string, length: string, limit: string) => string;
-  nextSlotAt: (time: string, title: string) => string;
-  noLaterSlot: string;
-  runsInto: (end: string, title: string, start: string) => string;
-  runsIntoOn: (day: string, end: string, title: string, start: string) => string;
-  pastMidnight: string;
+  startTime: string;
+  slotEnds: string;
+  prevSlotEnds: string;
+  nextSlotBegins: string;
+  noSlotsAfter: string;
+  onlySlot: string;
+  overlaps: string;
   measuring: string;
   followsVideo: string;
   until: (time: string) => string;
   noVideo: string;
-  endNote: (time: string) => string;
-  endNoteNextDay: (time: string) => string;
 };
 
 const en: Copy = {
@@ -191,7 +191,7 @@ const en: Copy = {
   standardSlot: "Standard TV timeslot",
   longestFile: "Longest file",
   findLongest: "Find the longest running video in the folder",
-  chooseLength: "Choose a length",
+  chooseLength: "Choose slot duration",
   customLength: "Custom",
   minutes: (n) => `${n} min`,
   minutesUnit: "min",
@@ -267,19 +267,17 @@ const en: Copy = {
     `The next episode, ${title}, is ${length}. This slot can play up to ${limit}, so it will not play.`,
   wontFitFolder: (title, length, limit) =>
     `The shortest video, ${title}, is ${length}. This slot can play up to ${limit}, so nothing will play.`,
-  nextSlotAt: (time) => `Next slot starts at ${time}`,
-  noLaterSlot: "Nothing else is scheduled today after this slot.",
-  runsInto: (end, title, start) =>
-    `This runs until ${end} and into ${title}, which starts at ${start}.`,
-  runsIntoOn: (day, end, title, start) =>
-    `${day}: this runs until ${end} and into ${title}, which starts at ${start}.`,
-  pastMidnight: "This continues into the next day.",
+  startTime: "Start time",
+  slotEnds: "Slot ends at",
+  prevSlotEnds: "Previous slot ends at",
+  nextSlotBegins: "Next slot begins at",
+  noSlotsAfter: "No slots scheduled after this slot",
+  onlySlot: "Only slot today",
+  overlaps: "Overlaps",
   measuring: "Measuring…",
   followsVideo: "Follows the video",
   until: (time) => `Until ${time}`,
   noVideo: "No video found there.",
-  endNote: (time) => `Ends at ${time}.`,
-  endNoteNextDay: (time) => `Ends at ${time} the next day.`,
 };
 
 function runLength(sec: number, hr: boolean): string {
@@ -442,7 +440,7 @@ const hr: Copy = {
   standardSlot: "Standardni TV termin",
   longestFile: "Najdulja datoteka",
   findLongest: "Pronađi najdulji video u mapi",
-  chooseLength: "Odaberi trajanje",
+  chooseLength: "Odaberi trajanje bloka",
   customLength: "Proizvoljno",
   minutes: (n) => `${n} min`,
   minutesUnit: "min",
@@ -518,19 +516,17 @@ const hr: Copy = {
     `Sljedeća epizoda, ${title}, traje ${length}. U ovaj blok stane najviše ${limit}, pa se neće pustiti.`,
   wontFitFolder: (title, length, limit) =>
     `Najkraći video, ${title}, traje ${length}. U ovaj blok stane najviše ${limit}, pa se ništa neće pustiti.`,
-  nextSlotAt: (time) => `Sljedeći blok počinje u ${time}`,
-  noLaterSlot: "Nakon ovog bloka danas nema ništa zakazano.",
-  runsInto: (end, title, start) =>
-    `Ovo traje do ${end} i preklapa se s ${title}, koji počinje u ${start}.`,
-  runsIntoOn: (day, end, title, start) =>
-    `${day}: ovo traje do ${end} i preklapa se s ${title}, koji počinje u ${start}.`,
-  pastMidnight: "Ovo prelazi u sljedeći dan.",
+  startTime: "Vrijeme početka",
+  slotEnds: "Blok završava u",
+  prevSlotEnds: "Prethodni blok završava u",
+  nextSlotBegins: "Sljedeći blok počinje u",
+  noSlotsAfter: "Nema zakazanih blokova nakon ovog bloka",
+  onlySlot: "Jedini blok danas",
+  overlaps: "Preklapa se",
   measuring: "Mjerenje…",
   followsVideo: "Slijedi video",
   until: (time) => `Do ${time}`,
   noVideo: "Tamo nema videa.",
-  endNote: (time) => `Blok završava u ${time}.`,
-  endNoteNextDay: (time) => `Blok završava u ${time} sljedećeg dana.`,
 };
 
 const copy: Record<Lang, Copy> = { en, hr };

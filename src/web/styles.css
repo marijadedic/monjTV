@@ -1477,45 +1477,87 @@ html[data-theme="dusk"] .add-form .info {
 
 .day-times {
   display: grid;
-  gap: 10px;
+  gap: 14px;
 }
 
 .day-start {
   display: grid;
-  grid-template-columns: 1fr 10fr ;
-  grid-template-rows: auto 1fr;
-  gap: 8px 10px;
-  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.day-start:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
 }
 
 .day-name {
   font-size: 0.95rem;
   font-weight: 650;
-  text-transform: capitalize;
+}
+
+.day-start .start-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.day-start .start-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  min-width: 0;
 }
 
 .day-start input.time {
   width: 9.5rem;
+  max-width: 100%;
 }
 
-.day-start .note {
-  margin: 0.5rem 0 0 0;
+.day-start .end {
   color: var(--muted);
   font-size: 0.9rem;
-  font-weight: 100;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.day-start .end b,
+.day-start .facts b {
+  color: var(--text);
+  font-weight: 650;
+}
+
+.day-start .end em {
+  margin-left: 0.3rem;
+  font-style: normal;
+  color: var(--accent);
+  font-weight: 650;
+  text-transform: capitalize;
+}
+
+.day-start .facts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
   overflow-wrap: anywhere;
-  grid-column: 1 / 3
 }
 
-hr {
-  border-width: 1px 0 0 0;
-  border-color: var(--line);
-
-}
-
-.day-start .note.warn {
+.day-start .facts.warn {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 4px 0.55rem;
   color: var(--warn);
 }
 
