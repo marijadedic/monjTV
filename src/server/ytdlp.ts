@@ -18,6 +18,12 @@ function assetName(): string {
   return "yt-dlp";
 }
 
+// yt-dlp only enables deno unless told otherwise. Without a JS runtime,
+// YouTube leaves some stream URLs unsigned, so mpv starts the watch link and then drops it.
+export function ytdlpRuntimeArgs(): string[] {
+  return ["--js-runtimes", `node:${process.execPath}`];
+}
+
 export async function ensureYtdlp(): Promise<string> {
   if (existsSync(ytdlpBin)) return ytdlpBin;
   if (!ensuring) {

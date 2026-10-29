@@ -1,4 +1,4 @@
-import type { PlayerStatus, RundownItem, TodayRundown } from "../shared/types.ts";
+import type { IntermissionItem, PlayerStatus, RundownItem, TodayRundown } from "../shared/types.ts";
 import { formatHm, msUntil, nowSec, parseHm, weekday } from "./clock.ts";
 import { titleFromPath } from "./files.ts";
 import { Mpv } from "./mpv.ts";
@@ -7,8 +7,8 @@ import { markEpisodeDone, markRandomPlayed } from "./progress.ts";
 import { ensureToday, joinOffset, loadToday, onAirItem, saveToday } from "./rundown.ts";
 import { DAY_SECONDS, windowOn } from "../shared/window.ts";
 import { isYoutubeUrl, parseYoutubeUrl, youtubeLabel } from "../shared/youtube.ts";
-import { blocksForDay, loadSchedule } from "./schedule.ts";
-import { cachedYoutube, probeYoutube } from "./youtube.ts";
+import { blocksForDay, loadSchedule, playingIntermission } from "./schedule.ts";
+import { cachedYoutube } from "./youtube.ts";
 
 const mpv = new Mpv();
 let waitingUntil: string | null = null;
@@ -17,7 +17,7 @@ let lastError: string | null = null;
 let handlingEnd = false;
 let replacing = false;
 let stopping = false;
-let fallbackPlay: { folder: string; path: string } | null = null;
+let fallbackPlay: { kind: IntermissionItem["kind"]; folder: string; path: string } | null = null;
 let fallbackRetry: ReturnType<typeof setTimeout> | null = null;
 let playEpoch = 0;
 let provisionalSkips: string[] = [];
@@ -123,8 +123,8 @@ async function onEndFile(reason: string): Promise<void> {
   }
   if (replacing || handlingEnd) return;
   if (reason !== "eof") {
-    if (fallbackPlay && isYoutubeUrl(fallbackPlay.path) && reason !== "quit") {
-      retryYoutubeIntermission(fallbackPlay.path);
+    if (fallbackPlay?.kind === "youtube" && reason !== "quit") {
+      retryYoutubeIntermission();
     }
     return;
   }
@@ -147,7 +147,7 @@ async function onEndFile(reason: string): Promise<void> {
         }
       }
     } else if (finishedIntermission) {
-      if (!isYoutubeUrl(finishedIntermission.path)) {
+      if (finishedIntermission.kind === "folder") {
         await markEpisodeDone(finishedIntermission.folder, finishedIntermission.path);
       }
       fallbackPlay = null;
@@ -194,8 +194,25 @@ async function playNow(): Promise<void> {
     const next = dayBlocks.find((block) => parseHm(windowOn(block, day).start) > now);
     if (next) armWaitUntil(parseHm(windowOn(next, day).start));
   }
-  if (schedule.fallbackFolder) await playFallback(schedule.fallbackFolder);
-  else await stopIntermission();
+  await playActiveIntermission();
+}
+
+// Start the selected intermission, or stop it when nothing is selected.
+async function playActiveIntermission(): Promise<void> {
+  const item = playingIntermission(await loadSchedule());
+  if (!item) {
+    await stopIntermission();
+    return;
+  }
+  await playFallback(item);
+}
+
+// Switch the gap filler when the selection changes. A scheduled show keeps the screen.
+export async function syncIntermission(): Promise<void> {
+  if (stopping || !mpv.running) return;
+  const today = await loadToday();
+  if (today.items.some((item) => item.status === "playing")) return;
+  await playActiveIntermission();
 }
 
 // Cut off an intermission file so the scheduled block has the screen.
@@ -212,16 +229,16 @@ async function stopIntermission(): Promise<void> {
   }
 }
 
-// Play a YouTube URL, or the next episode from the intermission folder.
-async function playFallback(source: string): Promise<void> {
-  const url = parseYoutubeUrl(source);
-  if (url) {
+// Play the selected YouTube URL, video file, or next episode from a folder.
+async function playFallback(item: IntermissionItem): Promise<void> {
+  if (item.kind === "youtube") {
+    const url = parseYoutubeUrl(item.source);
+    if (!url) return;
     if (fallbackPlay?.path === url) return;
     const epoch = ++playEpoch;
     try {
-      fallbackPlay = { folder: url, path: url };
+      fallbackPlay = { kind: "youtube", folder: url, path: url };
       replacing = true;
-      void probeYoutube(url, { allowLive: true }).catch(() => undefined);
       await mpv.loadFile(url);
       if (epoch !== playEpoch) await restoreCurrentLoad();
     } catch (err) {
@@ -234,11 +251,22 @@ async function playFallback(source: string): Promise<void> {
     return;
   }
   try {
-    const file = await pick({ folder: source, mode: "next-episode" });
-    if (!file) return;
-    if (fallbackPlay?.path === file) return;
+    const file =
+      item.kind === "video"
+        ? await pick({ folder: "", mode: "specific-file", file: item.source })
+        : await pick({ folder: item.source, mode: "next-episode" });
+    if (!file) {
+      lastError = item.kind === "video" ? `Video does not exist: ${item.source}` : null;
+      if (fallbackPlay) {
+        fallbackPlay = null;
+        replacing = true;
+        await mpv.stopPlayback();
+      }
+      return;
+    }
+    if (fallbackPlay?.path === file && fallbackPlay.kind === item.kind) return;
     const epoch = ++playEpoch;
-    fallbackPlay = { folder: source, path: file };
+    fallbackPlay = { kind: item.kind, folder: item.kind === "folder" ? item.source : file, path: file };
     replacing = true;
     await mpv.loadFile(file);
     if (epoch !== playEpoch) await restoreCurrentLoad();
@@ -267,13 +295,13 @@ async function restoreCurrentLoad(): Promise<void> {
   if (epoch === playEpoch) await mpv.stopPlayback().catch(() => undefined);
 }
 
-function retryYoutubeIntermission(url: string): void {
+function retryYoutubeIntermission(): void {
   clearFallbackRetry();
   fallbackPlay = null;
   fallbackRetry = setTimeout(() => {
     fallbackRetry = null;
     if (stopping || !mpv.running) return;
-    void playFallback(url);
+    void playActiveIntermission();
   }, 2000);
 }
 

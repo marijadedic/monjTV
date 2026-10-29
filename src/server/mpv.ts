@@ -97,6 +97,13 @@ export class Mpv {
         `--script-opts=ytdl_hook-ytdl_path=${ytdlp}`,
         "--ytdl-format=bestvideo[height<=1080][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=1080][vcodec^=avc]+bestaudio/bestvideo[height<=1080]+bestaudio/best[height<=1080]/18/best",
         "--ytdl-raw-options-append=no-playlist=",
+        // Node solves YouTube's player challenge. Without it, some stream links never start.
+        `--ytdl-raw-options-append=js-runtimes=node:${process.execPath}`,
+        "--ytdl-raw-options-append=socket-timeout=30",
+        "--ytdl-raw-options-append=extractor-retries=3",
+        "--demuxer-lavf-o-append=reconnect=1",
+        "--demuxer-lavf-o-append=reconnect_streamed=1",
+        "--demuxer-lavf-o-append=reconnect_delay_max=5",
         ...decodeArgs(),
       ],
       { stdio: ["ignore", "ignore", "inherit"] },

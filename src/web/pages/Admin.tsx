@@ -3,6 +3,8 @@ import {
   DAYS,
   type BlockMode,
   type Day,
+  type IntermissionItem,
+  type IntermissionKind,
   type Schedule,
   type ScheduleBlock,
   type SlotLength,
@@ -197,16 +199,25 @@ function slotHover(
   return block.file ?? block.folder;
 }
 
-function fallbackLabel(source: string, titles: Readonly<Record<string, string>> = {}): string {
-  const url = parseYoutubeUrl(source);
-  if (url) return titles[url] || youtubeLabel(source);
-  return folderLabel(source);
+function intermissionLabel(item: IntermissionItem, titles: Readonly<Record<string, string>> = {}): string {
+  if (item.kind === "youtube") {
+    const url = parseYoutubeUrl(item.source);
+    if (url && titles[url]) return titles[url];
+    return youtubeLabel(item.source);
+  }
+  if (item.kind === "video") return fileTitle(item.source);
+  return folderLabel(item.source);
 }
 
-function youtubeScheduleKey(schedule: Schedule): string {
+function youtubeScheduleKey(schedule: Schedule, extra = ""): string {
   const urls = new Set<string>();
-  const fallback = parseYoutubeUrl(schedule.fallbackFolder);
-  if (fallback) urls.add(fallback);
+  for (const item of schedule.intermissions) {
+    if (item.kind !== "youtube") continue;
+    const url = parseYoutubeUrl(item.source);
+    if (url) urls.add(url);
+  }
+  const draft = parseYoutubeUrl(extra);
+  if (draft) urls.add(draft);
   for (const block of schedule.blocks) {
     if (block.mode !== "youtube") continue;
     const url = parseYoutubeUrl(block.file ?? "");
@@ -215,41 +226,19 @@ function youtubeScheduleKey(schedule: Schedule): string {
   return [...urls].sort().join("\n");
 }
 
-type IntermissionKind = "folder" | "youtube";
-
-function readIntermission(source: string): {
-  kind: IntermissionKind;
-  folder: string;
-  youtube: string;
-} {
-  if (isYoutubeUrl(source)) {
-    return { kind: "youtube", folder: "", youtube: parseYoutubeUrl(source) ?? source };
-  }
-  return { kind: "folder", folder: source, youtube: "" };
-}
-
-function sameFallback(saved: string, pending: string): boolean {
-  const savedUrl = parseYoutubeUrl(saved);
-  const pendingUrl = parseYoutubeUrl(pending);
-  if (savedUrl || pendingUrl) return savedUrl === pendingUrl && pendingUrl !== null;
-  return saved === pending;
-}
-
-function intermissionPending(
+function pendingSource(
   kind: IntermissionKind,
-  folder: string,
-  youtube: string,
-): { value: string; error: "youtube" | "folder-has-youtube" | null } {
+  value: string,
+): { source: string; error: "youtube" | "youtube-in-path" | null } {
+  const trimmed = value.trim();
+  if (!trimmed) return { source: "", error: null };
   if (kind === "youtube") {
-    const trimmed = youtube.trim();
-    if (!trimmed) return { value: "", error: null };
     const parsed = parseYoutubeUrl(trimmed);
-    if (!parsed) return { value: trimmed, error: "youtube" };
-    return { value: parsed, error: null };
+    if (!parsed) return { source: trimmed, error: "youtube" };
+    return { source: parsed, error: null };
   }
-  const trimmed = folder.trim();
-  if (isYoutubeUrl(trimmed)) return { value: trimmed, error: "folder-has-youtube" };
-  return { value: trimmed, error: null };
+  if (isYoutubeUrl(trimmed)) return { source: trimmed, error: "youtube-in-path" };
+  return { source: trimmed, error: null };
 }
 
 type FolderHit = { name: string; path: string };
@@ -265,6 +254,7 @@ function FolderPath({
   onChange,
   onAction,
   onBlur,
+  onEnter,
 }: {
   value: string;
   placeholder: string;
@@ -276,6 +266,7 @@ function FolderPath({
   onChange: (value: string) => void;
   onAction: () => void;
   onBlur?: () => void;
+  onEnter?: () => void;
 }) {
   const [dirs, setDirs] = useState<FolderHit[]>([]);
   const [open, setOpen] = useState(false);
@@ -314,7 +305,10 @@ function FolderPath({
       setOpen(false);
       return;
     }
-    if (!open || dirs.length === 0) return;
+    if (!open || dirs.length === 0) {
+      if (event.key === "Enter") onEnter?.();
+      return;
+    }
     if (event.key === "ArrowDown") {
       event.preventDefault();
       setActive((index) => (index + 1) % dirs.length);
@@ -324,6 +318,8 @@ function FolderPath({
     } else if (event.key === "Enter" && active >= 0 && dirs[active]) {
       event.preventDefault();
       onChange(dirs[active].path);
+    } else if (event.key === "Enter") {
+      onEnter?.();
     }
   }
 
@@ -590,7 +586,7 @@ function dayClashes(
 }
 
 function emptySchedule(): Schedule {
-  return { blocks: [], fallbackFolder: "" };
+  return { blocks: [], intermissions: [], activeIntermission: "" };
 }
 
 export function Admin() {
@@ -607,9 +603,8 @@ export function Admin() {
   const [fitMiss, setFitMiss] = useState<SlotMiss | null>(null);
   const [picking, setPicking] = useState<"draft" | "fallback" | null>(null);
   const [intermissionOpen, setIntermissionOpen] = useState(false);
-  const [intermissionKind, setIntermissionKind] = useState<IntermissionKind>("folder");
-  const [folderDraft, setFolderDraft] = useState("");
-  const [youtubeDraft, setYoutubeDraft] = useState("");
+  const [addKind, setAddKind] = useState<IntermissionKind>("folder");
+  const [addDraft, setAddDraft] = useState("");
   const [intermissionError, setIntermissionError] = useState<string | null>(null);
   const [intermissionSaving, setIntermissionSaving] = useState(false);
   const [panelToken, setPanelToken] = useState(0);
@@ -622,14 +617,11 @@ export function Admin() {
   const [fileCount, setFileCount] = useState(0);
   const [elapsedSec, setElapsedSec] = useState(0);
   const scheduleRef = useRef(schedule);
-  const intermissionKindRef = useRef<IntermissionKind>("folder");
-  const folderDraftRef = useRef("");
-  const youtubeDraftRef = useRef("");
-  const intermissionEdited = useRef(false);
+  const addKindRef = useRef<IntermissionKind>("folder");
+  const addDraftRef = useRef("");
   scheduleRef.current = schedule;
-  intermissionKindRef.current = intermissionKind;
-  folderDraftRef.current = folderDraft;
-  youtubeDraftRef.current = youtubeDraft;
+  addKindRef.current = addKind;
+  addDraftRef.current = addDraft;
   const formRef = useRef<HTMLFormElement>(null);
   const formErrorRef = useRef<HTMLParagraphElement>(null);
   const slotOpRef = useRef<SlotOp | null>(null);
@@ -640,19 +632,18 @@ export function Admin() {
     api
       .schedule()
       .then((loaded) => {
-        const next = { ...emptySchedule(), ...loaded, blocks: loaded.blocks ?? [] };
-        setSchedule(next);
-        if (!intermissionEdited.current) {
-          const read = readIntermission(next.fallbackFolder);
-          setIntermissionKind(read.kind);
-          setFolderDraft(read.folder);
-          setYoutubeDraft(read.youtube);
-        }
+        setSchedule({
+          ...emptySchedule(),
+          ...loaded,
+          blocks: loaded.blocks ?? [],
+          intermissions: loaded.intermissions ?? [],
+          activeIntermission: loaded.activeIntermission ?? "",
+        });
       })
       .catch((e: Error) => setError(e.message));
   }, []);
 
-  const titleKey = youtubeScheduleKey(schedule);
+  const titleKey = youtubeScheduleKey(schedule, addKind === "youtube" ? addDraft : "");
   useEffect(() => {
     const urls = titleKey ? titleKey.split("\n") : [];
     if (urls.length === 0) return;
@@ -943,37 +934,27 @@ export function Admin() {
     }
   }
 
-  function editFolderDraft(value: string) {
-    intermissionEdited.current = true;
-    folderDraftRef.current = value;
-    setFolderDraft(value);
+  function editAddDraft(value: string) {
+    addDraftRef.current = value;
+    setAddDraft(value);
     setIntermissionError(null);
     setSaved(false);
   }
 
-  function editYoutubeDraft(value: string) {
-    intermissionEdited.current = true;
-    youtubeDraftRef.current = value;
-    setYoutubeDraft(value);
-    setIntermissionError(null);
-    setSaved(false);
-  }
-
-  function chooseIntermissionKind(kind: IntermissionKind) {
-    intermissionEdited.current = true;
-    intermissionKindRef.current = kind;
-    setIntermissionKind(kind);
+  function chooseAddKind(kind: IntermissionKind) {
+    addKindRef.current = kind;
+    setAddKind(kind);
     setIntermissionError(null);
   }
 
-  async function chooseFallback() {
+  async function chooseAddSource() {
+    const video = addKindRef.current === "video";
     setPicking("fallback");
     setIntermissionError(null);
     try {
-      const picked = await api.pickFolder();
+      const picked = video ? await api.pickFile() : await api.pickFolder();
       if (!picked.path) return;
-      chooseIntermissionKind("folder");
-      editFolderDraft(picked.path);
+      editAddDraft(picked.path);
     } catch (e) {
       setIntermissionError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -981,43 +962,62 @@ export function Admin() {
     }
   }
 
-  async function saveIntermission() {
-    const pending = intermissionPending(
-      intermissionKindRef.current,
-      folderDraftRef.current,
-      youtubeDraftRef.current,
-    );
-    if (pending.error) {
-      setIntermissionError(pending.error);
-      return;
-    }
+  async function changeIntermission(
+    next: Pick<Schedule, "intermissions" | "activeIntermission">,
+  ): Promise<boolean> {
     const current = scheduleRef.current;
-    if (sameFallback(current.fallbackFolder, pending.value)) return;
     setIntermissionSaving(true);
     setIntermissionError(null);
     try {
-      const res = await persist({ ...current, fallbackFolder: pending.value });
-      const stored = res.schedule.fallbackFolder;
-      if (stored) {
-        const read = readIntermission(stored);
-        setIntermissionKind(read.kind);
-        setFolderDraft(read.folder);
-        setYoutubeDraft(read.youtube);
-      } else if (intermissionKindRef.current === "youtube") {
-        setYoutubeDraft("");
-      } else {
-        setFolderDraft("");
-      }
+      await persist({ ...current, ...next });
+      return true;
     } catch (e) {
       setIntermissionError(e instanceof Error ? e.message : String(e));
+      return false;
     } finally {
       setIntermissionSaving(false);
     }
   }
 
+  async function addIntermission() {
+    const pending = pendingSource(addKindRef.current, addDraftRef.current);
+    if (pending.error) {
+      setIntermissionError(pending.error);
+      return;
+    }
+    if (!pending.source) return;
+    const current = scheduleRef.current;
+    const item: IntermissionItem = {
+      id: crypto.randomUUID(),
+      kind: addKindRef.current,
+      source: pending.source,
+    };
+    const saved = await changeIntermission({
+      intermissions: [...current.intermissions, item],
+      activeIntermission: current.activeIntermission || item.id,
+    });
+    if (!saved) return;
+    addDraftRef.current = "";
+    setAddDraft("");
+  }
+
+  function selectIntermission(id: string) {
+    const current = scheduleRef.current;
+    if (current.activeIntermission === id) return;
+    void changeIntermission({ intermissions: current.intermissions, activeIntermission: id });
+  }
+
+  function removeIntermission(id: string) {
+    const current = scheduleRef.current;
+    void changeIntermission({
+      intermissions: current.intermissions.filter((item) => item.id !== id),
+      activeIntermission: current.activeIntermission === id ? "" : current.activeIntermission,
+    });
+  }
+
   function intermissionErrorText(error: string): string {
     if (error === "youtube") return t.error("Not a YouTube video URL");
-    if (error === "folder-has-youtube") return t.intermissionYoutubeInFolder;
+    if (error === "youtube-in-path") return t.intermissionYoutubeInFolder;
     return t.error(error);
   }
 
@@ -1133,27 +1133,17 @@ export function Admin() {
     setFieldError((current) => ({ ...current, time: undefined }));
   }
 
-  const fallbackName = schedule.fallbackFolder
-    ? fallbackLabel(schedule.fallbackFolder, youtubeTitles)
+  const selectedIntermission =
+    schedule.intermissions.find((item) => item.id === schedule.activeIntermission) ?? null;
+  const fallbackName = selectedIntermission
+    ? intermissionLabel(selectedIntermission, youtubeTitles)
     : "";
-  const pendingIntermission = intermissionPending(intermissionKind, folderDraft, youtubeDraft);
-  const savedIsYoutube = isYoutubeUrl(schedule.fallbackFolder);
-  const sameIntermissionKind =
-    (intermissionKind === "youtube" && savedIsYoutube) ||
-    (intermissionKind === "folder" && !savedIsYoutube);
-  const intermissionDirty = pendingIntermission.error
-    ? true
-    : sameIntermissionKind
-      ? !sameFallback(schedule.fallbackFolder, pendingIntermission.value)
-      : pendingIntermission.value !== "";
-  const intermissionPreview =
-    intermissionKind === "youtube"
-      ? parseYoutubeUrl(youtubeDraft)
-        ? fallbackLabel(youtubeDraft, youtubeTitles)
-        : ""
-      : folderDraft.trim()
-        ? folderLabel(folderDraft)
-        : "";
+  const pendingAdd = pendingSource(addKind, addDraft);
+  const addPreview = pendingAdd.error
+    ? ""
+    : pendingAdd.source
+      ? intermissionLabel({ id: "", kind: addKind, source: pendingAdd.source }, youtubeTitles)
+      : "";
   const matched = draft && measured?.key === measureKey(draft) ? measured : null;
   const length = matched?.length ?? null;
   const lengthMins = length ? Math.ceil(length.durationSec / 60) : 0;
@@ -1210,68 +1200,118 @@ export function Admin() {
         {!draft && intermissionOpen && (
           <div class="intermission-open" ref={intermissionPanelRef}>
             <span>{t.ifEmpty}</span>
-            <div class="seg intermission-kind" role="radiogroup" aria-label={t.intermissionFrom}>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={intermissionKind === "folder"}
-                class={intermissionKind === "folder" ? "on" : ""}
-                onClick={() => chooseIntermissionKind("folder")}
-              >
-                {t.folder}
-              </button>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={intermissionKind === "youtube"}
-                class={intermissionKind === "youtube" ? "on" : ""}
-                onClick={() => chooseIntermissionKind("youtube")}
-              >
-                {t.youtube}
-              </button>
-            </div>
-            {intermissionKind === "folder" ? (
-              <FolderPath
-                kind="folder"
-                value={folderDraft}
-                placeholder={t.folderPlaceholder}
-                invalid={intermissionError === "folder-has-youtube"}
-                actionLabel={picking === "fallback" ? t.choosing : t.browse}
-                actionBusy={picking === "fallback"}
-                listLabel={t.folder}
-                onChange={editFolderDraft}
-                onAction={() => void chooseFallback()}
-              />
+            {schedule.intermissions.length === 0 ? (
+              <p class="intermission-empty">{t.intermissionEmpty}</p>
             ) : (
+              <ul class="intermission-list" role="radiogroup" aria-label={t.intermissionPick}>
+                <li class={!selectedIntermission ? "on" : ""}>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={!selectedIntermission}
+                    class="pick"
+                    disabled={intermissionSaving}
+                    onClick={() => selectIntermission("")}
+                  >
+                    <i />
+                    <b>{t.none}</b>
+                  </button>
+                </li>
+                {schedule.intermissions.map((item) => {
+                  const on = item.id === schedule.activeIntermission;
+                  return (
+                    <li key={item.id} class={on ? "on" : ""}>
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={on}
+                        class="pick"
+                        title={item.source}
+                        disabled={intermissionSaving}
+                        onClick={() => selectIntermission(item.id)}
+                      >
+                        <i />
+                        <b>{intermissionLabel(item, youtubeTitles)}</b>
+                        <span>
+                          {item.kind === "folder" ? t.folder : item.kind === "video" ? t.video : t.youtube}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        class="x"
+                        aria-label={t.remove}
+                        title={t.remove}
+                        disabled={intermissionSaving}
+                        onClick={() => removeIntermission(item.id)}
+                      >
+                        ×
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <span class="k">{t.add}</span>
+            <div class="seg intermission-kind" role="radiogroup" aria-label={t.intermissionFrom}>
+              {(["folder", "video", "youtube"] as const).map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  role="radio"
+                  aria-checked={addKind === kind}
+                  class={addKind === kind ? "on" : ""}
+                  onClick={() => chooseAddKind(kind)}
+                >
+                  {kind === "folder" ? t.folder : kind === "video" ? t.video : t.youtube}
+                </button>
+              ))}
+            </div>
+            {addKind === "youtube" ? (
               <div class="path-field">
                 <div class="field">
                   <input
-                    value={youtubeDraft}
+                    value={addDraft}
                     placeholder={t.youtubePlaceholder}
-                    aria-invalid={intermissionError === "youtube" ? "true" : undefined}
-                    onInput={(event) => editYoutubeDraft((event.target as HTMLInputElement).value)}
+                    aria-invalid={pendingAdd.error === "youtube" || intermissionError ? "true" : undefined}
+                    onInput={(event) => editAddDraft((event.target as HTMLInputElement).value)}
                     onKeyDown={(event) => {
                       if (event.key !== "Enter") return;
                       event.preventDefault();
-                      void saveIntermission();
+                      void addIntermission();
                     }}
                   />
                 </div>
               </div>
+            ) : (
+              <FolderPath
+                kind={addKind === "video" ? "video" : "folder"}
+                value={addDraft}
+                placeholder={addKind === "video" ? t.videoPlaceholder : t.folderPlaceholder}
+                invalid={pendingAdd.error === "youtube-in-path" || Boolean(intermissionError)}
+                actionLabel={picking === "fallback" ? t.choosing : t.browse}
+                actionBusy={picking === "fallback"}
+                listLabel={addKind === "video" ? t.video : t.folder}
+                onChange={editAddDraft}
+                onAction={() => void chooseAddSource()}
+                onEnter={() => void addIntermission()}
+              />
             )}
-            {intermissionPreview && <p class="folder-name">{intermissionPreview}</p>}
-            {intermissionError && <p class="field-error">{intermissionErrorText(intermissionError)}</p>}
+            {addPreview && <p class="folder-name">{addPreview}</p>}
+            {(intermissionError || pendingAdd.error) && (
+              <p class="field-error">{intermissionErrorText(intermissionError || pendingAdd.error || "")}</p>
+            )}
             <span>
-              {intermissionKind === "youtube" ? t.youtubeIntermission : t.nextHint} {t.intermissionCut}
+              {addKind === "youtube" ? t.youtubeIntermission : addKind === "video" ? t.oneHint : t.nextHint}{" "}
+              {t.intermissionCut}
             </span>
             <div class="intermission-actions">
               <button
                 type="button"
                 class="primary"
-                disabled={!intermissionDirty || intermissionSaving}
-                onClick={() => void saveIntermission()}
+                disabled={!pendingAdd.source || Boolean(pendingAdd.error) || intermissionSaving}
+                onClick={() => void addIntermission()}
               >
-                {t.save}
+                {t.add}
               </button>
             </div>
           </div>

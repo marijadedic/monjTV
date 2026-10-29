@@ -203,7 +203,7 @@ A file is placed on the rundown only when it fits the block. It can end by the b
 
 Progress updates when a file reaches the end (`eof`). Stopping mpv puts a `playing` item back to `planned`, and puts back to `planned` any item that this start marked `skipped`.
 
-If nothing is on — outside every block, or after a slot’s video has ended early — and an intermission source is set, mpv fills the gap. A local folder is walked in order, the same way a next-episode block does. A YouTube URL, including a live stream, plays instead of a folder. A scheduled slot cuts that off when it starts. An intermission file does not have to finish. Those plays are not rundown items. A local file that reaches the end on its own remembers its place in that folder. A file cut off by the next slot does not, so the next gap starts it again from the beginning. A YouTube intermission that ends or drops is started again. Set the source from the Intermission chip above the day columns. The chip is Pauza in Croatian, and nije odabrano when nothing is chosen. Browse opens the same folder dialog as a slot, or paste a YouTube URL.
+If nothing is on — outside every block, or after a slot’s video has ended early — and an intermission is selected, mpv fills the gap. The list can hold folders, video files, and YouTube links, including a live stream. The selected entry plays. A folder is walked in order, the same way a next-episode block does. A video file plays that file, and starts again if it ends before the next slot. A YouTube URL plays instead. A scheduled slot cuts that off when it starts. An intermission file does not have to finish. Those plays are not rundown items. A folder file that reaches the end on its own remembers its place in that folder. A file cut off by the next slot does not, so the next gap starts it again from the beginning. A video file or YouTube intermission that ends or drops is started again. Set the list from the Intermission chip above the day columns. The chip is Pauza in Croatian, and nije odabrano when nothing is chosen. Browse opens the same folder or file dialog as a slot, or paste a YouTube URL.
 
 If `ffprobe` is missing or cannot read a file, that file is treated as 45 minutes long, and the rundown times drift. Install FFmpeg if the rails look wrong.
 
@@ -220,7 +220,7 @@ If `ffprobe` is missing or cannot read a file, that file is treated as 45 minute
 
 | File                 | Contents                                                                 |
 | -------------------- | ------------------------------------------------------------------------ |
-| `data/schedule.json` | The week: `blocks` and `fallbackFolder`.                                 |
+| `data/schedule.json` | The week: `blocks`, `intermissions`, and `activeIntermission`.           |
 | `data/today.json`    | Today's rundown. Rebuilt when the date changes or the schedule is saved. |
 | `data/progress.json` | `lastCompleted` (last finished path per folder) and `recentRandom`.      |
 
@@ -239,11 +239,18 @@ A schedule with one weekday block looks like this:
       "mode": "next-episode"
     }
   ],
-  "fallbackFolder": "/home/you/videos/music"
+  "intermissions": [
+    {
+      "id": "b7e1c2a0-4d55-4a1e-9f30-6c8a1d2e4b70",
+      "kind": "folder",
+      "source": "/home/you/videos/music"
+    }
+  ],
+  "activeIntermission": "b7e1c2a0-4d55-4a1e-9f30-6c8a1d2e4b70"
 }
 ```
 
-Days are `mon` `tue` `wed` `thu` `fri` `sat` `sun`. Times are `HH:mm`.
+Days are `mon` `tue` `wed` `thu` `fri` `sat` `sun`. Times are `HH:mm`. An intermission `kind` is `folder`, `video`, or `youtube`. An older `fallbackFolder` is read once and saved as the selected entry.
 
 ## Commands
 

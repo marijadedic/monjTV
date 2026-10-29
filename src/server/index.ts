@@ -4,11 +4,11 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { Hono } from "hono";
-import { isBlockMode, type Schedule } from "../shared/types.ts";
+import { isBlockMode } from "../shared/types.ts";
 import { PORT } from "../shared/constants.ts";
 import { assertVideo, browse, pickFile, pickFolder, suggestPaths } from "./files.ts";
 import { clientDir } from "./paths.ts";
-import { getStatus, shutdownPlayer, startPlayer } from "./player.ts";
+import { getStatus, shutdownPlayer, startPlayer, syncIntermission } from "./player.ts";
 import { loadProgress } from "./progress.ts";
 import {
   ensureToday,
@@ -19,7 +19,7 @@ import {
   slotLength,
   videoCount,
 } from "./rundown.ts";
-import { assertFallback, assertFolder, changedBlocks, loadSchedule, saveSchedule } from "./schedule.ts";
+import { assertFolder, changedBlocks, loadSchedule, saveSchedule } from "./schedule.ts";
 import { assertYoutubeVideo, youtubeTitles } from "./youtube.ts";
 import { frameOf } from "./still.ts";
 import { closeAppTabs, portsFrom } from "./tabs.ts";
@@ -39,18 +39,18 @@ app.get("/api/schedule", async (c) => {
 
 // Save the schedule and rebuild today around current playback.
 app.put("/api/schedule", async (c) => {
-  const body = (await c.req.json()) as Schedule;
+  const body = (await c.req.json()) as Parameters<typeof saveSchedule>[0];
   try {
     for (const block of body.blocks ?? []) {
       if (block.mode === "specific-file") await assertVideo(block.file ?? "");
       else if (block.mode === "youtube") await assertYoutubeVideo(block.file ?? "");
       else await assertFolder(block.folder);
     }
-    if (body.fallbackFolder?.trim()) await assertFallback(body.fallbackFolder.trim());
     const previous = await loadSchedule();
     const saved = await saveSchedule(body);
     const today = await rebuildTodayPreservingPlayback();
     const misses = await missesForBlocks(changedBlocks(previous.blocks, saved.blocks));
+    await syncIntermission();
     return c.json({ schedule: saved, today, misses });
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
@@ -96,11 +96,11 @@ app.get("/api/today", async (c) => {
   return c.json(await ensureToday());
 });
 
-// Serve one cached frame for a random-file or specific-file rundown item.
+// Serve one cached frame for a local-file rundown item.
 app.get("/api/today/items/:id/still", async (c) => {
   const today = await ensureToday();
   const item = today.items.find((entry) => entry.id === c.req.param("id"));
-  if (!item || (item.mode !== "random-file" && item.mode !== "specific-file")) return c.notFound();
+  if (!item || item.mode === "youtube") return c.notFound();
   const file = await frameOf(item.path);
   if (!file) return c.notFound();
   const bytes = await readFile(file);

@@ -23,9 +23,26 @@ export interface ScheduleBlock {
   mode: BlockMode;
 }
 
+export const INTERMISSION_KINDS = ["folder", "video", "youtube"] as const;
+export type IntermissionKind = (typeof INTERMISSION_KINDS)[number];
+
+export function isIntermissionKind(value: string | undefined): value is IntermissionKind {
+  return INTERMISSION_KINDS.includes(value as IntermissionKind);
+}
+
+/** One thing that can fill the gaps between slots. */
+export interface IntermissionItem {
+  id: string;
+  kind: IntermissionKind;
+  /** Folder path, video path, or a canonical YouTube watch URL. */
+  source: string;
+}
+
 export interface Schedule {
   blocks: ScheduleBlock[];
-  fallbackFolder: string;
+  intermissions: IntermissionItem[];
+  /** Id of the intermission that plays. Empty when none is selected. */
+  activeIntermission: string;
 }
 
 export interface Progress {

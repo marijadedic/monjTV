@@ -1,29 +1,50 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { DAYS, isBlockMode, type Day, type Schedule, type ScheduleBlock } from "../shared/types.ts";
+import {
+  DAYS,
+  isBlockMode,
+  isIntermissionKind,
+  type Day,
+  type IntermissionItem,
+  type Schedule,
+  type ScheduleBlock,
+} from "../shared/types.ts";
 import { DAY_MINUTES, clockOf, minutesOf, segmentsOf, windowOn } from "../shared/window.ts";
 import { isYoutubeUrl, parseYoutubeUrl } from "../shared/youtube.ts";
 import { parseHm, isHm } from "./clock.ts";
-import { isDir } from "./files.ts";
+import { assertVideo, isDir } from "./files.ts";
 import { schedulePath } from "./paths.ts";
 import { readJson, writeJson } from "./store.ts";
 
-const empty: Schedule = { blocks: [], fallbackFolder: "" };
+const empty: Schedule = { blocks: [], intermissions: [], activeIntermission: "" };
+
+type StoredSchedule = {
+  blocks?: ScheduleBlock[];
+  fallbackFolder?: unknown;
+  intermissions?: unknown;
+  activeIntermission?: unknown;
+};
 
 // Read the weekly schedule from disk.
 export async function loadSchedule(): Promise<Schedule> {
-  const data = await readJson<Schedule>(schedulePath, empty);
-  return {
-    blocks: Array.isArray(data.blocks) ? data.blocks : [],
-    fallbackFolder: fallbackFolderOf(data.fallbackFolder),
-  };
+  const data = await readJson<StoredSchedule>(schedulePath, empty);
+  const schedule = scheduleFrom(data);
+  if (!Array.isArray(data.intermissions)) await writeJson(schedulePath, schedule);
+  return schedule;
 }
 
 // Validate the schedule and write it to disk.
-export async function saveSchedule(schedule: Schedule): Promise<Schedule> {
+export async function saveSchedule(schedule: StoredSchedule): Promise<Schedule> {
   const normalized = validateSchedule(schedule);
+  await assertIntermissions(normalized.intermissions);
   await writeJson(schedulePath, normalized);
   return normalized;
+}
+
+// The intermission the player should fill gaps with.
+export function playingIntermission(schedule: Schedule): IntermissionItem | null {
+  if (!schedule.activeIntermission) return null;
+  return schedule.intermissions.find((item) => item.id === schedule.activeIntermission) ?? null;
 }
 
 // Blocks that were added or whose window, folder, file, or mode changed.
@@ -52,7 +73,7 @@ export function blocksForDay(schedule: Schedule, day: Day): ScheduleBlock[] {
 }
 
 // Normalize blocks and reject overlaps, including leftovers that run past midnight.
-export function validateSchedule(input: Schedule): Schedule {
+export function validateSchedule(input: StoredSchedule): Schedule {
   if (!input || !Array.isArray(input.blocks)) {
     throw new Error("Schedule must have a blocks array");
   }
@@ -73,7 +94,16 @@ export function validateSchedule(input: Schedule): Schedule {
       }
     }
   }
-  return { blocks, fallbackFolder: fallbackFolderOf(input.fallbackFolder) };
+  const { intermissions, activeIntermission } = intermissionsFrom(input, true);
+  return { blocks, intermissions, activeIntermission };
+}
+
+// Blocks plus the intermission list, without rejecting a saved block.
+function scheduleFrom(data: StoredSchedule): Schedule {
+  return {
+    blocks: Array.isArray(data.blocks) ? data.blocks : [],
+    ...intermissionsFrom(data, false),
+  };
 }
 
 // A folder path, a canonical YouTube watch URL, or empty.
@@ -81,6 +111,66 @@ function fallbackFolderOf(value: unknown): string {
   if (typeof value !== "string") return "";
   const trimmed = value.trim();
   return parseYoutubeUrl(trimmed) ?? trimmed;
+}
+
+// The saved list, or one item made from an older fallbackFolder.
+function intermissionsFrom(
+  data: StoredSchedule,
+  strict: boolean,
+): { intermissions: IntermissionItem[]; activeIntermission: string } {
+  if (Array.isArray(data.intermissions)) {
+    const seen = new Set<string>();
+    const intermissions = data.intermissions.flatMap((raw) => {
+      const item = normalizeIntermission(raw, seen, strict);
+      return item ? [item] : [];
+    });
+    const wanted = typeof data.activeIntermission === "string" ? data.activeIntermission : "";
+    const activeIntermission = intermissions.some((item) => item.id === wanted) ? wanted : "";
+    return { intermissions, activeIntermission };
+  }
+  const source = fallbackFolderOf(data.fallbackFolder);
+  if (!source) return { intermissions: [], activeIntermission: "" };
+  const item: IntermissionItem = {
+    id: randomUUID(),
+    kind: isYoutubeUrl(source) ? "youtube" : "folder",
+    source,
+  };
+  return { intermissions: [item], activeIntermission: item.id };
+}
+
+// Keep a usable list entry. Saving rejects a bad one; loading skips it.
+function normalizeIntermission(raw: unknown, seen: Set<string>, strict: boolean): IntermissionItem | null {
+  const fail = (message: string): null => {
+    if (strict) throw new Error(message);
+    return null;
+  };
+  if (!raw || typeof raw !== "object") return fail("Invalid intermission");
+  const item = raw as { id?: unknown; kind?: unknown; source?: unknown };
+  const source = typeof item.source === "string" ? item.source.trim() : "";
+  const kind = typeof item.kind === "string" && isIntermissionKind(item.kind) ? item.kind : "";
+  if (!kind) return fail("Invalid intermission");
+  if (kind === "youtube") {
+    const url = parseYoutubeUrl(source);
+    if (!url) return fail("Not a YouTube video URL");
+    return { id: freshId(item.id, seen), kind, source: url };
+  }
+  if (!source || isYoutubeUrl(source)) {
+    return fail(
+      isYoutubeUrl(source)
+        ? "That is a YouTube link. Choose YouTube, then add it."
+        : kind === "video"
+          ? "Type the video path."
+          : "Type the folder path.",
+    );
+  }
+  return { id: freshId(item.id, seen), kind, source };
+}
+
+function freshId(id: unknown, seen: Set<string>): string {
+  let next = typeof id === "string" && id.trim() ? id.trim() : randomUUID();
+  if (seen.has(next)) next = randomUUID();
+  seen.add(next);
+  return next;
 }
 
 // Fill defaults and reject an invalid block.
@@ -194,10 +284,11 @@ export async function assertFolder(folder: string): Promise<void> {
   }
 }
 
-// A folder on disk, or a YouTube URL for intermission.
-export async function assertFallback(source: string): Promise<void> {
-  const trimmed = source.trim();
-  if (!trimmed) return;
-  if (isYoutubeUrl(trimmed)) return;
-  await assertFolder(trimmed);
+// Each list entry is a folder, a video file, or a YouTube URL. Live streams are allowed.
+export async function assertIntermissions(items: IntermissionItem[]): Promise<void> {
+  for (const item of items) {
+    if (item.kind === "youtube") continue;
+    if (item.kind === "video") await assertVideo(item.source);
+    else await assertFolder(item.source);
+  }
 }

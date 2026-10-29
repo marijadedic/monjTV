@@ -5,7 +5,7 @@ import { api } from "../api.ts";
 import { useI18n } from "../i18n.tsx";
 
 function showsFrame(mode: RundownItem["mode"]): boolean {
-  return mode === "random-file" || mode === "specific-file";
+  return mode === "next-episode" || mode === "random-file" || mode === "specific-file";
 }
 
 function stillSrc(item: RundownItem): string {

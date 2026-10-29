@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { parseYoutubeUrl, youtubeLabel } from "../shared/youtube.ts";
-import { ensureYtdlp } from "./ytdlp.ts";
+import { ensureYtdlp, ytdlpRuntimeArgs } from "./ytdlp.ts";
 
 const execFileAsync = promisify(execFile);
 
@@ -48,6 +48,11 @@ export async function probeYoutube(
         "--skip-download",
         "--no-warnings",
         "--ignore-no-formats-error",
+        "--socket-timeout",
+        "30",
+        "--extractor-retries",
+        "3",
+        ...ytdlpRuntimeArgs(),
         "--print",
         "%(.{title,duration,is_live,live_status})j",
         url,

@@ -95,6 +95,8 @@ type Copy = {
   intermissionPlaceholder: string;
   intermissionFrom: string;
   intermissionYoutubeInFolder: string;
+  intermissionEmpty: string;
+  intermissionPick: string;
   none: string;
   change: string;
   clickFirst: string;
@@ -239,7 +241,9 @@ const en: Copy = {
   intermissionCut: "A new slot cuts it off.",
   intermissionPlaceholder: "/path/to/folder or a YouTube URL",
   intermissionFrom: "Source",
-  intermissionYoutubeInFolder: "That is a YouTube link. Choose YouTube, then Save.",
+  intermissionYoutubeInFolder: "That is a YouTube link. Choose YouTube, then add it.",
+  intermissionEmpty: "Nothing here yet. Add a folder, a video, or a YouTube link.",
+  intermissionPick: "The selected one plays.",
   none: "None",
   change: "Change",
   clickFirst: "Click to add the first slot",
@@ -340,6 +344,9 @@ const hrExact: Record<string, string> = {
     "Odaberite video, mapu ili YouTube URL da bi blok dobio trajanje.",
   "Still measuring the video.": "Video se još mjeri.",
   "Block must be shorter than 24 hours": "Blok mora biti kraći od 24 sata.",
+  "Invalid intermission": "Neispravna pauza.",
+  "That is a YouTube link. Choose YouTube, then add it.":
+    "To je YouTube poveznica. Odaberite YouTube, pa dodajte.",
 };
 
 function hrError(message: string): string {
@@ -490,7 +497,9 @@ const hr: Copy = {
   intermissionCut: "Novi blok prekida reprodukciju.",
   intermissionPlaceholder: "/putanja/do/mape ili YouTube URL",
   intermissionFrom: "Izvor",
-  intermissionYoutubeInFolder: "To je YouTube poveznica. Odaberite YouTube, pa Spremi.",
+  intermissionYoutubeInFolder: "To je YouTube poveznica. Odaberite YouTube, pa dodajte.",
+  intermissionEmpty: "Još nema ničega. Dodajte mapu, video ili YouTube poveznicu.",
+  intermissionPick: "Pušta se odabrano.",
   none: "nije odabrano",
   change: "Promijeni",
   clickFirst: "Klikni za dodati prvi blok",
