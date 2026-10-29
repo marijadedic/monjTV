@@ -47,6 +47,19 @@ export function playingIntermission(schedule: Schedule): IntermissionItem | null
   return schedule.intermissions.find((item) => item.id === schedule.activeIntermission) ?? null;
 }
 
+// True when this block is new, or its folder, file, or mode changed.
+// A slot whose show was deleted can stay until it is removed, and can be removed
+// without the missing folder blocking the save.
+export function sourceChanged(before: ScheduleBlock[], block: ScheduleBlock): boolean {
+  const old = before.find((item) => item.id === block.id);
+  if (!old) return true;
+  return (
+    old.mode !== block.mode ||
+    old.folder.trim() !== (block.folder ?? "").trim() ||
+    (old.file ?? "").trim() !== (block.file ?? "").trim()
+  );
+}
+
 // Blocks that were added or whose window, folder, file, or mode changed.
 export function changedBlocks(before: ScheduleBlock[], after: ScheduleBlock[]): ScheduleBlock[] {
   return after.filter((block) => {

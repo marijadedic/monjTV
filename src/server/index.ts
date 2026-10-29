@@ -6,10 +6,10 @@ import path from "node:path";
 import { Hono } from "hono";
 import { isBlockMode } from "../shared/types.ts";
 import { PORT } from "../shared/constants.ts";
-import { assertVideo, browse, pickFile, pickFolder, suggestPaths } from "./files.ts";
+import { assertVideo, browse, isDir, isVideoFile, pickFile, pickFolder, suggestPaths } from "./files.ts";
 import { clientDir } from "./paths.ts";
-import { getStatus, shutdownPlayer, startPlayer, syncIntermission } from "./player.ts";
-import { loadProgress } from "./progress.ts";
+import { getStatus, intermissionFile, shutdownPlayer, startPlayer, syncIntermission } from "./player.ts";
+import { forgetUnusedFolders, loadProgress } from "./progress.ts";
 import {
   ensureToday,
   loadToday,
@@ -19,7 +19,7 @@ import {
   slotLength,
   videoCount,
 } from "./rundown.ts";
-import { assertFolder, changedBlocks, loadSchedule, saveSchedule } from "./schedule.ts";
+import { assertFolder, changedBlocks, loadSchedule, saveSchedule, sourceChanged } from "./schedule.ts";
 import { assertYoutubeVideo, youtubeTitles } from "./youtube.ts";
 import { frameOf } from "./still.ts";
 import { closeAppTabs, portsFrom } from "./tabs.ts";
@@ -41,13 +41,15 @@ app.get("/api/schedule", async (c) => {
 app.put("/api/schedule", async (c) => {
   const body = (await c.req.json()) as Parameters<typeof saveSchedule>[0];
   try {
+    const previous = await loadSchedule();
     for (const block of body.blocks ?? []) {
+      if (!sourceChanged(previous.blocks, block)) continue;
       if (block.mode === "specific-file") await assertVideo(block.file ?? "");
       else if (block.mode === "youtube") await assertYoutubeVideo(block.file ?? "");
       else await assertFolder(block.folder);
     }
-    const previous = await loadSchedule();
     const saved = await saveSchedule(body);
+    await forgetUnusedFolders(previous.blocks, saved.blocks);
     const today = await rebuildTodayPreservingPlayback();
     const misses = await missesForBlocks(changedBlocks(previous.blocks, saved.blocks));
     await syncIntermission();
@@ -68,7 +70,11 @@ app.post("/api/youtube/titles", async (c) => {
 
 // Length of the video a slot will play. A random folder uses its longest video.
 app.get("/api/video-count", async (c) => {
-  return c.json({ count: await videoCount(c.req.query("folder") ?? "") });
+  const file = (c.req.query("file") ?? "").trim();
+  if (file) return c.json({ count: 0, exists: await isVideoFile(file) });
+  const folder = (c.req.query("folder") ?? "").trim();
+  const exists = folder.length > 0 && (await isDir(folder));
+  return c.json({ count: exists ? await videoCount(folder) : 0, exists });
 });
 
 app.get("/api/slot-length", async (c) => {
@@ -102,6 +108,19 @@ app.get("/api/today/items/:id/still", async (c) => {
   const item = today.items.find((entry) => entry.id === c.req.param("id"));
   if (!item || item.mode === "youtube") return c.notFound();
   const file = await frameOf(item.path);
+  if (!file) return c.notFound();
+  const bytes = await readFile(file);
+  return c.body(bytes, 200, {
+    "Content-Type": "image/jpeg",
+    "Cache-Control": "private, max-age=86400",
+  });
+});
+
+// One cached frame for the local file filling a gap. The query must be that file.
+app.get("/api/player/intermission-still", async (c) => {
+  const filePath = intermissionFile();
+  if (!filePath || c.req.query("file") !== filePath) return c.notFound();
+  const file = await frameOf(filePath);
   if (!file) return c.notFound();
   const bytes = await readFile(file);
   return c.body(bytes, 200, {

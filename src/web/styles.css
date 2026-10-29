@@ -156,6 +156,16 @@ a {
   padding-right: 32px;
 }
 
+.shell.today-shell {
+  max-width: none;
+  padding-left: 32px;
+  padding-right: 32px;
+}
+
+.shell.today-shell main {
+  max-width: 1280px;
+}
+
 .shell.wide main,
 .shell.wide main > section,
 .shell.wide .week-wrap {
@@ -342,7 +352,7 @@ button:disabled {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 18px;
   align-items: end;
-  margin: 0 0 18px;
+  margin: 0;
 }
 
 .now-strip.has-still {
@@ -420,19 +430,58 @@ button:disabled {
 
 .card.playing {
   border: 1px solid var(--line);
-  box-shadow: inset 3px 0 0 var(--accent);
+  padding: 18px 16px;
+  box-shadow: inset 5px 0 0 var(--ok);
+  background: color-mix(in srgb, var(--ok) 10%, var(--panel));
+}
+
+.card.playing.has-still {
+  grid-template-columns: 132px minmax(84px, 130px) minmax(0, 1fr) auto;
+}
+
+.card.playing .still {
+  width: 132px;
+  height: 74px;
+}
+
+.card.playing .title {
+  font-size: 1.28rem;
+}
+
+.card.playing .pill.playing {
+  font-size: 0.95rem;
+  padding: 4px 10px;
 }
 
 html[data-theme="dusk"] .card.playing {
-  box-shadow: inset 3px 0 0 #8ea384;
+  box-shadow: inset 5px 0 0 #8ea384;
+}
+
+html[data-theme="teletext"] .card.playing {
+  box-shadow: inset 5px 0 0 #00ff00;
+  background: #000;
 }
 
 .card.playing .time {
   color: var(--text);
 }
 
-.card.done {
-  opacity: 0.72;
+.card.done,
+.card.skipped,
+.card.passed {
+  opacity: 0.45;
+}
+
+.card.done .still,
+.card.skipped .still,
+.card.passed .still {
+  filter: grayscale(1);
+}
+
+html[data-theme="teletext"] .card.done,
+html[data-theme="teletext"] .card.skipped,
+html[data-theme="teletext"] .card.passed {
+  opacity: 0.55;
 }
 
 .card.skipped .title {
@@ -478,12 +527,50 @@ html[data-theme="dusk"] .pill.playing {
   background: color-mix(in srgb, #8ea384 28%, var(--panel));
 }
 
-.now-strip .pill.playing {
+.now-strip .pill.playing,
+.pill.on-air {
   color: var(--ok);
   background: var(--pill-air);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  font-weight: 700;
   padding: 2px 8px;
+}
+
+.pill.gap {
+  color: var(--text);
+  background: var(--pill-wait);
+  letter-spacing: 0.01em;
+  font-weight: 700;
+  padding: 2px 8px;
+}
+
+.card.playing .pill.on-air {
+  font-size: 0.95rem;
+  padding: 4px 10px;
+}
+
+.today-break {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 40px 0 32px;
+}
+
+.next-plain {
+  color: var(--text);
+  font-weight: 400;
+}
+
+.will-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+.will-line b {
+  font-weight: 650;
+  overflow-wrap: anywhere;
 }
 
 .now-strip .pill.next {
@@ -759,7 +846,7 @@ html[data-theme="light"] .prefs-quit:hover:not(:disabled) {
 }
 
 .rail-item.playing .dot {
-  background: var(--accent);
+  background: var(--ok);
   box-shadow: none;
 }
 
@@ -772,7 +859,8 @@ html[data-theme="dusk"] .rail-item.playing .dot {
   background: #8ea384;
 }
 
-.rail-item.done .dot {
+.rail-item.done .dot,
+.rail-item.passed .dot {
   background: var(--warn);
   box-shadow: none;
 }
@@ -2060,8 +2148,14 @@ html[data-theme="teletext"] .pill {
 }
 
 html[data-theme="teletext"] .pill.playing,
+html[data-theme="teletext"] .pill.on-air,
 html[data-theme="teletext"] .now-strip .pill.playing {
   background: #00ff00;
+  color: #000;
+}
+
+html[data-theme="teletext"] .pill.gap {
+  background: #00ffff;
   color: #000;
 }
 

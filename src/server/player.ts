@@ -47,7 +47,14 @@ export async function getStatus(): Promise<PlayerStatus> {
     currentItemId: current?.id ?? null,
     willStartItemId,
     fallbackTitle: current || !fallbackPlay ? null : fallbackTitleOf(fallbackPlay.path),
+    fallbackPath: current || !fallbackPlay || isYoutubeUrl(fallbackPlay.path) ? null : fallbackPlay.path,
   };
+}
+
+// Local file filling a gap, if one is on screen.
+export function intermissionFile(): string | null {
+  if (!fallbackPlay || isYoutubeUrl(fallbackPlay.path)) return null;
+  return fallbackPlay.path;
 }
 
 // Start mpv and begin today's rundown.

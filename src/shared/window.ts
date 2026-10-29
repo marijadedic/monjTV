@@ -93,6 +93,28 @@ export function itemCoversNow(
   return now >= start;
 }
 
+// A planned slot whose start is still ahead. An overnight file that began yesterday is not ahead.
+export function itemStartsLater(
+  item: { start: string; durationSec: number; overnight?: boolean; status?: string },
+  now: number,
+): boolean {
+  if (item.status && item.status !== "planned") return false;
+  const start = secondsOf(item.start);
+  if (item.overnight && start + item.durationSec > DAY_SECONDS) return false;
+  return start > now;
+}
+
+// Done, skipped, or a window that has already ended. The file on screen is not passed.
+export function itemHasPassed(
+  item: { start: string; durationSec: number; overnight?: boolean; status?: string },
+  now: number,
+): boolean {
+  if (item.status === "playing") return false;
+  if (item.status === "done" || item.status === "skipped") return true;
+  if (itemCoversNow(item, now)) return false;
+  return !itemStartsLater(item, now);
+}
+
 export function itemJoinOffset(
   item: { start: string; overnight?: boolean },
   now: number,

@@ -25,6 +25,8 @@ type Copy = {
   nextAt: (time: string) => string;
   nothingOn: string;
   willStart: string;
+  nextMark: string;
+  startsAt: (title: string, time: string) => string;
   scheduled: string;
   willNotStart: string;
   missedStart: (title: string, end: string) => string;
@@ -111,6 +113,8 @@ type Copy = {
   choosing: string;
   browse: string;
   remove: string;
+  sourceMissingFolder: string;
+  sourceMissingVideo: string;
   day: Record<Day, string>;
   error: (message: string) => string;
   runLength: (sec: number) => string;
@@ -149,6 +153,8 @@ const en: Copy = {
   nextAt: (time) => `Next slot starts at ${time}`,
   nothingOn: "Nothing is on right now.",
   willStart: "Will start",
+  nextMark: "Next -",
+  startsAt: (title, time) => `${title} starts at ${time}`,
   scheduled: "Scheduled",
   willNotStart: "Will not start",
   missedStart: (title, end) => `${title} is scheduled until ${end}. It will not start.`,
@@ -266,6 +272,8 @@ const en: Copy = {
   choosing: "Choosing…",
   browse: "Browse",
   remove: "Remove",
+  sourceMissingFolder: "This folder was removed from disk. Remove the slot, or choose another folder.",
+  sourceMissingVideo: "This video was removed from disk. Remove the slot, or choose another video.",
   day: { mon: "mon", tue: "tue", wed: "wed", thu: "thu", fri: "fri", sat: "sat", sun: "sun" },
   error: (message) => message,
   runLength: (sec) => runLength(sec, false),
@@ -400,11 +408,13 @@ const hr: Copy = {
   croatian: "Hrvatski",
   noSlots: "Nema blokova za danas.",
   addInAdmin: "Dodaj ih u Adminu",
-  onAir: "U eteru",
+  onAir: "trenutno se prikazuje",
   waiting: "Čeka",
   nextAt: (time) => `Sljedeći blok počinje u ${time}`,
   nothingOn: "Trenutno se ništa ne emitira.",
   willStart: "Počet će",
+  nextMark: "Sljedeće -",
+  startsAt: (title, time) => `${title} počinje u ${time}`,
   scheduled: "Na rasporedu",
   willNotStart: "Neće krenuti",
   missedStart: (title, end) => `${title} je na rasporedu do ${end}. Neće krenuti.`,
@@ -522,6 +532,8 @@ const hr: Copy = {
   choosing: "Odabir…",
   browse: "Odaberi",
   remove: "Ukloni",
+  sourceMissingFolder: "Ova mapa je uklonjena s diska. Uklonite blok ili odaberite drugu mapu.",
+  sourceMissingVideo: "Ovaj video je uklonjen s diska. Uklonite blok ili odaberite drugi video.",
   day: hrDay,
   error: hrError,
   runLength: (sec) => runLength(sec, true),

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 import type { ItemStatus, PlayerStatus, RundownItem, TodayRundown } from "../../shared/types.ts";
-import { itemCoversNow, itemProgress } from "../../shared/window.ts";
+import { itemCoversNow, itemHasPassed, itemProgress, itemStartsLater, secondsOf } from "../../shared/window.ts";
 import { api } from "../api.ts";
 import { useI18n } from "../i18n.tsx";
 
@@ -10,6 +10,10 @@ function showsFrame(mode: RundownItem["mode"]): boolean {
 
 function stillSrc(item: RundownItem): string {
   return `/api/today/items/${encodeURIComponent(item.id)}/still?file=${encodeURIComponent(item.path)}`;
+}
+
+function gapStillSrc(filePath: string): string {
+  return `/api/player/intermission-still?file=${encodeURIComponent(filePath)}`;
 }
 
 function folderName(filePath: string): string {
@@ -22,13 +26,38 @@ function nowSec(d: Date): number {
   return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
 }
 
-function progressOf(item: RundownItem, sec: number): number {
-  return itemProgress(item, sec);
+function onNowPlanned(items: RundownItem[], sec: number): RundownItem | null {
+  let chosen: RundownItem | null = null;
+  for (const item of items) {
+    if (item.status !== "planned" || !itemCoversNow(item, sec)) continue;
+    if (!chosen || secondsOf(item.start) >= secondsOf(chosen.start)) chosen = item;
+  }
+  return chosen;
 }
 
-function scheduledNow(items: RundownItem[], sec: number): RundownItem | null {
+function nextPlanned(items: RundownItem[], sec: number): RundownItem | null {
+  let chosen: RundownItem | null = null;
+  let chosenStart = Infinity;
   for (const item of items) {
-    if (itemCoversNow(item, sec)) return item;
+    if (!itemStartsLater(item, sec)) continue;
+    const start = secondsOf(item.start);
+    if (start < chosenStart) {
+      chosen = item;
+      chosenStart = start;
+    }
+  }
+  return chosen;
+}
+
+function heldItem(items: RundownItem[], sec: number): RundownItem | null {
+  let winner: RundownItem | null = null;
+  for (const item of items) {
+    if (item.status !== "planned" || !itemCoversNow(item, sec)) continue;
+    if (!winner || secondsOf(item.start) >= secondsOf(winner.start)) winner = item;
+  }
+  for (const item of items) {
+    if (item.status !== "planned" || !itemCoversNow(item, sec)) continue;
+    if (winner && item.id !== winner.id) return item;
   }
   return null;
 }
@@ -37,7 +66,7 @@ export function Today() {
   const { t } = useI18n();
   const pill: Record<ItemStatus, string> = {
     planned: t.planned,
-    playing: t.playing,
+    playing: t.onAir,
     done: t.done,
     skipped: t.skipped,
   };
@@ -94,21 +123,17 @@ export function Today() {
 
   const current = today?.items.find((item) => item.id === status?.currentItemId) ?? null;
   const sec = nowSec(now);
-  const willStart =
-    !current && status?.willStartItemId
-      ? (today?.items.find((item) => item.id === status.willStartItemId) ?? null)
-      : null;
-  const scheduled = today ? scheduledNow(today.items, sec) : null;
-  const held =
-    scheduled && scheduled.status === "planned" && scheduled.id !== willStart?.id ? scheduled : null;
-  const stripItem = current ?? willStart ?? held;
-  const stripStill =
-    stripItem && showsFrame(stripItem.mode) && !missed[stripItem.path] ? stripItem : null;
+  const next = today ? nextPlanned(today.items, sec) : null;
+  const due = !current && !status?.fallbackTitle && today ? onNowPlanned(today.items, sec) : null;
+  const held = today && !current ? heldItem(today.items, sec) : null;
+  const gapTitle = !current && status?.fallbackTitle ? status.fallbackTitle : null;
+  const gapPath = gapTitle && status?.fallbackPath && !missed[status.fallbackPath] ? status.fallbackPath : null;
+  const stripStill = current && showsFrame(current.mode) && !missed[current.path] ? current : null;
 
   function hideStill(filePath: string) {
     setMissed((currentMissed) => ({ ...currentMissed, [filePath]: true }));
   }
-  const fraction = current ? progressOf(current, sec) : 0;
+  const fraction = current ? itemProgress(current, sec) : 0;
   const modeLabel = (mode: RundownItem["mode"]) => {
     if (mode === "next-episode") return t.nextEpisode;
     if (mode === "specific-file") return t.oneVideo;
@@ -121,19 +146,21 @@ export function Today() {
     return folderName(item.path);
   }
 
+  const showColumn = Boolean(today && (today.items.length > 0 || gapTitle));
+
   return (
     <section class="today">
       {status?.error && <p class="error">{t.error(status.error)}</p>}
       {error && <p class="error">{t.error(error)}</p>}
-      {today && today.items.length === 0 && !status?.fallbackTitle && (
+      {today && today.items.length === 0 && !gapTitle && (
         <div class="empty">
           <p>{t.noSlots}</p>
           <a href="/admin">{t.addInAdmin}</a>
         </div>
       )}
-      {today && (today.items.length > 0 || status?.fallbackTitle) && (
+      {showColumn && today && (
         <>
-          <div class={`now-strip${stripStill ? " has-still" : ""}`}>
+          <div class={`now-strip${stripStill || gapPath ? " has-still" : ""}`}>
             {stripStill && (
               <img
                 key={stripStill.path}
@@ -143,10 +170,19 @@ export function Today() {
                 onError={() => hideStill(stripStill.path)}
               />
             )}
+            {gapPath && (
+              <img
+                key={gapPath}
+                class="still"
+                src={gapStillSrc(gapPath)}
+                alt=""
+                onError={() => hideStill(gapPath)}
+              />
+            )}
             <div>
               {current ? (
                 <>
-                  <span class="pill playing">{t.onAir}</span>
+                  <span class="pill on-air">{t.onAir}</span>
                   <h2 class="strip-title">{current.title}</h2>
                   <div class="muted" title={current.path}>
                     {current.start}–{current.end} · {modeLabel(current.mode)} · {sourceLabel(current)}
@@ -162,43 +198,31 @@ export function Today() {
                     <i style={{ width: `${fraction * 100}%` }} />
                   </div>
                 </>
-              ) : status?.fallbackTitle ? (
+              ) : gapTitle ? (
                 <>
-                  <span class="pill playing">{t.onAir}</span>
-                  <h2 class="strip-title">{status.fallbackTitle}</h2>
-                  <div class="muted">
-                    {t.ifEmpty}
-                    {status.waitingUntil ? ` · ${t.nextAt(status.waitingUntil)}` : ""}. {t.intermissionCut}
-                  </div>
-                </>
-              ) : willStart ? (
-                <>
-                  <span class="pill next">{t.willStart}</span>
-                  <h2 class="strip-title">{willStart.title}</h2>
-                  <div class="muted" title={willStart.path}>
-                    {willStart.start}–{willStart.end} · {modeLabel(willStart.mode)} ·{" "}
-                    {sourceLabel(willStart)}
-                  </div>
-                  {held && <p class="muted strip-note">{t.missedStart(held.title, held.end)}</p>}
-                </>
-              ) : status?.waitingUntil ? (
-                <>
-                  <span class="pill">{t.waiting}</span>
-                  <h2 class="strip-title">{t.nextAt(status.waitingUntil)}</h2>
-                </>
-              ) : held ? (
-                <>
-                  <span class="pill">{t.scheduled}</span>
-                  <h2 class="strip-title">{held.title}</h2>
-                  <div class="muted" title={held.path}>
-                    {held.start}–{held.end} · {modeLabel(held.mode)} · {sourceLabel(held)}
-                  </div>
-                  <p class="muted strip-note">{t.willNotStart}</p>
+                  <span class="pill gap">{t.intermission}</span>
+                  <h2 class="strip-title">{gapTitle}</h2>
+                  {next && (
+                    <p class="will-line">
+                      <span class="next-plain">{t.nextMark}</span>
+                      <b>
+                        {next.title} · {next.start}
+                      </b>
+                    </p>
+                  )}
                 </>
               ) : (
                 <>
-                  <h2 class="strip-title">{t.today}</h2>
-                  <div class="muted">{t.nothingOn}</div>
+                  <h2 class="strip-title">{t.nothingOn}</h2>
+                  {due ? (
+                    <div class="muted">
+                      {due.title} · {due.start}–{due.end}
+                    </div>
+                  ) : next ? (
+                    <div class="muted">{t.startsAt(next.title, next.start)}</div>
+                  ) : (
+                    status?.waitingUntil && <div class="muted">{t.nextAt(status.waitingUntil)}</div>
+                  )}
                 </>
               )}
             </div>
@@ -207,55 +231,57 @@ export function Today() {
             </button>
           </div>
           {today.items.length > 0 && (
-            <div class="rail">
-              {today.items.map((item) => {
-                const cardStill = showsFrame(item.mode) && !missed[item.path];
-                const starting = willStart?.id === item.id;
-                const wontStart = held?.id === item.id;
-                return (
-                <div key={item.id} class={`rail-item ${item.status}${starting ? " will-start" : ""}`}>
-                  <i class="dot" />
-                  <article class={`card ${item.status}${cardStill ? " has-still" : ""}`}>
-                    {cardStill && (
-                      <img
-                        key={item.path}
-                        class="still"
-                        src={stillSrc(item)}
-                        alt=""
-                        onError={() => hideStill(item.path)}
-                      />
-                    )}
-                    <div class="time">
-                      {item.start}–{item.end}
-                    </div>
-                    <div>
-                      <div class="title-row">
-                        <div class="title">{item.title}</div>
-                        {item.status !== "planned" && (
-                          <span class={`pill ${item.status}`}>{pill[item.status]}</span>
+            <>
+              <hr class="today-break" />
+              <div class="rail">
+                {today.items.map((item) => {
+                  const passed = itemHasPassed(item, sec);
+                  const cardStill = showsFrame(item.mode) && !missed[item.path];
+                  const coming = Boolean(gapTitle && next?.id === item.id);
+                  const wontStart = held?.id === item.id;
+                  return (
+                    <div key={item.id} class={`rail-item ${item.status}${passed ? " passed" : ""}`}>
+                      <i class="dot" />
+                      <article class={`card ${item.status}${passed ? " passed" : ""}${cardStill ? " has-still" : ""}`}>
+                        {cardStill && (
+                          <img
+                            key={item.path}
+                            class="still"
+                            src={stillSrc(item)}
+                            alt=""
+                            onError={() => hideStill(item.path)}
+                          />
                         )}
-                        {starting && <span class="pill next">{t.willStart}</span>}
-                        {wontStart && <span class="pill">{t.scheduled}</span>}
-                      </div>
-                      <div class="muted" title={item.path}>
-                        {modeLabel(item.mode)} · {sourceLabel(item)}
-                        {wontStart ? ` · ${t.willNotStart}` : ""}
-                      </div>
+                        <div class="time">
+                          {item.start}–{item.end}
+                        </div>
+                        <div>
+                          <div class="title-row">
+                            {coming && <span class="next-plain">{t.nextMark}</span>}
+                            <div class="title">{item.title}</div>
+                            {item.status === "playing" && <span class="pill on-air">{t.onAir}</span>}
+                            {item.status !== "planned" && item.status !== "playing" && (
+                              <span class={`pill ${item.status}`}>{pill[item.status]}</span>
+                            )}
+                          </div>
+                          <div class="muted" title={item.path}>
+                            {modeLabel(item.mode)} · {sourceLabel(item)}
+                            {wontStart ? ` · ${t.willNotStart}` : ""}
+                          </div>
+                        </div>
+                        <div>
+                          {item.mode === "random-file" && item.status !== "playing" && !passed && (
+                            <button onClick={() => shuffle(item)} disabled={busy === item.id}>
+                              {t.shuffle}
+                            </button>
+                          )}
+                        </div>
+                      </article>
                     </div>
-                    <div>
-                      {item.mode === "random-file" &&
-                        item.status !== "playing" &&
-                        item.status !== "done" && (
-                          <button onClick={() => shuffle(item)} disabled={busy === item.id}>
-                            {t.shuffle}
-                          </button>
-                        )}
-                    </div>
-                  </article>
-                </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </>
       )}

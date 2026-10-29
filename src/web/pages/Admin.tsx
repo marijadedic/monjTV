@@ -616,6 +616,7 @@ export function Admin() {
   const [measuring, setMeasuring] = useState(false);
   const [fileCount, setFileCount] = useState(0);
   const [elapsedSec, setElapsedSec] = useState(0);
+  const [sourceMissing, setSourceMissing] = useState(false);
   const scheduleRef = useRef(schedule);
   const addKindRef = useRef<IntermissionKind>("folder");
   const addDraftRef = useRef("");
@@ -687,6 +688,31 @@ export function Admin() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [panelToken]);
+
+  useEffect(() => {
+    if (!draft?.id || draft.mode === "youtube") {
+      setSourceMissing(false);
+      return;
+    }
+    const file = draft.mode === "specific-file" ? draft.file.trim() : "";
+    const folder = draft.folder.trim();
+    if (draft.mode === "specific-file" ? !file : !folder) {
+      setSourceMissing(false);
+      return;
+    }
+    let cancel = false;
+    api
+      .videoCount(folder, file)
+      .then((res) => {
+        if (!cancel) setSourceMissing(res.exists === false);
+      })
+      .catch(() => {
+        if (!cancel) setSourceMissing(false);
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [draft?.id, draft?.mode, draft?.folder, draft?.file]);
 
   useEffect(() => {
     if (!draft || draft.lengthChoice !== "longest") {
@@ -1052,6 +1078,9 @@ export function Admin() {
     } else if (!draft.folder.trim()) {
       next.folder = "Each block needs a folder";
     }
+    if (sourceMissing) {
+      next.folder = draft.mode === "specific-file" ? t.sourceMissingVideo : t.sourceMissingFolder;
+    }
     if (next.time || next.folder) {
       setFieldError(next);
       return;
@@ -1161,9 +1190,11 @@ export function Admin() {
   const lengthCh = Math.max(...lengthLabels.map((label) => label.length));
   const addDisabled = !draft
     ? true
-    : draft.lengthChoice === "longest"
-      ? measuring || !pathChosen || !length || Boolean(matched?.error)
-      : !pathChosen || fixedMin === null;
+    : sourceMissing
+      ? true
+      : draft.lengthChoice === "longest"
+        ? measuring || !pathChosen || !length || Boolean(matched?.error)
+        : !pathChosen || fixedMin === null;
   const ghostsByDay = draft
     ? Object.fromEntries(DAYS.map((day) => [day, ghostsOn(draft, day, schedule.blocks)]))
     : null;
@@ -1487,7 +1518,7 @@ export function Admin() {
                   kind={draft.mode === "specific-file" ? "video" : "folder"}
                   value={draft.mode === "specific-file" ? draft.file : draft.folder}
                   placeholder={draft.mode === "specific-file" ? t.videoPlaceholder : t.folderPlaceholder}
-                  invalid={Boolean(fieldError.folder)}
+                  invalid={sourceMissing || Boolean(fieldError.folder)}
                   actionLabel={picking === "draft" ? t.choosing : t.browse}
                   actionBusy={picking === "draft"}
                   listLabel={draft.mode === "specific-file" ? t.video : t.folder}
@@ -1503,7 +1534,12 @@ export function Admin() {
                 />
               )}
               {draft.mode === "youtube" && <p class="mode-note">{t.youtubeCaveat}</p>}
-              {fieldError.folder && <p class="field-error">{t.error(fieldError.folder)}</p>}
+              {sourceMissing && (
+                <p class="field-error">
+                  {draft.mode === "specific-file" ? t.sourceMissingVideo : t.sourceMissingFolder}
+                </p>
+              )}
+              {!sourceMissing && fieldError.folder && <p class="field-error">{t.error(fieldError.folder)}</p>}
               {draft.mode !== "youtube" && draft.mode !== "next-episode" && (
               <fieldset class="source">
                 <legend class="k">{t.slotDuration}</legend>
@@ -1754,7 +1790,9 @@ export function Admin() {
               {draft.id && (
                 <button
                   type="button"
-                  class={slotOp === "remove" ? "quiet working" : "quiet"}
+                  class={
+                    slotOp === "remove" ? "quiet working" : sourceMissing ? "primary" : "quiet"
+                  }
                   disabled={slotOp !== null}
                   onClick={() => void removeDraft()}
                 >

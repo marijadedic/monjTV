@@ -15,6 +15,7 @@ import {
   DAY_MINUTES,
   DAY_SECONDS,
   itemCoversNow,
+  itemHasPassed,
   itemJoinOffset,
   leftoverMin,
   lengthMinutes,
@@ -488,7 +489,7 @@ export async function shuffleItem(itemId: string): Promise<TodayRundown> {
   const item = rundown.items.find((i) => i.id === itemId);
   if (!item) throw new Error("Item not found");
   if (item.mode !== "random-file") throw new Error("Only random items can be shuffled");
-  if (item.status === "playing" || item.status === "done") {
+  if (item.status === "playing" || itemHasPassed(item, nowSec())) {
     throw new Error("Cannot shuffle a playing or finished item");
   }
 

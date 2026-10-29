@@ -45,8 +45,10 @@ export const api = {
     ),
   pickFolder: () => req<{ path: string | null }>("/api/browse/pick", { method: "POST" }),
   pickFile: () => req<{ path: string | null }>("/api/browse/pick-file", { method: "POST" }),
-  videoCount: (folder: string) =>
-    req<{ count: number }>(`/api/video-count?folder=${encodeURIComponent(folder)}`),
+  videoCount: (folder: string, file = "") =>
+    req<{ count: number; exists: boolean }>(
+      `/api/video-count?folder=${encodeURIComponent(folder)}&file=${encodeURIComponent(file)}`,
+    ),
   youtubeTitles: (urls: string[]) =>
     req<{ titles: Record<string, string> }>("/api/youtube/titles", {
       method: "POST",

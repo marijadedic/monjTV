@@ -92,7 +92,7 @@ export function App() {
   return (
     <>
       {theme === "dusk" && <GroveFrame />}
-      <div class={admin ? "shell wide" : "shell"}>
+      <div class={admin ? "shell wide" : "shell today-shell"}>
         <header class="top">
           <a class="brand" href="/">
             monjTV

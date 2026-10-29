@@ -93,6 +93,8 @@ export interface PlayerStatus {
   currentItemId: string | null;
   willStartItemId: string | null;
   fallbackTitle: string | null;
+  /** Local file filling the gap. Null for a YouTube filler or when a show is on. */
+  fallbackPath: string | null;
 }
 
 export interface BrowseResult {
