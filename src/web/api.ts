@@ -37,6 +37,11 @@ export const api = {
     }),
   shuffle: (id: string) =>
     req<TodayRundown>(`/api/today/items/${id}/shuffle`, { method: "POST" }),
+  stepEpisode: (id: string, direction: "prev" | "next") =>
+    req<TodayRundown>(`/api/today/items/${id}/episode`, {
+      method: "POST",
+      body: JSON.stringify({ direction }),
+    }),
   browse: (path?: string) =>
     req<BrowseResult>(`/api/browse${path ? `?path=${encodeURIComponent(path)}` : ""}`),
   suggestPaths: (path: string, kind: "folder" | "video" = "folder") =>

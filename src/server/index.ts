@@ -8,7 +8,7 @@ import { isBlockMode } from "../shared/types.ts";
 import { PORT } from "../shared/constants.ts";
 import { assertVideo, browse, isDir, isVideoFile, pickFile, pickFolder, suggestPaths } from "./files.ts";
 import { clientDir } from "./paths.ts";
-import { getStatus, intermissionFile, shutdownPlayer, startPlayer, syncIntermission } from "./player.ts";
+import { getStatus, intermissionFile, replayItem, shutdownPlayer, startPlayer, syncIntermission } from "./player.ts";
 import { forgetUnusedFolders, loadProgress } from "./progress.ts";
 import {
   ensureToday,
@@ -17,6 +17,7 @@ import {
   rebuildTodayPreservingPlayback,
   shuffleItem,
   slotLength,
+  stepEpisode,
   videoCount,
 } from "./rundown.ts";
 import { assertFolder, changedBlocks, loadSchedule, saveSchedule, sourceChanged } from "./schedule.ts";
@@ -133,6 +134,21 @@ app.get("/api/player/intermission-still", async (c) => {
 app.post("/api/today/items/:id/shuffle", async (c) => {
   try {
     return c.json(await shuffleItem(c.req.param("id")));
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+  }
+});
+
+// Move a next-episode item to the previous or next file in its folder.
+app.post("/api/today/items/:id/episode", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const direction = body?.direction === "prev" ? -1 : body?.direction === "next" ? 1 : 0;
+  if (!direction) return c.json({ error: "direction must be prev or next" }, 400);
+  try {
+    const itemId = c.req.param("id");
+    const today = await stepEpisode(itemId, direction);
+    await replayItem(itemId);
+    return c.json(today);
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
   }

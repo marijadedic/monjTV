@@ -515,6 +515,66 @@ export async function shuffleItem(itemId: string): Promise<TodayRundown> {
   return rundown;
 }
 
+// Move a next-episode item to the previous or next file, and keep later episodes in order.
+export async function stepEpisode(itemId: string, direction: -1 | 1): Promise<TodayRundown> {
+  const rundown = await ensureToday();
+  const item = rundown.items.find((entry) => entry.id === itemId);
+  if (!item) throw new Error("Item not found");
+  if (item.mode !== "next-episode") throw new Error("Only next-episode items can change episode");
+  const now = nowSec();
+  if (item.status === "done" || item.status === "skipped" || (item.status !== "playing" && itemHasPassed(item, now))) {
+    throw new Error("Cannot change a finished episode");
+  }
+
+  const schedule = await loadSchedule();
+  const block = schedule.blocks.find((entry) => entry.id === item.blockId);
+  if (!block) throw new Error("Slot missing from schedule");
+
+  const files = await videosIn(block.folder);
+  const index = files.indexOf(item.path);
+  if (index === -1) throw new Error("Episode is no longer in this folder");
+  const startIndex = index + direction;
+  if (startIndex < 0) throw new Error("No previous episode");
+  if (startIndex >= files.length) throw new Error("No next episode");
+
+  const tail = rundown.items.filter((row) => {
+    if (row.blockId !== item.blockId || Boolean(row.overnight) !== Boolean(item.overnight)) return false;
+    if (row.mode !== "next-episode") return false;
+    if (row.id === item.id) return true;
+    if (parseHm(row.start) <= parseHm(item.start)) return false;
+    return row.status === "planned" && !itemHasPassed(row, now);
+  });
+  const tailIds = new Set(tail.map((row) => row.id));
+  const locked = new Set(
+    rundown.items.filter((row) => row.blockId === item.blockId && !tailIds.has(row.id)).map((row) => row.path),
+  );
+  const startFile = files[startIndex]!;
+  if (locked.has(startFile)) {
+    throw new Error(direction < 0 ? "No previous episode" : "No next episode");
+  }
+
+  const drop = new Set<string>();
+  let cursor = startIndex;
+  for (const row of tail) {
+    while (cursor < files.length && locked.has(files[cursor]!)) cursor += 1;
+    const file = files[cursor];
+    if (!file) {
+      drop.add(row.id);
+      continue;
+    }
+    row.path = file;
+    row.title = titleFromPath(file);
+    row.durationSec = await probeDuration(file);
+    if (row.status !== "playing") row.status = "planned";
+    cursor += 1;
+  }
+  if (drop.size > 0) rundown.items = rundown.items.filter((row) => !drop.has(row.id));
+
+  recomputeBlockTimes(rundown, block);
+  await saveToday(rundown);
+  return rundown;
+}
+
 // Recalculate start and end times for every item in a block.
 function recomputeBlockTimes(rundown: TodayRundown, block: ScheduleBlock): void {
   const overnight = rundown.items.filter((item) => item.blockId === block.id && item.overnight);

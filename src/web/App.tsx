@@ -92,7 +92,7 @@ export function App() {
   return (
     <>
       {theme === "dusk" && <GroveFrame />}
-      <div class={admin ? "shell wide" : "shell today-shell"}>
+      <div class={admin ? "shell wide" : "shell today-head"}>
         <header class="top">
           <a class="brand" href="/">
             monjTV
@@ -147,16 +147,29 @@ export function App() {
             </div>
           </details>
         </header>
-        <nav class="folders" aria-label={t.sections}>
-          <a href="/" class={admin ? "" : "on"} aria-current={admin ? undefined : "page"}>
-            {t.today}
-          </a>
-          <a href="/admin" class={admin ? "on" : ""} aria-current={admin ? "page" : undefined}>
-            {t.admin}
-          </a>
-        </nav>
-        <main>{off ? <p class="empty">{t.off}</p> : admin ? <Admin /> : <Today />}</main>
+        {admin && (
+          <nav class="folders" aria-label={t.sections}>
+            <a href="/">{t.today}</a>
+            <a href="/admin" class="on" aria-current="page">
+              {t.admin}
+            </a>
+          </nav>
+        )}
+        {admin && <main>{off ? <p class="empty">{t.off}</p> : <Admin />}</main>}
       </div>
+      {!admin && (
+        <>
+          <nav class="folders today-tabs" aria-label={t.sections}>
+            <a href="/" class="on" aria-current="page">
+              {t.today}
+            </a>
+            <a href="/admin">{t.admin}</a>
+          </nav>
+          <div class="shell today-body">
+            <main>{off ? <p class="empty">{t.off}</p> : <Today />}</main>
+          </div>
+        </>
+      )}
     </>
   );
 }

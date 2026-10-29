@@ -38,6 +38,10 @@ type Copy = {
   done: string;
   skipped: string;
   shuffle: string;
+  previousEpisode: string;
+  nextEpisodeButton: string;
+  previousEpisodeLabel: string;
+  nextEpisodeLabel: string;
   playNow: string;
   startTv: string;
   options: string;
@@ -166,6 +170,10 @@ const en: Copy = {
   done: "Done",
   skipped: "Skipped",
   shuffle: "Shuffle",
+  previousEpisode: "Previous",
+  nextEpisodeButton: "Next",
+  previousEpisodeLabel: "Previous episode",
+  nextEpisodeLabel: "Next episode",
   playNow: "Play now",
   startTv: "Start TV",
   options: "Options",
@@ -326,6 +334,12 @@ const hrExact: Record<string, string> = {
   "Item not found": "Stavka nije pronađena.",
   "Only random items can be shuffled": "Promiješati se mogu samo nasumične stavke.",
   "Cannot shuffle a playing or finished item": "Stavka koja svira ili je gotova ne može se promiješati.",
+  "Only next-episode items can change episode": "Epizodu mogu mijenjati samo stavke sljedeće epizode.",
+  "Cannot change a finished episode": "Završena epizoda ne može se promijeniti.",
+  "No previous episode": "Nema prethodne epizode.",
+  "No next episode": "Nema sljedeće epizode.",
+  "Episode is no longer in this folder": "Te epizode više nema u mapi.",
+  "direction must be prev or next": "Smjer mora biti prethodna ili sljedeća.",
   "Slot missing from schedule": "Blok nedostaje u rasporedu.",
   "No other files in this folder": "U ovoj mapi nema drugih datoteka.",
   "Schedule must have a slot array": "Raspored mora sadržavati blokove.",
@@ -426,6 +440,10 @@ const hr: Copy = {
   done: "Gotovo",
   skipped: "Preskočeno",
   shuffle: "Promiješaj",
+  previousEpisode: "Prethodna",
+  nextEpisodeButton: "Sljedeća",
+  previousEpisodeLabel: "Prethodna epizoda",
+  nextEpisodeLabel: "Sljedeća epizoda",
   playNow: "Pusti sada",
   startTv: "Pokreni TV",
   options: "Opcije",

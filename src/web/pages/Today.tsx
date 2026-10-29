@@ -49,6 +49,10 @@ function nextPlanned(items: RundownItem[], sec: number): RundownItem | null {
   return chosen;
 }
 
+function canStepEpisode(item: RundownItem, passed: boolean): boolean {
+  return item.mode === "next-episode" && !passed;
+}
+
 function heldItem(items: RundownItem[], sec: number): RundownItem | null {
   let winner: RundownItem | null = null;
   for (const item of items) {
@@ -121,6 +125,19 @@ export function Today() {
     }
   }
 
+  async function step(item: RundownItem, direction: "prev" | "next") {
+    setBusy(`${item.id}:${direction}`);
+    setError(null);
+    try {
+      setToday(await api.stepEpisode(item.id, direction));
+      setStatus(await api.status());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   const current = today?.items.find((item) => item.id === status?.currentItemId) ?? null;
   const sec = nowSec(now);
   const next = today ? nextPlanned(today.items, sec) : null;
@@ -147,6 +164,21 @@ export function Today() {
   }
 
   const showColumn = Boolean(today && (today.items.length > 0 || gapTitle));
+  const episodeItem = current?.mode === "next-episode" ? current : due?.mode === "next-episode" ? due : null;
+
+  function episodeButtons(item: RundownItem) {
+    const pending = busy === `${item.id}:prev` || busy === `${item.id}:next`;
+    return (
+      <div class="episode-step">
+        <button onClick={() => step(item, "prev")} disabled={pending} aria-label={t.previousEpisodeLabel}>
+          {t.previousEpisode}
+        </button>
+        <button onClick={() => step(item, "next")} disabled={pending} aria-label={t.nextEpisodeLabel}>
+          {t.nextEpisodeButton}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <section class="today">
@@ -226,9 +258,12 @@ export function Today() {
                 </>
               )}
             </div>
-            <button class="primary" onClick={start} disabled={busy === "start"}>
-              {status?.running ? t.playNow : t.startTv}
-            </button>
+            <div class="now-actions">
+              {episodeItem && episodeButtons(episodeItem)}
+              <button class="primary" onClick={start} disabled={busy === "start"}>
+                {status?.running ? t.playNow : t.startTv}
+              </button>
+            </div>
           </div>
           {today.items.length > 0 && (
             <>
@@ -268,14 +303,15 @@ export function Today() {
                             {modeLabel(item.mode)} · {sourceLabel(item)}
                             {wontStart ? ` · ${t.willNotStart}` : ""}
                           </div>
+                          {canStepEpisode(item, passed) && episodeButtons(item)}
                         </div>
-                        <div>
-                          {item.mode === "random-file" && item.status !== "playing" && !passed && (
+                        {item.mode === "random-file" && item.status !== "playing" && !passed && (
+                          <div>
                             <button onClick={() => shuffle(item)} disabled={busy === item.id}>
                               {t.shuffle}
                             </button>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </article>
                     </div>
                   );

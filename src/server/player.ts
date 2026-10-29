@@ -345,6 +345,15 @@ function nextPlannedStart(today: TodayRundown, now: number): number | null {
   return wake;
 }
 
+// Start the episode that replaced the one on screen, from the beginning.
+export async function replayItem(itemId: string): Promise<void> {
+  if (stopping || !mpv.running) return;
+  const today = await loadToday();
+  const item = today.items.find((row) => row.id === itemId);
+  if (!item || item.status !== "playing") return;
+  await playItem(item, 0);
+}
+
 // Load an item in mpv at the clock offset and mark it playing.
 async function playItem(item: RundownItem, offsetSec: number): Promise<void> {
   clearFallbackRetry();
