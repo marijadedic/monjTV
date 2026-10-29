@@ -222,6 +222,13 @@ app.post("/api/shutdown", async (c) => {
 
 const clientIndex = path.join(clientDir, "index.html");
 if (existsSync(clientIndex)) {
+  app.use("*", async (c, next) => {
+    await next();
+    if (c.req.path.startsWith("/api") || c.req.path.startsWith("/assets/")) return;
+    // Today is always "/", so a cached copy of that document hides a new build.
+    // Admin is a different address and was loading the new files.
+    c.res.headers.set("Cache-Control", "no-store");
+  });
   app.use(
     "/*",
     serveStatic({

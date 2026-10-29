@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { api } from "./api.ts";
 import { GroveFrame } from "./Grove.tsx";
+import { pageHref } from "./href.ts";
 import { Today } from "./pages/Today.tsx";
 import { Admin } from "./pages/Admin.tsx";
 import { useI18n, type Lang } from "./i18n.tsx";
@@ -94,7 +95,7 @@ export function App() {
       {theme === "dusk" && <GroveFrame />}
       <div class={admin ? "shell wide" : "shell today-head"}>
         <header class="top">
-          <a class="brand" href="/">
+          <a class="brand" href={pageHref("/")}>
             monjTV
           </a>
           <div class="when">
@@ -149,8 +150,8 @@ export function App() {
         </header>
         {admin && (
           <nav class="folders" aria-label={t.sections}>
-            <a href="/">{t.today}</a>
-            <a href="/admin" class="on" aria-current="page">
+            <a href={pageHref("/")}>{t.today}</a>
+            <a href={pageHref("/admin")} class="on" aria-current="page">
               {t.admin}
             </a>
           </nav>
@@ -160,10 +161,10 @@ export function App() {
       {!admin && (
         <>
           <nav class="folders today-tabs" aria-label={t.sections}>
-            <a href="/" class="on" aria-current="page">
+            <a href={pageHref("/")} class="on" aria-current="page">
               {t.today}
             </a>
-            <a href="/admin">{t.admin}</a>
+            <a href={pageHref("/admin")}>{t.admin}</a>
           </nav>
           <div class="shell today-body">
             <main>{off ? <p class="empty">{t.off}</p> : <Today />}</main>

@@ -47,7 +47,8 @@ function videoIdOf(url: URL): string | null {
     id = url.searchParams.get("v");
   } else {
     const match = url.pathname.match(/^\/(shorts|embed|live)\/([^/]+)/);
-    id = match?.[2] ?? null;
+    // /embed/videoseries?list= is a playlist, not a video called "videoseries".
+    if (match?.[2] && match[2] !== "videoseries") id = match[2];
   }
   if (!id || !VIDEO_ID.test(id)) return null;
   return id;

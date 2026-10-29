@@ -343,7 +343,7 @@ async function playYoutubeIntermission(source: string): Promise<void> {
   }
   const url = parseYoutubeUrl(source);
   if (!url) return;
-  if (fallbackPlay?.path === url && !fallbackPlay.queued) return;
+  if (fallbackPlay?.path === url && fallbackPlay.folder === url && !fallbackPlay.queued) return;
   const epoch = ++playEpoch;
   try {
     fallbackPlay = { kind: "youtube", folder: url, path: url };

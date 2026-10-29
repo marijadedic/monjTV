@@ -42,9 +42,17 @@ if ! curl -sf --max-time 2 "http://127.0.0.1:${PORT}/api/health" >/dev/null; the
   fi
 fi
 
-echo "opening http://127.0.0.1:${PORT}/" >> logs/monjtv.log
+# A new query skips the browser's saved copy of Today. The hash changes with each UI build.
+ui="http://127.0.0.1:${PORT}/"
+asset="$(grep -o 'assets/index-[^"]*\.js' dist/client/index.html 2>/dev/null | head -n 1 || true)"
+if [ -n "$asset" ]; then
+  hash="${asset#assets/index-}"
+  hash="${hash%.js}"
+  ui="${ui}?v=${hash}"
+fi
+echo "opening ${ui}" >> logs/monjtv.log
 if [ "$(uname -s)" = "Darwin" ]; then
-  open "http://127.0.0.1:${PORT}/"
+  open "$ui"
 elif command -v xdg-open >/dev/null; then
-  xdg-open "http://127.0.0.1:${PORT}/" >/dev/null 2>&1 || true
+  xdg-open "$ui" >/dev/null 2>&1 || true
 fi

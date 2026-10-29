@@ -2,6 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import type { ItemStatus, PlayerStatus, RundownItem, TodayRundown } from "../../shared/types.ts";
 import { itemCoversNow, itemHasPassed, itemProgress, itemStartsLater, secondsOf } from "../../shared/window.ts";
 import { api } from "../api.ts";
+import { pageHref } from "../href.ts";
 import { useI18n } from "../i18n.tsx";
 
 function showsFrame(mode: RundownItem["mode"]): boolean {
@@ -187,7 +188,7 @@ export function Today() {
       {today && today.items.length === 0 && !gapTitle && (
         <div class="empty">
           <p>{t.noSlots}</p>
-          <a href="/admin">{t.addInAdmin}</a>
+          <a href={pageHref("/admin")}>{t.addInAdmin}</a>
         </div>
       )}
       {showColumn && today && (

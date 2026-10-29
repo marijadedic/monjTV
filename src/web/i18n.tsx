@@ -245,7 +245,7 @@ const en: Copy = {
   youtubeProbeCache:
     "The length comes from yt-dlp. Keep yt-dlp updated; YouTube changes often. This needs the internet.",
   youtubeIntermission:
-    "A YouTube video, playlist, or live stream. A playlist plays in order and starts again at the end. Playback needs the internet.",
+    "A YouTube video, playlist, or live stream. A link that includes a list plays that playlist in order, then starts again. Playback needs the internet.",
   video: "Video",
   videoPlaceholder: "/path/to/video.mp4",
   alsoOn: "Also play on",
@@ -520,7 +520,7 @@ const hr: Copy = {
   youtubeProbeCache:
     "Trajanje dolazi iz yt-dlp. Održavajte yt-dlp ažurnim; YouTube se često mijenja. Treba internet.",
   youtubeIntermission:
-    "YouTube video, popis ili prijenos uživo. Popis ide redom i na kraju kreće ispočetka. Reprodukcija treba internet.",
+    "YouTube video, popis ili prijenos uživo. Poveznica s popisom pušta taj popis redom, pa kreće ispočetka. Reprodukcija treba internet.",
   video: "Video",
   videoPlaceholder: "/putanja/do/videa.mp4",
   alsoOn: "Pusti i na",
