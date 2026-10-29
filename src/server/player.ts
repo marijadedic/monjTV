@@ -6,9 +6,16 @@ import { pick } from "./picker.ts";
 import { markEpisodeDone, markRandomPlayed } from "./progress.ts";
 import { ensureToday, joinOffset, loadToday, onAirItem, saveToday } from "./rundown.ts";
 import { DAY_SECONDS, windowOn } from "../shared/window.ts";
-import { isYoutubeUrl, parseYoutubeUrl, youtubeLabel } from "../shared/youtube.ts";
+import {
+  isYoutubeUrl,
+  parseYoutubePlaylist,
+  parseYoutubeUrl,
+  playlistStartIndex,
+  youtubeLabel,
+  type YoutubePlaylistRef,
+} from "../shared/youtube.ts";
 import { blocksForDay, loadSchedule, playingIntermission } from "./schedule.ts";
-import { cachedYoutube } from "./youtube.ts";
+import { cachedYoutubeTitle, loadYoutubePlaylist } from "./youtube.ts";
 
 const mpv = new Mpv();
 let waitingUntil: string | null = null;
@@ -17,7 +24,24 @@ let lastError: string | null = null;
 let handlingEnd = false;
 let replacing = false;
 let stopping = false;
-let fallbackPlay: { kind: IntermissionItem["kind"]; folder: string; path: string } | null = null;
+type PlaylistCursor = {
+  source: string;
+  videos: string[];
+  index: number;
+  fails: number;
+};
+
+type FallbackPlay = {
+  kind: IntermissionItem["kind"];
+  folder: string;
+  path: string;
+  playlist?: PlaylistCursor;
+  /** Path is the next video to load, not the one already on screen. */
+  queued?: boolean;
+};
+
+let fallbackPlay: FallbackPlay | null = null;
+let playlistFetch = 0;
 let fallbackRetry: ReturnType<typeof setTimeout> | null = null;
 let playEpoch = 0;
 let provisionalSkips: string[] = [];
@@ -130,7 +154,26 @@ async function onEndFile(reason: string): Promise<void> {
   }
   if (replacing || handlingEnd) return;
   if (reason !== "eof") {
+    if (fallbackPlay?.playlist && reason === "error") {
+      if (!queuePlaylist(fallbackPlay, true)) {
+        lastError = "Could not play this YouTube playlist";
+        retryYoutubeIntermission(20_000);
+        return;
+      }
+      handlingEnd = true;
+      try {
+        await playNow();
+      } finally {
+        handlingEnd = false;
+      }
+      return;
+    }
     if (fallbackPlay?.kind === "youtube" && reason !== "quit") {
+      if (fallbackPlay.playlist) {
+        fallbackPlay = { ...fallbackPlay, queued: true };
+        scheduleIntermission(2000);
+        return;
+      }
       retryYoutubeIntermission();
     }
     return;
@@ -157,7 +200,11 @@ async function onEndFile(reason: string): Promise<void> {
       if (finishedIntermission.kind === "folder") {
         await markEpisodeDone(finishedIntermission.folder, finishedIntermission.path);
       }
-      fallbackPlay = null;
+      if (finishedIntermission.playlist) {
+        if (!queuePlaylist(finishedIntermission, false)) fallbackPlay = null;
+      } else {
+        fallbackPlay = null;
+      }
     }
     await playNow();
   } finally {
@@ -236,25 +283,10 @@ async function stopIntermission(): Promise<void> {
   }
 }
 
-// Play the selected YouTube URL, video file, or next episode from a folder.
+// Play the selected YouTube video or playlist, a video file, or the next episode from a folder.
 async function playFallback(item: IntermissionItem): Promise<void> {
   if (item.kind === "youtube") {
-    const url = parseYoutubeUrl(item.source);
-    if (!url) return;
-    if (fallbackPlay?.path === url) return;
-    const epoch = ++playEpoch;
-    try {
-      fallbackPlay = { kind: "youtube", folder: url, path: url };
-      replacing = true;
-      await mpv.loadFile(url);
-      if (epoch !== playEpoch) await restoreCurrentLoad();
-    } catch (err) {
-      if (epoch !== playEpoch) return;
-      lastError = err instanceof Error ? err.message : String(err);
-      fallbackPlay = null;
-    } finally {
-      replacing = false;
-    }
+    await playYoutubeIntermission(item.source);
     return;
   }
   try {
@@ -302,14 +334,136 @@ async function restoreCurrentLoad(): Promise<void> {
   if (epoch === playEpoch) await mpv.stopPlayback().catch(() => undefined);
 }
 
-function retryYoutubeIntermission(): void {
+// One video loops. A playlist walks the list, then starts again at the beginning.
+async function playYoutubeIntermission(source: string): Promise<void> {
+  const playlist = parseYoutubePlaylist(source);
+  if (playlist) {
+    await playYoutubePlaylist(source, playlist);
+    return;
+  }
+  const url = parseYoutubeUrl(source);
+  if (!url) return;
+  if (fallbackPlay?.path === url && !fallbackPlay.queued) return;
+  const epoch = ++playEpoch;
+  try {
+    fallbackPlay = { kind: "youtube", folder: url, path: url };
+    replacing = true;
+    await mpv.loadFile(url);
+    if (epoch !== playEpoch) await restoreCurrentLoad();
+  } catch (err) {
+    if (epoch !== playEpoch) return;
+    lastError = err instanceof Error ? err.message : String(err);
+    fallbackPlay = null;
+  } finally {
+    replacing = false;
+  }
+}
+
+async function playYoutubePlaylist(source: string, ref: YoutubePlaylistRef): Promise<void> {
+  const same =
+    fallbackPlay?.kind === "youtube" &&
+    fallbackPlay.folder === source &&
+    fallbackPlay.playlist?.source === source &&
+    fallbackPlay.playlist.videos.length > 0;
+  let videos = same ? fallbackPlay!.playlist!.videos : [];
+  let index = same ? fallbackPlay!.playlist!.index : 0;
+  let fails = same ? fallbackPlay!.playlist!.fails : 0;
+
+  if (!videos.length) {
+    const epoch = playEpoch;
+    const token = ++playlistFetch;
+    try {
+      const loaded = await loadYoutubePlaylist(ref.url);
+      if (token !== playlistFetch || epoch !== playEpoch || stopping) return;
+      videos = loaded.videos.map((video) => video.url);
+      index = playlistStartIndex(
+        loaded.videos.map((video) => video.id),
+        ref,
+      );
+      fails = 0;
+    } catch (err) {
+      if (token !== playlistFetch || epoch !== playEpoch || stopping) return;
+      lastError = err instanceof Error ? err.message : String(err);
+      fallbackPlay = null;
+      return;
+    }
+  }
+
+  if (!videos.length) {
+    lastError = "This YouTube playlist has no videos";
+    fallbackPlay = null;
+    return;
+  }
+  index %= videos.length;
+  const url = videos[index]!;
+  if (fallbackPlay?.folder === source && fallbackPlay.path === url && !fallbackPlay.queued) return;
+
+  const epoch = ++playEpoch;
+  fallbackPlay = {
+    kind: "youtube",
+    folder: source,
+    path: url,
+    queued: true,
+    playlist: { source, videos, index, fails },
+  };
+  try {
+    replacing = true;
+    await mpv.loadFile(url);
+    if (epoch !== playEpoch) {
+      await restoreCurrentLoad();
+      return;
+    }
+    if (fallbackPlay?.folder === source) fallbackPlay.queued = false;
+    lastError = null;
+  } catch (err) {
+    if (epoch !== playEpoch) return;
+    lastError = err instanceof Error ? err.message : String(err);
+    if (!fallbackPlay?.playlist || !queuePlaylist(fallbackPlay, true)) {
+      lastError = "Could not play this YouTube playlist";
+      retryYoutubeIntermission(20_000);
+      return;
+    }
+    scheduleIntermission(1500);
+  } finally {
+    replacing = false;
+  }
+}
+
+// Move to the next playlist video. A run of failures stops instead of spinning.
+function queuePlaylist(play: FallbackPlay, failed: boolean): boolean {
+  const list = play.playlist;
+  if (!list || list.videos.length === 0) return false;
+  const fails = failed ? list.fails + 1 : 0;
+  if (failed && fails >= list.videos.length) {
+    fallbackPlay = null;
+    return false;
+  }
+  const index = (list.index + 1) % list.videos.length;
+  const path = list.videos[index];
+  if (!path) return false;
+  fallbackPlay = {
+    kind: "youtube",
+    folder: list.source,
+    path,
+    queued: true,
+    playlist: { ...list, index, fails },
+  };
+  return true;
+}
+
+function retryYoutubeIntermission(delayMs = 2000): void {
   clearFallbackRetry();
   fallbackPlay = null;
+  scheduleIntermission(delayMs);
+}
+
+function scheduleIntermission(delayMs: number): void {
+  clearFallbackRetry();
   fallbackRetry = setTimeout(() => {
     fallbackRetry = null;
     if (stopping || !mpv.running) return;
     void playActiveIntermission();
-  }, 2000);
+  }, delayMs);
 }
 
 function clearFallbackRetry(): void {
@@ -320,7 +474,7 @@ function clearFallbackRetry(): void {
 
 function fallbackTitleOf(filePath: string): string {
   if (!isYoutubeUrl(filePath)) return titleFromPath(filePath);
-  return cachedYoutube(filePath)?.title ?? youtubeLabel(filePath);
+  return cachedYoutubeTitle(filePath) ?? youtubeLabel(filePath);
 }
 
 function hasStarted(item: RundownItem, now: number): boolean {

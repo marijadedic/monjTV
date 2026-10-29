@@ -929,17 +929,22 @@ html[data-theme="dusk"] .today button.primary {
 .week-scale {
   --name-h: 1.15rem;
   --name-gap: 4px;
-  --slot-read: 2.35rem;
+  --slot-floor: 2.6rem;
+  --slot-cap: 3.6rem;
+  --gap-floor: 1.4rem;
+  --minute: 0.0285rem;
   display: grid;
-  grid-template-columns: auto repeat(7, minmax(0, 1fr));
-  grid-template-rows: minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  align-items: start;
+  gap: 4px;
   margin-bottom: 16px;
 }
 
 .shell.wide .week-scale {
   flex: 1 1 auto;
-  min-height: 30rem;
+  min-height: 0;
+  overflow: auto;
+  grid-template-rows: minmax(100%, auto);
 }
 
 .day {
@@ -952,17 +957,6 @@ html[data-theme="dusk"] .today button.primary {
 
 .day.editing {
   z-index: 2;
-}
-
-.hours {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  margin-top: calc(var(--name-h) + var(--name-gap));
-  min-height: 0;
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-variant-numeric: tabular-nums;
 }
 
 .day .name {
@@ -981,14 +975,28 @@ html[data-theme="dusk"] .today button.primary {
 
 .week-scale .track {
   position: relative;
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 0 0 auto;
+  min-height: min-content;
   margin-top: 0;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 6px;
   overflow: hidden;
+  background: #1c2333;
+}
+
+.day:has(.gap.first) {
+  align-self: stretch;
+  min-height: 100%;
+}
+
+.day:has(.gap.first) .track {
+  flex: 1 1 auto;
+  min-height: 100%;
+}
+
+html[data-theme="light"] .week-scale .track {
   background: var(--browse);
 }
 
@@ -1007,9 +1015,10 @@ html[data-theme="dusk"] .week-scale button.gap:hover {
 .week-scale button.gap,
 .week-scale button.slot {
   appearance: none;
-  position: absolute;
-  left: 0;
-  right: 0;
+  position: relative;
+  flex: 0 0 auto;
+  left: auto;
+  right: auto;
   width: auto;
   margin: 0;
   border: 0;
@@ -1020,9 +1029,33 @@ html[data-theme="dusk"] .week-scale button.gap:hover {
 }
 
 .week-scale button.gap {
-  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: max(var(--gap-floor), calc(var(--mins) * var(--minute)));
+  padding: 1px 4px;
+  overflow: hidden;
   background: transparent;
   color: var(--muted);
+  font-size: 0.62rem;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.week-scale button.gap.long {
+  height: var(--slot-cap);
+}
+
+.week-scale button.gap.first {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 100%;
+}
+
+.week-scale button.gap.tight {
+  color: var(--warn);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 55%, transparent);
 }
 
 .week-scale button.gap:hover,
@@ -1044,48 +1077,52 @@ html[data-theme="dusk"] .week-scale button.gap:hover {
 }
 
 .gap b,
-.slot b {
+.slot b,
+.slot .tm,
+.slot i {
+  display: block;
   max-width: 100%;
-  font-size: 0.8rem;
-  font-weight: 650;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.gap i,
-.slot i {
-  font-style: normal;
-  font-size: 0.68rem;
+.gap b,
+.slot b {
+  font-size: 0.72rem;
+  font-weight: 650;
 }
 
-.week-scale button.slot {
-  z-index: 1;
+.gap i,
+.slot i,
+.slot .tm {
+  font-style: normal;
+  font-size: 0.58rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+.week-scale button.slot,
+.week-scale .ghost {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: stretch;
   gap: 1px;
-  padding: 1px 6px;
+  height: min(var(--slot-cap), max(var(--slot-floor), calc(var(--mins) * var(--minute))));
+  padding: 2px 6px;
   overflow: hidden;
-  line-height: 1.05;
+  line-height: 1.1;
   text-align: left;
-  background: var(--primary);
-  color: var(--on-primary);
-  container-type: size;
-}
-
-.week-scale button.slot b {
-  font-size: min(0.8rem, 44cqh);
+  background: #8ec0ff;
+  color: #102038;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 12%, transparent);
 }
 
 .week-scale button.slot.spill {
-  box-shadow: inset 0 2px 0 color-mix(in srgb, var(--accent) 70%, transparent);
-}
-
-.week-scale button.slot i {
-  display: block;
-  font-size: min(0.68rem, 34cqh);
-  white-space: nowrap;
+  box-shadow:
+    inset 0 2px 0 var(--accent),
+    inset 0 0 0 1px color-mix(in srgb, currentColor 12%, transparent);
 }
 
 .week-scale button.slot.pick,
@@ -1093,174 +1130,35 @@ html[data-theme="dusk"] .week-scale button.gap:hover {
   box-shadow: inset 0 0 0 1.5px var(--accent);
 }
 
-html[data-theme="dark"] .week-scale button.slot,
-html[data-theme="dark"] .week-scale .ghost {
-  background: linear-gradient(180deg, #e6eef8 0%, #3f6ca3 100%);
-  color: #102038;
-}
-
-html[data-theme="light"] .week-scale button.slot,
-html[data-theme="light"] .week-scale .ghost {
-  background: linear-gradient(180deg, #e6eef8 0%, #2f62a0 100%);
-  color: #102038;
-}
-
-html[data-theme="dusk"] .week-scale button.slot {
-  border-radius: 3px;
-  background: linear-gradient(180deg, #eef5e4 0%, #8ea384 100%);
-  color: #243024;
-  box-shadow:
-    0 1px 3px rgba(70, 82, 55, 0.06),
-    inset 0 1px 0 rgba(255, 252, 245, 0.4);
-}
-
-html[data-theme="dusk"] .week-scale button.slot i {
-  color: #3e4c34;
-}
-
-html[data-theme="dusk"] .week-scale button.slot.pick {
-  box-shadow:
-    inset 0 0 0 1.5px #6d845f,
-    0 1px 3px rgba(70, 82, 55, 0.06);
-}
-
-html[data-theme="dark"] .week-scale button.slot.shows,
-html[data-theme="dark"] .week-scale .ghost.shows {
-  background: linear-gradient(180deg, #f8e6ee 0%, #9a5a74 100%);
+.week-scale button.slot.shows,
+.week-scale .ghost.shows {
+  background: #e7b7c8;
   color: #2e1420;
 }
 
-html[data-theme="light"] .week-scale button.slot.shows,
-html[data-theme="light"] .week-scale .ghost.shows {
-  background: linear-gradient(180deg, #f8e6ee 0%, #9a5670 100%);
-  color: #2e1420;
-}
-
-html[data-theme="dusk"] .week-scale button.slot.shows {
-  background: linear-gradient(180deg, #eef4f8 0%, #7f97ad 100%);
-  color: #1c2833;
-  box-shadow:
-    0 1px 3px rgba(40, 55, 70, 0.06),
-    inset 0 1px 0 rgba(255, 252, 245, 0.45);
-}
-
-html[data-theme="dusk"] .week-scale button.slot.shows i {
-  color: #2c3d4d;
-}
-
-html[data-theme="dusk"] .week-scale button.slot.shows.pick {
-  box-shadow:
-    inset 0 0 0 1.5px #5d7388,
-    0 1px 3px rgba(40, 55, 70, 0.06);
-}
-
-html[data-theme="dark"] .week-scale button.slot.film,
-html[data-theme="dark"] .week-scale .ghost.film {
-  background: linear-gradient(180deg, #f0d7a2 0%, #c4842a 100%);
+.week-scale button.slot.film,
+.week-scale .ghost.film {
+  background: #f0d7a2;
   color: #2c1c08;
 }
 
-html[data-theme="light"] .week-scale button.slot.film,
-html[data-theme="light"] .week-scale .ghost.film {
-  background: linear-gradient(180deg, #f3e6c8 0%, #c4a36a 100%);
-  color: #3a2c14;
-}
-
-html[data-theme="dusk"] .week-scale button.slot.film {
-  background: linear-gradient(180deg, #f3c7a4 0%, #c45c28 100%);
-  color: #2c1408;
-  box-shadow:
-    0 1px 3px rgba(90, 40, 16, 0.08),
-    inset 0 1px 0 rgba(255, 252, 245, 0.4);
-}
-
-html[data-theme="dusk"] .week-scale button.slot.film i {
-  color: #5a3014;
-}
-
-html[data-theme="dusk"] .week-scale button.slot.film.pick {
-  box-shadow:
-    inset 0 0 0 1.5px #8a3e16,
-    0 1px 3px rgba(90, 40, 16, 0.08);
-}
-
-html[data-theme="dusk"] .week-scale .ghost.shows {
-  background: linear-gradient(180deg, rgba(238, 244, 248, 0.88) 0%, rgba(127, 151, 173, 0.92) 100%);
-  color: #1c2833;
-  box-shadow: inset 0 0 0 1.5px #5d7388;
-}
-
-html[data-theme="dusk"] .week-scale .ghost.film {
-  background: linear-gradient(180deg, rgba(243, 199, 164, 0.9) 0%, rgba(196, 92, 40, 0.92) 100%);
-  color: #2c1408;
-  box-shadow: inset 0 0 0 1.5px #8a3e16;
-}
-
-html[data-theme="dark"] .week-scale button.slot.tube,
-html[data-theme="dark"] .week-scale .ghost.tube {
-  background: linear-gradient(180deg, #f8d4d0 0%, #a33a3a 100%);
+.week-scale button.slot.tube,
+.week-scale .ghost.tube {
+  background: #f0b2ac;
   color: #2c1010;
-}
-
-html[data-theme="light"] .week-scale button.slot.tube,
-html[data-theme="light"] .week-scale .ghost.tube {
-  background: linear-gradient(180deg, #f8d8d4 0%, #b44a4a 100%);
-  color: #2c1010;
-}
-
-html[data-theme="dusk"] .week-scale button.slot.tube {
-  background: linear-gradient(180deg, #f4d0c8 0%, #b45448 100%);
-  color: #2c1410;
-  box-shadow:
-    0 1px 3px rgba(90, 40, 30, 0.08),
-    inset 0 1px 0 rgba(255, 252, 245, 0.4);
-}
-
-html[data-theme="dusk"] .week-scale button.slot.tube i {
-  color: #5a281c;
-}
-
-html[data-theme="dusk"] .week-scale button.slot.tube.pick {
-  box-shadow:
-    inset 0 0 0 1.5px #8a3a30,
-    0 1px 3px rgba(90, 40, 30, 0.08);
-}
-
-html[data-theme="dusk"] .week-scale .ghost.tube {
-  background: linear-gradient(180deg, rgba(244, 208, 200, 0.9) 0%, rgba(180, 84, 72, 0.92) 100%);
-  color: #2c1410;
-  box-shadow: inset 0 0 0 1.5px #8a3a30;
-}
-
-.shell.wide .week-scale button.slot b {
-  font-size: min(0.95rem, 44cqh);
 }
 
 .week-scale .ghost {
-  position: absolute;
-  left: 0;
-  right: 0;
-  z-index: 2;
-  display: flex;
-  align-items: center;
+  position: relative;
+  flex: 0 0 auto;
+  z-index: 1;
   min-width: 0;
-  padding: 0 8px;
-  overflow: hidden;
-  border-radius: 3px;
   pointer-events: none;
-  background: color-mix(in srgb, var(--primary) 72%, transparent);
-  color: var(--on-primary);
   box-shadow: inset 0 0 0 1.5px var(--primary-line);
 }
 
-html[data-theme="dusk"] .week-scale .ghost {
-  background: linear-gradient(180deg, rgba(238, 245, 228, 0.88) 0%, rgba(142, 163, 132, 0.92) 100%);
-  color: #243024;
-  box-shadow: inset 0 0 0 1.5px #6d845f;
-}
-
 .week-scale .ghost b {
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   font-weight: 650;
   white-space: nowrap;
 }

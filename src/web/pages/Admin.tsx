@@ -20,7 +20,13 @@ import {
   segmentsOf,
   windowOn,
 } from "../../shared/window.ts";
-import { isYoutubeUrl, parseYoutubeUrl, youtubeLabel } from "../../shared/youtube.ts";
+import {
+  canonicalYoutubeIntermission,
+  isYoutubeLink,
+  isYoutubeUrl,
+  parseYoutubeUrl,
+  youtubeLabel,
+} from "../../shared/youtube.ts";
 import { api } from "../api.ts";
 import { useI18n } from "../i18n.tsx";
 
@@ -201,7 +207,7 @@ function slotHover(
 
 function intermissionLabel(item: IntermissionItem, titles: Readonly<Record<string, string>> = {}): string {
   if (item.kind === "youtube") {
-    const url = parseYoutubeUrl(item.source);
+    const url = canonicalYoutubeIntermission(item.source);
     if (url && titles[url]) return titles[url];
     return youtubeLabel(item.source);
   }
@@ -213,10 +219,10 @@ function youtubeScheduleKey(schedule: Schedule, extra = ""): string {
   const urls = new Set<string>();
   for (const item of schedule.intermissions) {
     if (item.kind !== "youtube") continue;
-    const url = parseYoutubeUrl(item.source);
+    const url = canonicalYoutubeIntermission(item.source);
     if (url) urls.add(url);
   }
-  const draft = parseYoutubeUrl(extra);
+  const draft = canonicalYoutubeIntermission(extra);
   if (draft) urls.add(draft);
   for (const block of schedule.blocks) {
     if (block.mode !== "youtube") continue;
@@ -233,11 +239,11 @@ function pendingSource(
   const trimmed = value.trim();
   if (!trimmed) return { source: "", error: null };
   if (kind === "youtube") {
-    const parsed = parseYoutubeUrl(trimmed);
+    const parsed = canonicalYoutubeIntermission(trimmed);
     if (!parsed) return { source: trimmed, error: "youtube" };
     return { source: parsed, error: null };
   }
-  if (isYoutubeUrl(trimmed)) return { source: trimmed, error: "youtube-in-path" };
+  if (isYoutubeLink(trimmed)) return { source: trimmed, error: "youtube-in-path" };
   return { source: trimmed, error: null };
 }
 
@@ -274,7 +280,7 @@ function FolderPath({
   const listId = useRef(`folders-${Math.random().toString(36).slice(2)}`).current;
 
   useEffect(() => {
-    if (!open || !value.trim() || isYoutubeUrl(value)) {
+    if (!open || !value.trim() || isYoutubeLink(value)) {
       setDirs([]);
       setActive(-1);
       return;
@@ -384,26 +390,8 @@ function slotKind(block: { folder: string; mode: BlockMode }): string {
   return "";
 }
 
-function nextSlotStart(pieces: Piece[], index: number): number {
-  for (let i = index + 1; i < pieces.length; i++) {
-    const piece = pieces[i];
-    if (piece?.kind === "slot") return piece.start;
-  }
-  return DAY_MINUTES;
-}
-
-function bandStyle(start: number, end: number, roomEnd?: number): Record<string, string> {
-  const span = Math.max(0, end - start);
-  const natural = `${(span / DAY_MINUTES) * 100}%`;
-  const style: Record<string, string> = {
-    top: `${(start / DAY_MINUTES) * 100}%`,
-    height: natural,
-  };
-  if (roomEnd === undefined) return style;
-  const room = Math.max(span, roomEnd - start);
-  style.height = `max(${natural}, var(--slot-read))`;
-  style.maxHeight = `${(room / DAY_MINUTES) * 100}%`;
-  return style;
+function rowStyle(span: number): Record<string, string> {
+  return { "--mins": String(Math.max(0, span)) };
 }
 
 function piecesFor(day: Day, blocks: ScheduleBlock[]): Piece[] {
@@ -1042,7 +1030,7 @@ export function Admin() {
   }
 
   function intermissionErrorText(error: string): string {
-    if (error === "youtube") return t.error("Not a YouTube video URL");
+    if (error === "youtube") return t.error("Not a YouTube video or playlist URL");
     if (error === "youtube-in-path") return t.intermissionYoutubeInFolder;
     return t.error(error);
   }
@@ -1348,29 +1336,46 @@ export function Admin() {
           </div>
         )}
         <div class="week-scale">
-          <div class="hours" aria-hidden="true">
-            {["00", "04", "08", "12", "16", "20", "24"].map((hour) => (
-              <span key={hour}>{hour}</span>
-            ))}
-          </div>
           {DAYS.map((day) => {
             const pieces = piecesFor(day, schedule.blocks);
             const emptyDay = pieces.length === 1 && pieces[0]?.kind === "gap";
             const editing = draft?.origin === day;
+            const rows = [
+              ...pieces,
+              ...(ghostsByDay?.[day] ?? []).map((ghost) => ({
+                kind: "ghost" as const,
+                start: ghost.start,
+                end: ghost.end,
+              })),
+            ].sort((a, b) => a.start - b.start || (a.kind === "ghost" ? 1 : -1));
             return (
               <div key={day} class={`day${day === today ? " on" : ""}${editing ? " editing" : ""}`}>
                 <span class="name">{t.day[day]}</span>
                 <div class="track">
-                  {pieces.map((piece, index) => {
+                  {rows.map((piece) => {
                     const span = piece.end - piece.start;
+                    if (piece.kind === "ghost") {
+                      return (
+                        <span
+                          key={`ghost-${piece.start}-${piece.end}`}
+                          class={`ghost${draft ? slotKind(draft) : ""}`}
+                          style={rowStyle(span)}
+                        >
+                          <b>
+                            {clockFace(piece.start)}–{clockFace(piece.end)}
+                          </b>
+                        </span>
+                      );
+                    }
                     if (piece.kind === "gap") {
                       const long = span >= 120;
+                      const tight = !long && span < 30;
                       return (
                         <button
                           key={`gap-${piece.start}`}
                           type="button"
-                          class={`gap${long ? " long" : ""}${emptyDay ? " first" : ""}`}
-                          style={bandStyle(piece.start, piece.end)}
+                          class={`gap${long ? " long" : ""}${tight ? " tight" : ""}${emptyDay ? " first" : ""}`}
+                          style={rowStyle(span)}
                           title={long && fallbackName ? fallbackName : undefined}
                           onClick={(event) => {
                             const rect = (event.currentTarget as HTMLButtonElement).getBoundingClientRect();
@@ -1381,8 +1386,20 @@ export function Admin() {
                             openGap(day, piece.start, piece.end, at);
                           }}
                         >
-                          {long && fallbackName && <b>{fallbackName}</b>}
-                          {emptyDay && <i>{t.clickFirst}</i>}
+                          {long ? (
+                            <>
+                              <b>
+                                {clockFace(piece.start)}–{clockFace(piece.end)}
+                              </b>
+                              {fallbackName ? <i>{fallbackName}</i> : emptyDay ? <i>{t.clickFirst}</i> : null}
+                            </>
+                          ) : (
+                            <i>
+                              {tight
+                                ? `+ ${t.lengthOf(span)}`
+                                : `${clockFace(piece.start)}–${clockFace(piece.end)}`}
+                            </i>
+                          )}
                         </button>
                       );
                     }
@@ -1398,30 +1415,19 @@ export function Admin() {
                         key={`${piece.block.id}-${piece.origin}-${piece.start}`}
                         type="button"
                         class={`slot${slotKind(piece.block)}${picked ? " pick" : ""}${spill ? " spill" : ""}`}
-                        style={bandStyle(piece.start, piece.end, nextSlotStart(pieces, index))}
+                        style={rowStyle(span)}
                         title={slotHover(piece.block, youtubeTitles)}
                         onClick={() => openSlot(piece.block, piece.origin)}
                       >
-                        <b>{slotLabel(piece.block, youtubeTitles)}</b>
-                        <i>
-                          {clockFace(piece.start)}–{clockFace(piece.end)} · {t.lengthOf(piece.end - piece.start)}
+                        <span class="tm">
+                          {clockFace(piece.start)}–{clockFace(piece.end)}
                           {spill ? ` · ${t.day[piece.origin]}` : ""}
-                        </i>
+                        </span>
+                        <b>{slotLabel(piece.block, youtubeTitles)}</b>
+                        <i>{t.lengthOf(span)}</i>
                       </button>
                     );
                   })}
-                  {draft &&
-                    ghostsByDay?.[day]?.map((ghost) => (
-                    <span
-                      key={`ghost-${ghost.start}-${ghost.end}`}
-                      class={`ghost${slotKind(draft)}`}
-                      style={bandStyle(ghost.start, ghost.end, DAY_MINUTES)}
-                    >
-                      <b>
-                        {clockFace(ghost.start)}–{clockFace(ghost.end)}
-                      </b>
-                    </span>
-                  ))}
                 </div>
               </div>
             );

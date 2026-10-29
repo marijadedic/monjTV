@@ -34,7 +34,7 @@ export function isIntermissionKind(value: string | undefined): value is Intermis
 export interface IntermissionItem {
   id: string;
   kind: IntermissionKind;
-  /** Folder path, video path, or a canonical YouTube watch URL. */
+  /** Folder path, video path, or a canonical YouTube video or playlist URL. */
   source: string;
 }
 

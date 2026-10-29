@@ -245,7 +245,7 @@ const en: Copy = {
   youtubeProbeCache:
     "The length comes from yt-dlp. Keep yt-dlp updated; YouTube changes often. This needs the internet.",
   youtubeIntermission:
-    "A YouTube URL is fine here, including a live stream. Playback needs the internet.",
+    "A YouTube video, playlist, or live stream. A playlist plays in order and starts again at the end. Playback needs the internet.",
   video: "Video",
   videoPlaceholder: "/path/to/video.mp4",
   alsoOn: "Also play on",
@@ -351,6 +351,11 @@ const hrExact: Record<string, string> = {
   "Each specific-file slot needs a video": "Blok s jednim videom treba odabranu datoteku.",
   "Each YouTube slot needs a YouTube video URL": "YouTube blok treba YouTube URL videa.",
   "Not a YouTube video URL": "To nije YouTube URL videa.",
+  "Not a YouTube video or playlist URL": "To nije YouTube video ni popis za reprodukciju.",
+  "Not a YouTube playlist URL": "To nije YouTube popis za reprodukciju.",
+  "Could not read this YouTube playlist": "Ovaj YouTube popis nije se mogao pročitati.",
+  "This YouTube playlist has no videos": "U ovom YouTube popisu nema videa.",
+  "Could not play this YouTube playlist": "Ovaj YouTube popis nije se mogao pustiti.",
   "yt-dlp is not installed or not on PATH": "yt-dlp nije instaliran ili nije na PATH-u.",
   "Could not read this YouTube video": "Ovaj YouTube video nije se mogao pročitati.",
   "Could not read this YouTube video's length": "Trajanje ovog YouTube videa nije se moglo pročitati.",
@@ -515,7 +520,7 @@ const hr: Copy = {
   youtubeProbeCache:
     "Trajanje dolazi iz yt-dlp. Održavajte yt-dlp ažurnim; YouTube se često mijenja. Treba internet.",
   youtubeIntermission:
-    "YouTube URL ovdje može, uključujući prijenos uživo. Reprodukcija treba internet.",
+    "YouTube video, popis ili prijenos uživo. Popis ide redom i na kraju kreće ispočetka. Reprodukcija treba internet.",
   video: "Video",
   videoPlaceholder: "/putanja/do/videa.mp4",
   alsoOn: "Pusti i na",

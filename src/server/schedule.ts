@@ -10,7 +10,7 @@ import {
   type ScheduleBlock,
 } from "../shared/types.ts";
 import { DAY_MINUTES, clockOf, minutesOf, segmentsOf, windowOn } from "../shared/window.ts";
-import { isYoutubeUrl, parseYoutubeUrl } from "../shared/youtube.ts";
+import { canonicalYoutubeIntermission, isYoutubeLink, parseYoutubeUrl } from "../shared/youtube.ts";
 import { parseHm, isHm } from "./clock.ts";
 import { assertVideo, isDir } from "./files.ts";
 import { schedulePath } from "./paths.ts";
@@ -119,11 +119,11 @@ function scheduleFrom(data: StoredSchedule): Schedule {
   };
 }
 
-// A folder path, a canonical YouTube watch URL, or empty.
+// A folder path, a canonical YouTube video or playlist URL, or empty.
 function fallbackFolderOf(value: unknown): string {
   if (typeof value !== "string") return "";
   const trimmed = value.trim();
-  return parseYoutubeUrl(trimmed) ?? trimmed;
+  return canonicalYoutubeIntermission(trimmed) ?? trimmed;
 }
 
 // The saved list, or one item made from an older fallbackFolder.
@@ -145,7 +145,7 @@ function intermissionsFrom(
   if (!source) return { intermissions: [], activeIntermission: "" };
   const item: IntermissionItem = {
     id: randomUUID(),
-    kind: isYoutubeUrl(source) ? "youtube" : "folder",
+    kind: isYoutubeLink(source) ? "youtube" : "folder",
     source,
   };
   return { intermissions: [item], activeIntermission: item.id };
@@ -163,13 +163,13 @@ function normalizeIntermission(raw: unknown, seen: Set<string>, strict: boolean)
   const kind = typeof item.kind === "string" && isIntermissionKind(item.kind) ? item.kind : "";
   if (!kind) return fail("Invalid intermission");
   if (kind === "youtube") {
-    const url = parseYoutubeUrl(source);
-    if (!url) return fail("Not a YouTube video URL");
+    const url = canonicalYoutubeIntermission(source);
+    if (!url) return fail("Not a YouTube video or playlist URL");
     return { id: freshId(item.id, seen), kind, source: url };
   }
-  if (!source || isYoutubeUrl(source)) {
+  if (!source || isYoutubeLink(source)) {
     return fail(
-      isYoutubeUrl(source)
+      isYoutubeLink(source)
         ? "That is a YouTube link. Choose YouTube, then add it."
         : kind === "video"
           ? "Type the video path."
@@ -297,7 +297,7 @@ export async function assertFolder(folder: string): Promise<void> {
   }
 }
 
-// Each list entry is a folder, a video file, or a YouTube URL. Live streams are allowed.
+// Each list entry is a folder, a video file, or a YouTube video or playlist. Live streams are allowed.
 export async function assertIntermissions(items: IntermissionItem[]): Promise<void> {
   for (const item of items) {
     if (item.kind === "youtube") continue;
