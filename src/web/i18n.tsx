@@ -68,6 +68,7 @@ type Copy = {
   chooseFolder: string;
   chooseVideo: string;
   slotDuration: string;
+  videoDuration: string;
   slotDurationOf: (mins: number) => string;
   longestVideo: string;
   shortestVideo: string;
@@ -227,6 +228,7 @@ const en: Copy = {
   chooseFolder: "Choose folder",
   chooseVideo: "Choose video",
   slotDuration: "Slot duration",
+  videoDuration: "Video duration",
   slotDurationOf: (mins) => {
     const h = Math.floor(mins / 60);
     const m = mins % 60;
@@ -289,7 +291,7 @@ const en: Copy = {
   video: "Video",
   videoPlaceholder: "/path/to/video.mp4",
   alsoOn: "Also play on",
-  playHow: "Select the type of playback",
+  playHow: "Choose how it plays",
   ifEmpty: "Plays when nothing is on, and after a slot’s video ends early.",
   intermission: "Intermission",
   intermissionCut: "A new slot cuts it off.",
@@ -530,6 +532,7 @@ const hr: Copy = {
   chooseFolder: "Odaberi mapu",
   chooseVideo: "Odaberi video",
   slotDuration: "Trajanje",
+  videoDuration: "Trajanje videa",
   slotDurationOf: (mins) => {
     const h = Math.floor(mins / 60);
     const m = mins % 60;
@@ -592,7 +595,7 @@ const hr: Copy = {
   video: "Video",
   videoPlaceholder: "/putanja/do/videa.mp4",
   alsoOn: "Pusti i na",
-  playHow: "Odaberi tip reprodukcije",
+  playHow: "Odaberi kako se pušta",
   ifEmpty: "Reproducira se kad ništa nije na rasporedu, i kad video u bloku završi ranije.",
   intermission: "Pauza",
   intermissionCut: "Novi blok prekida reprodukciju.",

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import {
   DAYS,
-  ITEM_MODES,
   type BlockMode,
   type Day,
   type IntermissionItem,
@@ -476,6 +475,24 @@ function modeClass(mode: ItemMode): string {
   return "movie";
 }
 
+function blockHint(mode: BlockMode, t: ReturnType<typeof useI18n>["t"]): string {
+  if (mode === "playlist") return t.playlistHint;
+  return modeHint(mode, t);
+}
+
+function blockClass(mode: BlockMode): string {
+  if (mode === "playlist") return "stack";
+  return modeClass(mode);
+}
+
+function blockLabel(mode: BlockMode, t: ReturnType<typeof useI18n>["t"]): string {
+  if (mode === "playlist") return t.playlist;
+  return modeLabel(mode, t);
+}
+
+const CHIP_MODES: BlockMode[] = ["random-file", "next-episode", "specific-file", "youtube", "playlist"];
+const ADD_MODES: ItemMode[] = ["random-file", "next-episode", "specific-file", "youtube"];
+
 function itemLabel(item: DraftItem, titles: Readonly<Record<string, string>>): string {
   if (item.title) return item.title;
   if (item.mode === "youtube" && item.file) {
@@ -769,28 +786,42 @@ export function Admin() {
 
   useEffect(() => {
     if (!intermissionOpen) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      setIntermissionOpen(false);
+    }
     function onPointerDown(event: PointerEvent) {
       const target = event.target;
       if (!(target instanceof Node)) return;
       if (intermissionButtonRef.current?.contains(target)) return;
       if (intermissionPanelRef.current?.contains(target)) return;
+      event.preventDefault();
       setIntermissionOpen(false);
     }
+    window.addEventListener("keydown", onKey);
     document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
   }, [intermissionOpen]);
 
+  const formOpen = Boolean(draft);
   useEffect(() => {
-    if (!draft) return;
+    if (!formOpen) return;
     formRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
-    function onKey(event: KeyboardEvent) {
-      if (event.key !== "Escape" || slotOpRef.current) return;
+    function cancel() {
+      if (slotOpRef.current) return;
       setDraft(null);
       setFieldError({});
     }
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      cancel();
+    }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [panelToken]);
+  }, [formOpen, panelToken]);
 
   useEffect(() => {
     if (!draft?.id || draft.mode === "youtube" || draft.mode === "playlist") {
@@ -1739,11 +1770,20 @@ export function Admin() {
             );
           })}
         </div>
-        {draft && <div class="scrim" />}
+        {draft && (
+          <div
+            class="scrim"
+            onClick={() => {
+              if (slotOpRef.current) return;
+              setDraft(null);
+              setFieldError({});
+            }}
+          />
+        )}
         {draft && (
           <form
             ref={formRef}
-            class={draft.mode === "playlist" ? "add-form playlist-form" : "add-form"}
+            class="add-form"
             aria-busy={slotOp ? "true" : undefined}
             onSubmit={(event) => {
               event.preventDefault();
@@ -1756,57 +1796,20 @@ export function Admin() {
             <div class="pick-mode">
               <span class="k">{t.playHow}</span>
               <div class="modes" role="radiogroup" aria-label={t.playHow}>
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={draft.mode === "random-file"}
-                  class={draft.mode === "random-file" ? "mode on movie" : "mode"}
-                  onClick={() => chooseMode("random-file")}
-                >
-                  <b>{t.randomFile}</b>
-                  <span>{t.randomHint}</span>
-                </button>
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={draft.mode === "next-episode"}
-                  class={draft.mode === "next-episode" ? "mode on shows" : "mode"}
-                  onClick={() => chooseMode("next-episode")}
-                >
-                  <b>{t.nextEpisode}</b>
-                  <span>{t.nextHint}</span>
-                </button>
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={draft.mode === "specific-file"}
-                  class={draft.mode === "specific-file" ? "mode on film" : "mode"}
-                  onClick={() => chooseMode("specific-file")}
-                >
-                  <b>{t.oneVideo}</b>
-                  <span>{t.oneHint}</span>
-                </button>
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={draft.mode === "youtube"}
-                  class={draft.mode === "youtube" ? "mode on tube" : "mode"}
-                  onClick={() => chooseMode("youtube")}
-                >
-                  <b>{t.youtube}</b>
-                  <span>{t.youtubeHint}</span>
-                </button>
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={draft.mode === "playlist"}
-                  class={draft.mode === "playlist" ? "mode on stack" : "mode"}
-                  onClick={() => chooseMode("playlist")}
-                >
-                  <b>{t.playlist}</b>
-                  <span>{t.playlistHint}</span>
-                </button>
+                {CHIP_MODES.map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    role="radio"
+                    aria-checked={draft.mode === mode}
+                    class={draft.mode === mode ? `mode on ${blockClass(mode)}` : "mode"}
+                    onClick={() => chooseMode(mode)}
+                  >
+                    <b>{blockLabel(mode, t)}</b>
+                  </button>
+                ))}
               </div>
+              <p class="mode-note">{blockHint(draft.mode, t)}</p>
             </div>
             {draft.mode === "playlist" ? (
               <div class="folder-block">
@@ -1822,7 +1825,7 @@ export function Admin() {
                     }}
                   />
                 </label>
-                <span class="k">{t.playlistStack}</span>
+                <span class="k stack-head">{t.playlistStack}</span>
                 {draft.items.length === 0 ? (
                   <p class="mode-note">{t.playlistEmpty}</p>
                 ) : (
@@ -1876,105 +1879,104 @@ export function Admin() {
                 {stackSec ? (
                   <div class="picked">
                     <div>
-                      <span class="k">{t.slotDuration}</span>
-                      <span class="value">{t.slotDurationOf(Math.max(1, Math.ceil(stackSec / 60)))}</span>
-                    </div>
+                      <span class="k">{t.slotDuration} · {t.slotDurationOf(Math.max(1, Math.ceil(stackSec / 60)))}</span>                   </div>
                   </div>
                 ) : null}
-                <span class="k">{t.addToPlaylist}</span>
-                <div class="seg playlist-kind" role="radiogroup" aria-label={t.addToPlaylist}>
-                  {ITEM_MODES.map((mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      role="radio"
-                      aria-checked={draft.addMode === mode}
-                      class={draft.addMode === mode ? `on ${modeClass(mode)}` : ""}
-                      onClick={() =>
-                        setDraft({
-                          ...draft,
-                          addMode: mode,
-                          addFolder: mode === "youtube" ? "" : draft.addFolder,
-                          addFile: mode === "youtube" || mode === "specific-file" ? draft.addFile : "",
-                        })
-                      }
-                    >
-                      {modeLabel(mode, t)}
-                    </button>
-                  ))}
-                </div>
-                {draft.addMode === "youtube" ? (
-                  <div class="path-field">
-                    <div class="field">
-                      <input
-                        value={draft.addFile}
-                        placeholder={t.youtubePlaceholder}
-                        onInput={(event) => {
+                <div class="add-next">
+                  <span class="k">{t.addToPlaylist}</span>
+                  <div class="modes" role="radiogroup" aria-label={t.addToPlaylist}>
+                    {ADD_MODES.map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        role="radio"
+                        aria-checked={draft.addMode === mode}
+                        class={draft.addMode === mode ? `mode on ${modeClass(mode)}` : "mode"}
+                        onClick={() =>
                           setDraft({
                             ...draft,
-                            addFile: (event.target as HTMLInputElement).value,
-                            addFolder: "",
-                          });
-                          setFieldError((current) => ({ ...current, folder: undefined }));
-                        }}
-                      />
-                    </div>
+                            addMode: mode,
+                            addFolder: mode === "youtube" ? "" : draft.addFolder,
+                            addFile: mode === "youtube" || mode === "specific-file" ? draft.addFile : "",
+                          })
+                        }
+                      >
+                        <b>{modeLabel(mode, t)}</b>
+                      </button>
+                    ))}
                   </div>
-                ) : (
-                  <FolderPath
-                    key={draft.addMode}
-                    kind={draft.addMode === "specific-file" ? "video" : "folder"}
-                    value={draft.addMode === "specific-file" ? draft.addFile : draft.addFolder}
-                    placeholder={draft.addMode === "specific-file" ? t.videoPlaceholder : t.folderPlaceholder}
-                    invalid={Boolean(fieldError.folder)}
-                    actionLabel={picking === "draft" ? t.choosing : t.browse}
-                    actionBusy={picking === "draft"}
-                    listLabel={draft.addMode === "specific-file" ? t.video : t.folder}
-                    onChange={(value) => {
-                      setDraft(
-                        draft.addMode === "specific-file"
-                          ? { ...draft, addFile: value, addFolder: parentDir(value) }
-                          : { ...draft, addFolder: value },
-                      );
-                      setFieldError((current) => ({ ...current, folder: undefined }));
-                    }}
-                    onAction={() => void choosePath()}
-                  />
-                )}
-                {draft.addMode === "youtube" && <p class="mode-note">{t.youtubeCaveat}</p>}
-                {draft.addMode !== "youtube" && <p class="mode-note">{modeHint(draft.addMode, t)}</p>}
-                {measuring && pathChosen ? (
-                  <div class="wait">
-                    <div class="wait-line">
-                      <span class="spin" aria-hidden="true" />
-                      <span class="measure-label">{t.measuringVideos}</span>
+
+                  {draft.addMode === "youtube" && <p class="mode-note">{t.youtubeCaveat}</p>}
+                  {draft.addMode !== "youtube" && <p class="mode-note">{modeHint(draft.addMode, t)}</p>}
+                  
+                  {draft.addMode === "youtube" ? (
+                    <div class="path-field">
+                      <div class="field">
+                        <input
+                          value={draft.addFile}
+                          placeholder={t.youtubePlaceholder}
+                          onInput={(event) => {
+                            setDraft({
+                              ...draft,
+                              addFile: (event.target as HTMLInputElement).value,
+                              addFolder: "",
+                            });
+                            setFieldError((current) => ({ ...current, folder: undefined }));
+                          }}
+                        />
+                      </div>
                     </div>
-                  </div>
-                ) : length ? (
-                  <div class="picked">
-                    <div>
-                      <span class="k">{t.slotDuration}</span>
-                      <span class="value">
-                        {length.title} · {t.slotDurationOf(lengthMins)}
-                      </span>
+                  ) : (
+                    <FolderPath
+                      key={draft.addMode}
+                      kind={draft.addMode === "specific-file" ? "video" : "folder"}
+                      value={draft.addMode === "specific-file" ? draft.addFile : draft.addFolder}
+                      placeholder={draft.addMode === "specific-file" ? t.videoPlaceholder : t.folderPlaceholder}
+                      invalid={Boolean(fieldError.folder)}
+                      actionLabel={picking === "draft" ? t.choosing : t.browse}
+                      actionBusy={picking === "draft"}
+                      listLabel={draft.addMode === "specific-file" ? t.video : t.folder}
+                      onChange={(value) => {
+                        setDraft(
+                          draft.addMode === "specific-file"
+                            ? { ...draft, addFile: value, addFolder: parentDir(value) }
+                            : { ...draft, addFolder: value },
+                        );
+                        setFieldError((current) => ({ ...current, folder: undefined }));
+                      }}
+                      onAction={() => void choosePath()}
+                    />
+                  )}
+                  {measuring && pathChosen ? (
+                    <div class="wait">
+                      <div class="wait-line">
+                        <span class="spin" aria-hidden="true" />
+                        <span class="measure-label">{t.measuringVideos}</span>
+                      </div>
                     </div>
+                  ) : length ? (
+                    <div class="picked">
+                      <div>
+                        <span class="k">{t.videoDuration} · {t.slotDurationOf(lengthMins)}</span>
+                      </div>
+                    </div>
+                  ) : null}
+                  {matched?.error && <p class="field-error">{t.error(matched.error)}</p>}
+                  {pathChosen && !measuring && matched && !length && !matched.error && (
+                    <p class="field-error">{t.noVideo}</p>
+                  )}
+                  <div class="actions">
+                    <button
+                      type="button"
+                      class="primary"
+                      disabled={!length || measuring || !pathChosen || Boolean(matched?.error)}
+                      onClick={addStackItem}
+                    >
+                      {t.add}
+                    </button>
                   </div>
-                ) : null}
-                {matched?.error && <p class="field-error">{t.error(matched.error)}</p>}
-                {pathChosen && !measuring && matched && !length && !matched.error && (
-                  <p class="field-error">{t.noVideo}</p>
-                )}
-                <div class="playlist-add">
-                  <button
-                    type="button"
-                    class="primary"
-                    disabled={!length || measuring || !pathChosen || Boolean(matched?.error)}
-                    onClick={addStackItem}
-                  >
-                    {t.add}
-                  </button>
+                  {fieldError.folder && <p class="field-error">{t.error(fieldError.folder)}</p>}
                 </div>
-                {fieldError.folder && <p class="field-error">{t.error(fieldError.folder)}</p>}
               </div>
             ) : (
             <div class="folder-block">

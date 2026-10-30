@@ -81,6 +81,10 @@ export function App() {
   }
 
   useEffect(() => {
+    function closePrefs() {
+      const prefs = prefsRef.current;
+      if (prefs?.open) prefs.open = false;
+    }
     function onPointerDown(event: PointerEvent) {
       const prefs = prefsRef.current;
       if (!prefs?.open) return;
@@ -88,8 +92,16 @@ export function App() {
       if (!(target instanceof Node) || prefs.contains(target)) return;
       prefs.open = false;
     }
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      closePrefs();
+    }
     document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKey);
+    };
   }, []);
 
   return (
