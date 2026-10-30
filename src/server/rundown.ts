@@ -151,7 +151,7 @@ async function reflowSeries(board: BoardFile): Promise<boolean> {
   const today = dateKey();
   const now = nowSec();
   const days = board.days.filter((day) => inWindow(today, day.date)).sort((a, b) => a.date.localeCompare(b.date));
-  const cursors = new Map<string, { last: string | undefined; follow: boolean }>();
+  const cursors = new Map<string, { last?: string; consumed?: string; follow: boolean; day?: string }>();
   const filesCache = new Map<string, string[]>();
   const touched = new Set<string>();
   let changed = false;
@@ -177,38 +177,47 @@ async function reflowSeries(board: BoardFile): Promise<boolean> {
     if (day.date < today) continue;
     for (const item of sortRundown(day.items)) {
       if (item.overnight || item.mode !== "next-episode") continue;
-      const block = schedule.blocks.find((entry) => entry.id === item.blockId);
-      if (!block?.folder) continue;
-      const files = await filesIn(block.folder);
-      const cursor = cursors.get(block.folder) ?? {
-        last: progress.lastCompleted[block.folder],
+      const folder = seriesFolder(item, schedule);
+      if (!folder) continue;
+      const files = await filesIn(folder);
+      const cursor = cursors.get(folder) ?? {
+        last: progress.lastCompleted[folder],
+        consumed: progress.lastCompleted[folder],
         follow: false,
       };
-      cursors.set(block.folder, cursor);
+      cursors.set(folder, cursor);
       const played = item.status === "done" || item.status === "playing";
       const missed =
         item.status === "skipped" || (day.date === today && !played && itemHasPassed(item, now));
       if (played) {
         cursor.last = item.path;
+        cursor.consumed = item.path;
         cursor.follow = true;
+        cursor.day = day.date;
         continue;
       }
-      if (missed || cursor.follow) {
+      if (cursor.day !== day.date) cursor.last = cursor.consumed;
+      const laterSameDay = cursor.day === day.date;
+      if (missed || cursor.follow || laterSameDay) {
         const episode = nextFrom(files, cursor.last);
         if (!episode) continue;
-        await place(item, episode, day.date, block.id);
+        await place(item, episode, day.date, item.blockId);
+        cursor.last = episode;
         if (missed) {
           if (item.status !== "skipped") {
             item.status = "skipped";
             changed = true;
           }
+          cursor.follow = true;
         } else {
-          cursor.last = episode;
+          cursor.consumed = episode;
         }
-        cursor.follow = true;
+        cursor.day = day.date;
         continue;
       }
       cursor.last = item.path;
+      cursor.consumed = item.path;
+      cursor.day = day.date;
     }
   }
 
@@ -643,20 +652,32 @@ async function rebuildLiveDay(current: DayRundown): Promise<DayRundown> {
 // Fill today's items from the schedule and each video's length.
 export async function buildRundown(date = dateKey()): Promise<TodayRundown> {
   const schedule = await loadSchedule();
-  const progress = await loadProgress();
+  const stored = await loadProgress();
+  const progress = cloneProgress(stored);
   const day = weekdayOfKey(date);
   const items: RundownItem[] = [];
 
   for (const block of blocksForDay(schedule, day)) {
     const placed = windowOn(block, day);
-    items.push(
-      ...(await itemsForWindow(
-        block,
-        parseHm(placed.start),
-        parseHm(placed.start) + lengthMinutes(block) * 60,
-        progress,
-      )),
+    const built = await itemsForWindow(
+      block,
+      parseHm(placed.start),
+      parseHm(placed.start) + lengthMinutes(block) * 60,
+      progress,
     );
+    items.push(...built);
+    for (const item of built) {
+      const folder = sourceFolder(item, block);
+      if (!folder) continue;
+      if (item.mode === "next-episode") progress.lastCompleted[folder] = item.path;
+      else if (item.mode === "random-file") {
+        const prev = progress.recentRandom[folder] ?? [];
+        progress.recentRandom[folder] = [item.path, ...prev.filter((file) => file !== item.path)].slice(
+          0,
+          RECENT_RANDOM_LIMIT,
+        );
+      }
+    }
   }
 
   const yesterday = prevDay(day);
@@ -669,7 +690,7 @@ export async function buildRundown(date = dateKey()): Promise<TodayRundown> {
       block,
       parseHm(placed.start),
       parseHm(placed.start) + lengthMinutes(block) * 60,
-      progress,
+      stored,
     );
     for (const item of built) {
       const leftover = { ...item, overnight: true };
