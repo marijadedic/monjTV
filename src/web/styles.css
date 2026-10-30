@@ -128,6 +128,7 @@ html[data-theme="dusk"] body {
 
 html[data-theme="dusk"] .card,
 html[data-theme="dusk"] .add-form,
+html[data-theme="dusk"] .recent-window,
 html[data-theme="dusk"] .now-strip,
 html[data-theme="dusk"] .empty {
   border-radius: 18px;
@@ -156,12 +157,17 @@ a {
   padding-right: 32px;
 }
 
-.shell.today-head {
-  padding-bottom: 0;
+.shell.today-chrome {
+  max-width: none;
+  padding-left: 32px;
+  padding-right: 32px;
 }
 
-.shell.today-body {
-  padding-top: 0;
+.shell.today-chrome main {
+  width: 100%;
+  max-width: 1280px;
+  margin-right: auto;
+  margin-left: auto;
 }
 
 .shell.wide main,
@@ -782,6 +788,22 @@ html[data-theme="dusk"] .prefs .themes button.on {
   color: #fff;
 }
 
+.prefs-recent {
+  width: 100%;
+  margin-top: 2px;
+  font: 650 0.92rem/1.45 system-ui, sans-serif;
+  text-align: center;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+
+.prefs-recent:hover {
+  background: var(--browse-hover);
+}
+
 .prefs-quit {
   width: 100%;
   margin-top: 2px;
@@ -815,6 +837,130 @@ html[data-theme="light"] .prefs-quit:hover:not(:disabled) {
   display: flex;
 }
 
+.app-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(10, 12, 16, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+html[data-theme="dusk"] .app-scrim {
+  background: rgba(36, 42, 28, 0.38);
+}
+
+html[data-theme="light"] .app-scrim {
+  background: rgba(230, 223, 212, 0.62);
+}
+
+.recent-window {
+  position: fixed;
+  z-index: 31;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  gap: 1rem;
+  width: min(36rem, calc(100% - 48px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 1rem 1.5rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 6px 16px rgba(60, 70, 40, 0.1);
+  font-family: system-ui, sans-serif;
+}
+
+.recent-window header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.recent-window header b {
+  font-size: 1.05rem;
+}
+
+.recent-window header p,
+.recent-order,
+.recent-empty {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.recent-window .x {
+  padding: 4px 8px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.recent-folders {
+  display: grid;
+  gap: 14px;
+}
+
+.recent-folder {
+  display: grid;
+  gap: 6px;
+}
+
+.recent-folder h2 {
+  margin: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.recent-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.recent-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  background: var(--browse);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.recent-list .n {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 0.75rem;
+  min-width: 1.2rem;
+}
+
+.recent-list .name {
+  min-width: 0;
+}
+
+.recent-list b {
+  display: block;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.recent-list .place {
+  display: block;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+
 .prefs-label {
   color: var(--muted);
   font-size: 0.75rem;
@@ -827,11 +973,6 @@ html[data-theme="light"] .prefs-quit:hover:not(:disabled) {
   gap: 2px;
   margin: 1rem 0 1rem;
   border-bottom: 1px solid var(--line);
-}
-
-.folders.today-tabs {
-  margin-left: 32px;
-  margin-right: 32px;
 }
 
 .folders a {
@@ -2054,6 +2195,8 @@ html[data-theme="teletext"] body,
 html[data-theme="teletext"] .prefs,
 html[data-theme="teletext"] .themes button,
 html[data-theme="teletext"] .prefs-quit,
+html[data-theme="teletext"] .prefs-recent,
+html[data-theme="teletext"] .recent-window,
 html[data-theme="teletext"] .fit-warn,
 html[data-theme="teletext"] .week-head h1,
 html[data-theme="teletext"] .intermission,
@@ -2072,6 +2215,9 @@ html[data-theme="teletext"] .seg,
 html[data-theme="teletext"] .themes,
 html[data-theme="teletext"] .themes button,
 html[data-theme="teletext"] .prefs-quit,
+html[data-theme="teletext"] .prefs-recent,
+html[data-theme="teletext"] .recent-window,
+html[data-theme="teletext"] .recent-list li,
 html[data-theme="teletext"] button,
 html[data-theme="teletext"] input,
 html[data-theme="teletext"] .pill,
@@ -2092,6 +2238,7 @@ html[data-theme="teletext"] .week-scale .ghost {
 }
 
 html[data-theme="teletext"] .add-form,
+html[data-theme="teletext"] .recent-window,
 html[data-theme="teletext"] .intermission-open {
   box-shadow: none;
 }
@@ -2278,6 +2425,12 @@ html[data-theme="teletext"] .day-start .note {
 
 html[data-theme="teletext"] .prefs-quit:hover:not(:disabled) {
   background: #ff0000;
+  border-color: #ffff00;
+  color: #ffff00;
+}
+
+html[data-theme="teletext"] .prefs-recent:hover {
+  background: #0000ff;
   border-color: #ffff00;
   color: #ffff00;
 }

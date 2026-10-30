@@ -52,6 +52,25 @@ export interface Progress {
   recentRandom: Record<string, string[]>;
 }
 
+/** One file a random slot is currently skipping. */
+export interface RecentVideo {
+  path: string;
+  title: string;
+  /** Directory under the folder. Empty when the file sits in the folder itself. */
+  place: string;
+}
+
+/** Recently played random files for one folder. Newest video is first. */
+export interface RecentFolder {
+  folder: string;
+  name: string;
+  videos: RecentVideo[];
+}
+
+export interface RecentPlays {
+  folders: RecentFolder[];
+}
+
 export interface RundownItem {
   id: string;
   blockId: string;
@@ -97,6 +116,10 @@ export interface PlayerStatus {
   fallbackTitle: string | null;
   /** Local file filling the gap. Null for a YouTube filler or when a show is on. */
   fallbackPath: string | null;
+  /** Chosen gap filler. Set whenever one is selected, even if the player is idle. */
+  intermissionTitle: string | null;
+  intermissionKind: IntermissionKind | null;
+  intermissionSource: string | null;
 }
 
 export interface BrowseResult {

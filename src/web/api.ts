@@ -2,6 +2,7 @@ import type {
   BlockMode,
   BrowseResult,
   PlayerStatus,
+  RecentPlays,
   Schedule,
   SlotLength,
   SlotMiss,
@@ -63,6 +64,12 @@ export const api = {
     req<{ length: SlotLength | null }>(
       `/api/slot-length?mode=${encodeURIComponent(mode)}&folder=${encodeURIComponent(folder)}&file=${encodeURIComponent(file)}`,
     ),
+  recent: () => req<RecentPlays>("/api/recent"),
+  forgetRecent: (folder: string, filePath: string) =>
+    req<RecentPlays>("/api/recent/remove", {
+      method: "POST",
+      body: JSON.stringify({ folder, path: filePath }),
+    }),
   startPlayer: () => req<PlayerStatus>("/api/player/start", { method: "POST" }),
   status: () => req<PlayerStatus>("/api/player/status"),
   shutdown: () => req<{ ok: true }>("/api/shutdown", { method: "POST" }),

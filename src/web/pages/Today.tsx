@@ -1,6 +1,7 @@
 import { useEffect, useState } from "preact/hooks";
 import type { ItemStatus, PlayerStatus, RundownItem, TodayRundown } from "../../shared/types.ts";
 import { itemCoversNow, itemHasPassed, itemProgress, itemStartsLater, secondsOf } from "../../shared/window.ts";
+import { canonicalYoutubeIntermission, youtubeId } from "../../shared/youtube.ts";
 import { api } from "../api.ts";
 import { pageHref } from "../href.ts";
 import { useI18n } from "../i18n.tsx";
@@ -81,6 +82,7 @@ export function Today() {
   const [busy, setBusy] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
   const [missed, setMissed] = useState<Record<string, true>>({});
+  const [watchTitle, setWatchTitle] = useState<string | null>(null);
 
   async function refresh() {
     const [nextToday, nextStatus] = await Promise.all([api.today(), api.status()]);
@@ -100,6 +102,25 @@ export function Today() {
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    if (status?.intermissionKind !== "youtube" || !status.intermissionSource) {
+      setWatchTitle(null);
+      return;
+    }
+    const url = canonicalYoutubeIntermission(status.intermissionSource);
+    if (!url) return;
+    let stop = false;
+    api
+      .youtubeTitles([url])
+      .then((body) => {
+        if (!stop) setWatchTitle(body.titles[url] || null);
+      })
+      .catch(() => undefined);
+    return () => {
+      stop = true;
+    };
+  }, [status?.intermissionKind, status?.intermissionSource]);
 
   async function start() {
     setBusy("start");
@@ -144,8 +165,22 @@ export function Today() {
   const next = today ? nextPlanned(today.items, sec) : null;
   const due = !current && !status?.fallbackTitle && today ? onNowPlanned(today.items, sec) : null;
   const held = today && !current ? heldItem(today.items, sec) : null;
-  const gapTitle = !current && status?.fallbackTitle ? status.fallbackTitle : null;
-  const gapPath = gapTitle && status?.fallbackPath && !missed[status.fallbackPath] ? status.fallbackPath : null;
+  const liveFiller = !current && status?.fallbackTitle ? status.fallbackTitle : null;
+  const namedLive = liveFiller && !liveFiller.startsWith("YouTube · ") ? liveFiller : null;
+  const fillerName = watchTitle || status?.intermissionTitle || null;
+  const gapTitle = namedLive || (!current && !due ? fillerName : null) || liveFiller;
+  const gapFile =
+    gapTitle && status?.fallbackPath
+      ? status.fallbackPath
+      : gapTitle && status?.intermissionKind === "video"
+        ? status.intermissionSource
+        : null;
+  const gapPath = gapFile && !missed[gapFile] ? gapFile : null;
+  const watchId =
+    gapTitle && !gapPath && status?.intermissionKind === "youtube" && status.intermissionSource
+      ? youtubeId(status.intermissionSource)
+      : null;
+  const watchStill = watchId && !missed[watchId] ? watchId : null;
   const air = current ?? due;
   const stripStill = air && showsFrame(air.mode) && !missed[air.path] ? air : null;
 
@@ -194,7 +229,7 @@ export function Today() {
       )}
       {showColumn && today && (
         <>
-          <div class={`now-strip${stripStill || gapPath ? " has-still" : ""}`}>
+          <div class={`now-strip${stripStill || gapPath || watchStill ? " has-still" : ""}`}>
             {stripStill && (
               <img
                 key={stripStill.path}
@@ -211,6 +246,15 @@ export function Today() {
                 src={gapStillSrc(gapPath)}
                 alt=""
                 onError={() => hideStill(gapPath)}
+              />
+            )}
+            {watchStill && (
+              <img
+                key={watchStill}
+                class="still"
+                src={`https://i.ytimg.com/vi/${watchStill}/hqdefault.jpg`}
+                alt=""
+                onError={() => hideStill(watchStill)}
               />
             )}
             <div>

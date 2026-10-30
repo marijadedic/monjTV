@@ -45,6 +45,11 @@ type Copy = {
   playNow: string;
   startTv: string;
   options: string;
+  recentPlayed: string;
+  recentHint: string;
+  recentEmpty: string;
+  recentOrder: string;
+  close: string;
   shutDown: string;
   off: string;
   week: string;
@@ -179,6 +184,11 @@ const en: Copy = {
   playNow: "Play now",
   startTv: "Start TV",
   options: "Options",
+  recentPlayed: "Recently played",
+  recentHint: "Random slots skip these. Remove one to let it be picked again.",
+  recentEmpty: "No videos are on this list.",
+  recentOrder: "Most recent first",
+  close: "Close",
   shutDown: "Shut down",
   off: "monjTV is off",
   week: "Weekly schedule",
@@ -456,6 +466,11 @@ const hr: Copy = {
   playNow: "Pusti sada",
   startTv: "Pokreni TV",
   options: "Opcije",
+  recentPlayed: "Nedavno pušteno",
+  recentHint: "Nasumični blokovi preskaču ove datoteke. Uklonite jednu da se može opet odabrati.",
+  recentEmpty: "Na ovom popisu nema videa.",
+  recentOrder: "Najnovije prvo",
+  close: "Zatvori",
   shutDown: "Ugasi monjTV",
   off: "monjTV je ugašen",
   week: "Tjedni raspored",

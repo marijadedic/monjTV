@@ -8,8 +8,8 @@ import { isBlockMode } from "../shared/types.ts";
 import { PORT } from "../shared/constants.ts";
 import { assertVideo, browse, isDir, isVideoFile, pickFile, pickFolder, suggestPaths } from "./files.ts";
 import { clientDir } from "./paths.ts";
-import { getStatus, intermissionFile, replayItem, shutdownPlayer, startPlayer, syncIntermission } from "./player.ts";
-import { forgetUnusedFolders, loadProgress } from "./progress.ts";
+import { getStatus, intermissionStillAllowed, replayItem, shutdownPlayer, startPlayer, syncIntermission } from "./player.ts";
+import { forgetRandomPlayed, forgetUnusedFolders, loadProgress, recentPlays } from "./progress.ts";
 import {
   ensureToday,
   loadToday,
@@ -127,8 +127,8 @@ app.get("/api/today/items/:id/still", async (c) => {
 
 // One cached frame for the local file filling a gap. The query must be that file.
 app.get("/api/player/intermission-still", async (c) => {
-  const filePath = intermissionFile();
-  if (!filePath || c.req.query("file") !== filePath) return c.notFound();
+  const filePath = c.req.query("file") ?? "";
+  if (!(await intermissionStillAllowed(filePath))) return c.notFound();
   const file = await frameOf(filePath);
   if (!file) return c.notFound();
   const bytes = await readFile(file);
@@ -197,6 +197,20 @@ app.get("/api/browse", async (c) => {
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
   }
+});
+
+// Recently played random files, newest first in each folder.
+app.get("/api/recent", async (c) => {
+  return c.json(await recentPlays());
+});
+
+// Take one file off that list so a random slot can pick it again.
+app.post("/api/recent/remove", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const folder = typeof body?.folder === "string" ? body.folder : "";
+  const filePath = typeof body?.path === "string" ? body.path : "";
+  if (!folder || !filePath) return c.json({ error: "folder and path are required" }, 400);
+  return c.json(await forgetRandomPlayed(folder, filePath));
 });
 
 // Start mpv and begin playback.

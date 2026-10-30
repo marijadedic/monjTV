@@ -128,11 +128,11 @@ PORT=3001 npm start
 
 ### Launcher script
 
-`scripts/start.sh` is the same production run, in the background:
+`scripts/start.sh` is the same production run, in the background. The desktop icon uses this script, so each click builds and runs the current source:
 
-1. If `http://127.0.0.1:3000/api/health` is already up, it leaves that server alone.
-2. Otherwise it runs `npm run start:server` when `dist/client/index.html` exists, and `npm start` when that file is missing. The server is detached, so the launcher can exit. Logs go to `logs/monjtv.log`.
-3. It opens the UI in the default browser (`open` on macOS, `xdg-open` on Linux) and leaves that window in front. Closing that tab leaves the server running. Click the icon again and the remote opens. mpv starts from **Start TV** on Today.
+1. It runs `npm run build` and writes the log to `logs/monjtv.log`. A desktop notification says the build is in progress.
+2. If something is already listening on port 3000, it stops that process and mpv, then starts `npm run start:server`. The server is detached, so the launcher can exit.
+3. It opens the UI in the default browser (`open` on macOS, `xdg-open` on Linux) and leaves that window in front. Closing that tab leaves the server running. Click the icon again and it rebuilds, restarts, and opens the remote. mpv starts from **Start TV** on Today.
 
 ```bash
 chmod +x scripts/start.sh
@@ -264,7 +264,7 @@ Days are `mon` `tue` `wed` `thu` `fri` `sat` `sun`. Times are `HH:mm`. An interm
 | `npm start`                        | Build the UI, then serve it and the API on port 3000.                        |
 | `npm run start:server`             | Start the API on port 3000 when `dist/client` already exists.                |
 | `npm run typecheck`                | `tsc --noEmit`.                                                              |
-| `./scripts/start.sh`               | Start the server in the background and open the UI.                          |
+| `./scripts/start.sh`               | Build the UI, restart the server, and open the UI. The desktop icon does this. |
 | `node scripts/install-desktop.mjs` | Install a desktop icon for this operating system.                            |
 
 

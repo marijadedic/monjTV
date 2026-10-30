@@ -4,6 +4,7 @@ import { GroveFrame } from "./Grove.tsx";
 import { pageHref } from "./href.ts";
 import { Today } from "./pages/Today.tsx";
 import { Admin } from "./pages/Admin.tsx";
+import { RecentWindow } from "./Recent.tsx";
 import { useI18n, type Lang } from "./i18n.tsx";
 
 type Theme = "dark" | "dusk" | "light" | "teletext";
@@ -43,6 +44,7 @@ export function App() {
   const [theme, setTheme] = useState<Theme>(readTheme);
   const [now, setNow] = useState(() => new Date());
   const [off, setOff] = useState(false);
+  const [recentOpen, setRecentOpen] = useState(false);
   const prefsRef = useRef<HTMLDetailsElement>(null);
   const themeLabel: Record<Theme, string> = {
     dark: t.dark,
@@ -93,7 +95,7 @@ export function App() {
   return (
     <>
       {theme === "dusk" && <GroveFrame />}
-      <div class={admin ? "shell wide" : "shell today-head"}>
+      <div class={admin ? "shell wide" : "shell today-chrome"}>
         <header class="top">
           <a class="brand" href={pageHref("/")}>
             monjTV
@@ -142,35 +144,33 @@ export function App() {
                   </button>
                 ))}
               </div>
+              <button
+                type="button"
+                class="prefs-recent"
+                onClick={() => {
+                  if (prefsRef.current) prefsRef.current.open = false;
+                  setRecentOpen(true);
+                }}
+              >
+                {t.recentPlayed}
+              </button>
               <button type="button" class="prefs-quit" disabled={off} onClick={() => void shutDown()}>
                 {t.shutDown}
               </button>
             </div>
           </details>
         </header>
-        {admin && (
-          <nav class="folders" aria-label={t.sections}>
-            <a href={pageHref("/")}>{t.today}</a>
-            <a href={pageHref("/admin")} class="on" aria-current="page">
-              {t.admin}
-            </a>
-          </nav>
-        )}
-        {admin && <main>{off ? <p class="empty">{t.off}</p> : <Admin />}</main>}
+        <nav class="folders" aria-label={t.sections}>
+          <a href={pageHref("/")} class={admin ? "" : "on"} aria-current={admin ? undefined : "page"}>
+            {t.today}
+          </a>
+          <a href={pageHref("/admin")} class={admin ? "on" : ""} aria-current={admin ? "page" : undefined}>
+            {t.admin}
+          </a>
+        </nav>
+        <main>{off ? <p class="empty">{t.off}</p> : admin ? <Admin /> : <Today />}</main>
       </div>
-      {!admin && (
-        <>
-          <nav class="folders today-tabs" aria-label={t.sections}>
-            <a href={pageHref("/")} class="on" aria-current="page">
-              {t.today}
-            </a>
-            <a href={pageHref("/admin")}>{t.admin}</a>
-          </nav>
-          <div class="shell today-body">
-            <main>{off ? <p class="empty">{t.off}</p> : <Today />}</main>
-          </div>
-        </>
-      )}
+      {recentOpen && <RecentWindow onClose={() => setRecentOpen(false)} />}
     </>
   );
 }

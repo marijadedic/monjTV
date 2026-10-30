@@ -65,6 +65,7 @@ mpv.onExit = () => {
 export async function getStatus(): Promise<PlayerStatus> {
   const today = await loadToday();
   const current = today.items.find((i) => i.status === "playing");
+  const filler = playingIntermission(await loadSchedule());
   let willStartItemId: string | null = null;
   if (!current && !fallbackPlay) willStartItemId = onAirItem(today.items, nowSec())?.id ?? null;
   return {
@@ -75,7 +76,18 @@ export async function getStatus(): Promise<PlayerStatus> {
     willStartItemId,
     fallbackTitle: current || !fallbackPlay ? null : fallbackTitleOf(fallbackPlay.path),
     fallbackPath: current || !fallbackPlay || isYoutubeUrl(fallbackPlay.path) ? null : fallbackPlay.path,
+    intermissionTitle: filler ? selectedFillerTitle(filler) : null,
+    intermissionKind: filler?.kind ?? null,
+    intermissionSource: filler?.source ?? null,
   };
+}
+
+// A local gap file the still route may frame: the one on screen, or the selected video while idle.
+export async function intermissionStillAllowed(filePath: string): Promise<boolean> {
+  if (!filePath || isYoutubeUrl(filePath)) return false;
+  if (intermissionFile() === filePath) return true;
+  const filler = playingIntermission(await loadSchedule());
+  return filler?.kind === "video" && filler.source === filePath;
 }
 
 // Local file filling a gap, if one is on screen.
@@ -569,6 +581,11 @@ function clearFallbackRetry(): void {
 function fallbackTitleOf(filePath: string): string {
   if (!isYoutubeUrl(filePath)) return titleFromPath(filePath);
   return cachedYoutubeTitle(filePath) ?? youtubeLabel(filePath);
+}
+
+function selectedFillerTitle(item: IntermissionItem): string {
+  if (item.kind === "youtube") return cachedYoutubeTitle(item.source) ?? youtubeLabel(item.source);
+  return titleFromPath(item.source);
 }
 
 function hasStarted(item: RundownItem, now: number): boolean {
