@@ -2,12 +2,15 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
-const cache = new Map<string, number>();
+const FALLBACK_SEC = 45 * 60;
+const exact = new Map<string, number>();
+const failed = new Set<string>();
 
-// Video length in seconds, cached, with a fallback when probing fails.
-export async function probeDuration(file: string): Promise<number> {
-  const hit = cache.get(file);
+// Measured length in seconds. Null when ffprobe cannot read the file.
+export async function measureDuration(file: string): Promise<number | null> {
+  const hit = exact.get(file);
   if (hit) return hit;
+  if (failed.has(file)) return null;
   try {
     const { stdout } = await execFileAsync(
       "ffprobe",
@@ -25,13 +28,17 @@ export async function probeDuration(file: string): Promise<number> {
     const n = Number.parseFloat(stdout.trim());
     if (Number.isFinite(n) && n > 1) {
       const rounded = Math.round(n);
-      cache.set(file, rounded);
+      exact.set(file, rounded);
       return rounded;
     }
   } catch {
     // ffprobe missing or file unreadable
   }
-  const fallback = 45 * 60;
-  cache.set(file, fallback);
-  return fallback;
+  failed.add(file);
+  return null;
+}
+
+// Video length in seconds, cached, with a fallback when probing fails.
+export async function probeDuration(file: string): Promise<number> {
+  return (await measureDuration(file)) ?? FALLBACK_SEC;
 }

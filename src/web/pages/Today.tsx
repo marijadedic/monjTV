@@ -146,12 +146,13 @@ export function Today() {
   const held = today && !current ? heldItem(today.items, sec) : null;
   const gapTitle = !current && status?.fallbackTitle ? status.fallbackTitle : null;
   const gapPath = gapTitle && status?.fallbackPath && !missed[status.fallbackPath] ? status.fallbackPath : null;
-  const stripStill = current && showsFrame(current.mode) && !missed[current.path] ? current : null;
+  const air = current ?? due;
+  const stripStill = air && showsFrame(air.mode) && !missed[air.path] ? air : null;
 
   function hideStill(filePath: string) {
     setMissed((currentMissed) => ({ ...currentMissed, [filePath]: true }));
   }
-  const fraction = current ? itemProgress(current, sec) : 0;
+  const fraction = air ? itemProgress(air, sec) : 0;
   const modeLabel = (mode: RundownItem["mode"]) => {
     if (mode === "next-episode") return t.nextEpisode;
     if (mode === "specific-file") return t.oneVideo;
@@ -213,12 +214,12 @@ export function Today() {
               />
             )}
             <div>
-              {current ? (
+              {air ? (
                 <>
                   <span class="pill on-air">{t.onAir}</span>
-                  <h2 class="strip-title">{current.title}</h2>
-                  <div class="muted" title={current.path}>
-                    {current.start}–{current.end} · {modeLabel(current.mode)} · {sourceLabel(current)}
+                  <h2 class="strip-title">{air.title}</h2>
+                  <div class="muted" title={air.path}>
+                    {air.start}–{air.end} · {modeLabel(air.mode)} · {sourceLabel(air)}
                   </div>
                   <div
                     class="track"
@@ -247,11 +248,7 @@ export function Today() {
               ) : (
                 <>
                   <h2 class="strip-title">{t.nothingOn}</h2>
-                  {due ? (
-                    <div class="muted">
-                      {due.title} · {due.start}–{due.end}
-                    </div>
-                  ) : next ? (
+                  {next ? (
                     <div class="muted">{t.startsAt(next.title, next.start)}</div>
                   ) : (
                     status?.waitingUntil && <div class="muted">{t.nextAt(status.waitingUntil)}</div>
@@ -273,12 +270,13 @@ export function Today() {
                 {today.items.map((item) => {
                   const passed = itemHasPassed(item, sec);
                   const cardStill = showsFrame(item.mode) && !missed[item.path];
+                  const airing = air?.id === item.id;
                   const coming = Boolean(gapTitle && next?.id === item.id);
                   const wontStart = held?.id === item.id;
                   return (
-                    <div key={item.id} class={`rail-item ${item.status}${passed ? " passed" : ""}`}>
+                    <div key={item.id} class={`rail-item ${item.status}${airing ? " playing" : ""}${passed ? " passed" : ""}`}>
                       <i class="dot" />
-                      <article class={`card ${item.status}${passed ? " passed" : ""}${cardStill ? " has-still" : ""}`}>
+                      <article class={`card ${item.status}${airing ? " playing" : ""}${passed ? " passed" : ""}${cardStill ? " has-still" : ""}`}>
                         {cardStill && (
                           <img
                             key={item.path}
@@ -295,8 +293,8 @@ export function Today() {
                           <div class="title-row">
                             {coming && <span class="next-plain">{t.nextMark}</span>}
                             <div class="title">{item.title}</div>
-                            {item.status === "playing" && <span class="pill on-air">{t.onAir}</span>}
-                            {item.status !== "planned" && item.status !== "playing" && (
+                            {airing && <span class="pill on-air">{t.onAir}</span>}
+                            {item.status !== "planned" && item.status !== "playing" && !airing && (
                               <span class={`pill ${item.status}`}>{pill[item.status]}</span>
                             )}
                           </div>
@@ -306,7 +304,7 @@ export function Today() {
                           </div>
                           {canStepEpisode(item, passed) && episodeButtons(item)}
                         </div>
-                        {item.mode === "random-file" && item.status !== "playing" && !passed && (
+                        {item.mode === "random-file" && !airing && !passed && (
                           <div>
                             <button onClick={() => shuffle(item)} disabled={busy === item.id}>
                               {t.shuffle}

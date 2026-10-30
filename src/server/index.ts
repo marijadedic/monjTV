@@ -50,6 +50,14 @@ app.put("/api/schedule", async (c) => {
       else await assertFolder(block.folder);
     }
     const saved = await saveSchedule(body);
+    const playbackSame =
+      previous.activeIntermission === saved.activeIntermission &&
+      JSON.stringify(previous.blocks) === JSON.stringify(saved.blocks) &&
+      JSON.stringify(previous.intermissions) === JSON.stringify(saved.intermissions);
+    if (playbackSame) {
+      await syncIntermission();
+      return c.json({ schedule: saved, today: await loadToday(), misses: [] });
+    }
     await forgetUnusedFolders(previous.blocks, saved.blocks);
     const today = await rebuildTodayPreservingPlayback();
     const misses = await missesForBlocks(changedBlocks(previous.blocks, saved.blocks));

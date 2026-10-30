@@ -16,13 +16,19 @@ import { assertVideo, isDir } from "./files.ts";
 import { schedulePath } from "./paths.ts";
 import { readJson, writeJson } from "./store.ts";
 
-const empty: Schedule = { blocks: [], intermissions: [], activeIntermission: "" };
+const empty: Schedule = {
+  blocks: [],
+  intermissions: [],
+  activeIntermission: "",
+  intermissionRandomStart: false,
+};
 
 type StoredSchedule = {
   blocks?: ScheduleBlock[];
   fallbackFolder?: unknown;
   intermissions?: unknown;
   activeIntermission?: unknown;
+  intermissionRandomStart?: unknown;
 };
 
 // Read the weekly schedule from disk.
@@ -108,7 +114,12 @@ export function validateSchedule(input: StoredSchedule): Schedule {
     }
   }
   const { intermissions, activeIntermission } = intermissionsFrom(input, true);
-  return { blocks, intermissions, activeIntermission };
+  return {
+    blocks,
+    intermissions,
+    activeIntermission,
+    intermissionRandomStart: input.intermissionRandomStart === true,
+  };
 }
 
 // Blocks plus the intermission list, without rejecting a saved block.
@@ -116,6 +127,7 @@ function scheduleFrom(data: StoredSchedule): Schedule {
   return {
     blocks: Array.isArray(data.blocks) ? data.blocks : [],
     ...intermissionsFrom(data, false),
+    intermissionRandomStart: data.intermissionRandomStart === true,
   };
 }
 

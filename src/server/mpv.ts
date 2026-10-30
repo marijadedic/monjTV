@@ -54,6 +54,17 @@ function decodeArgs(): string[] {
   ];
 }
 
+// Seconds, or a percent such as "40%". Empty when playback should open at the beginning.
+function startArgOf(start: number | string): string {
+  if (typeof start === "number") {
+    if (!Number.isFinite(start) || start <= 0) return "";
+    return String(Math.floor(start));
+  }
+  const trimmed = start.trim();
+  if (!trimmed || trimmed === "0" || trimmed === "0%") return "";
+  return trimmed;
+}
+
 // True when this machine is a Raspberry Pi.
 function isRaspberryPi(): boolean {
   if (process.platform !== "linux") return false;
@@ -119,12 +130,12 @@ export class Mpv {
     this.sock.on("error", () => undefined);
   }
 
-  // Replace the current file. A positive start seeks that many seconds in.
-  async loadFile(filePath: string, startSec = 0): Promise<void> {
-    const start = Math.floor(startSec);
+  // Replace the current file. A start of seconds or a percent seeks into it.
+  async loadFile(filePath: string, start: number | string = 0): Promise<void> {
+    const startArg = startArgOf(start);
     const timeoutMs = isYoutubeUrl(filePath) ? 60_000 : 8_000;
-    if (start > 0) {
-      await this.command(["loadfile", filePath, "replace", -1, { start: String(start) }], timeoutMs);
+    if (startArg) {
+      await this.command(["loadfile", filePath, "replace", -1, { start: startArg }], timeoutMs);
       return;
     }
     await this.command(["loadfile", filePath, "replace"], timeoutMs);

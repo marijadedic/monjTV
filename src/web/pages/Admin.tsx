@@ -574,7 +574,7 @@ function dayClashes(
 }
 
 function emptySchedule(): Schedule {
-  return { blocks: [], intermissions: [], activeIntermission: "" };
+  return { blocks: [], intermissions: [], activeIntermission: "", intermissionRandomStart: false };
 }
 
 export function Admin() {
@@ -627,6 +627,7 @@ export function Admin() {
           blocks: loaded.blocks ?? [],
           intermissions: loaded.intermissions ?? [],
           activeIntermission: loaded.activeIntermission ?? "",
+          intermissionRandomStart: loaded.intermissionRandomStart === true,
         });
       })
       .catch((e: Error) => setError(e.message));
@@ -977,7 +978,8 @@ export function Admin() {
   }
 
   async function changeIntermission(
-    next: Pick<Schedule, "intermissions" | "activeIntermission">,
+    next: Pick<Schedule, "intermissions" | "activeIntermission"> &
+      Partial<Pick<Schedule, "intermissionRandomStart">>,
   ): Promise<boolean> {
     const current = scheduleRef.current;
     setIntermissionSaving(true);
@@ -1013,6 +1015,22 @@ export function Admin() {
     if (!saved) return;
     addDraftRef.current = "";
     setAddDraft("");
+  }
+
+  function setIntermissionRandomStart(on: boolean) {
+    const current = scheduleRef.current;
+    if (current.intermissionRandomStart === on) return;
+    setSchedule({ ...current, intermissionRandomStart: on });
+    void changeIntermission({
+      intermissions: current.intermissions,
+      activeIntermission: current.activeIntermission,
+      intermissionRandomStart: on,
+    }).then((saved) => {
+      if (saved) return;
+      setSchedule((latest) =>
+        latest.intermissionRandomStart === on ? { ...latest, intermissionRandomStart: !on } : latest,
+      );
+    });
   }
 
   function selectIntermission(id: string) {
@@ -1219,6 +1237,18 @@ export function Admin() {
         {!draft && intermissionOpen && (
           <div class="intermission-open" ref={intermissionPanelRef}>
             <span>{t.ifEmpty}</span>
+            <button
+              type="button"
+              class={schedule.intermissionRandomStart ? "intermission-random on" : "intermission-random"}
+              role="switch"
+              aria-checked={schedule.intermissionRandomStart}
+              title={t.intermissionRandomHint}
+              disabled={intermissionSaving}
+              onClick={() => setIntermissionRandomStart(!schedule.intermissionRandomStart)}
+            >
+              <i aria-hidden="true" />
+              <span>{t.intermissionRandom}</span>
+            </button>
             {schedule.intermissions.length === 0 ? (
               <p class="intermission-empty">{t.intermissionEmpty}</p>
             ) : (

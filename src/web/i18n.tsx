@@ -103,6 +103,8 @@ type Copy = {
   intermissionYoutubeInFolder: string;
   intermissionEmpty: string;
   intermissionPick: string;
+  intermissionRandom: string;
+  intermissionRandomHint: string;
   none: string;
   change: string;
   clickFirst: string;
@@ -258,6 +260,8 @@ const en: Copy = {
   intermissionYoutubeInFolder: "That is a YouTube link. Choose YouTube, then add it.",
   intermissionEmpty: "Nothing here yet. Add a folder, a video, or a YouTube link.",
   intermissionPick: "The selected one plays.",
+  intermissionRandom: "Start at a random point",
+  intermissionRandomHint: "Each time an intermission video starts, it opens somewhere in that video.",
   none: "None",
   change: "Change",
   clickFirst: "Click to add the first slot",
@@ -533,6 +537,8 @@ const hr: Copy = {
   intermissionYoutubeInFolder: "To je YouTube poveznica. Odaberite YouTube, pa dodajte.",
   intermissionEmpty: "Još nema ničega. Dodajte mapu, video ili YouTube poveznicu.",
   intermissionPick: "Pušta se odabrano.",
+  intermissionRandom: "Kreni na nasumičnom mjestu",
+  intermissionRandomHint: "Svaki put kad video pauze krene, otvara se negdje u tom videu.",
   none: "nije odabrano",
   change: "Promijeni",
   clickFirst: "Klikni za dodati prvi blok",

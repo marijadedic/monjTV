@@ -43,6 +43,8 @@ export interface Schedule {
   intermissions: IntermissionItem[];
   /** Id of the intermission that plays. Empty when none is selected. */
   activeIntermission: string;
+  /** Each intermission video opens somewhere in its length. */
+  intermissionRandomStart: boolean;
 }
 
 export interface Progress {
