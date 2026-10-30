@@ -149,8 +149,8 @@ a {
 
 .shell.wide {
   max-width: none;
-  height: 100dvh;
-  min-height: 1080px;
+  min-height: max(100dvh, 1080px);
+  height: auto;
   display: flex;
   flex-direction: column;
   padding-left: 32px;
@@ -173,10 +173,8 @@ a {
 .shell.wide main,
 .shell.wide main > section,
 .shell.wide .week-wrap {
-  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  min-height: 0;
 }
 
 .top {
@@ -1082,10 +1080,7 @@ html[data-theme="dusk"] .today button.primary {
 }
 
 .shell.wide .week-scale {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
-  grid-template-rows: minmax(100%, auto);
+  overflow: visible;
 }
 
 .day {
@@ -1093,7 +1088,6 @@ html[data-theme="dusk"] .today button.primary {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  min-height: 0;
 }
 
 .day.editing {
