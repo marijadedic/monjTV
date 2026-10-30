@@ -8,7 +8,11 @@ const STORAGE_KEY = "monjtv-lang";
 
 type Copy = {
   sections: string;
+  tv: string;
   today: string;
+  yesterday: string;
+  tomorrow: string;
+  days: string;
   admin: string;
   theme: string;
   dark: string;
@@ -19,6 +23,7 @@ type Copy = {
   english: string;
   croatian: string;
   noSlots: string;
+  noSlotsDay: string;
   addInAdmin: string;
   onAir: string;
   waiting: string;
@@ -147,7 +152,11 @@ type Copy = {
 
 const en: Copy = {
   sections: "Sections",
+  tv: "TV schedule",
   today: "Today",
+  yesterday: "Yesterday",
+  tomorrow: "Tomorrow",
+  days: "Days",
   admin: "Admin",
   theme: "Theme",
   dark: "Dark",
@@ -158,6 +167,7 @@ const en: Copy = {
   english: "English",
   croatian: "Croatian",
   noSlots: "No slots queued for today.",
+  noSlotsDay: "No slots queued.",
   addInAdmin: "Add some in Admin",
   onAir: "On air",
   waiting: "Waiting",
@@ -285,7 +295,7 @@ const en: Copy = {
     sat: "Saturday",
     sun: "Sunday",
   },
-  saved: "Saved. Today’s rundown rebuilt.",
+  saved: "Saved. The TV schedule was rebuilt.",
   start: "Start",
   end: "End",
   mode: "Mode",
@@ -429,7 +439,11 @@ function hrError(message: string): string {
 
 const hr: Copy = {
   sections: "Odjeljci",
+  tv: "TV raspored",
   today: "Danas",
+  yesterday: "Jučer",
+  tomorrow: "Sutra",
+  days: "Dani",
   admin: "Admin",
   theme: "Tema",
   dark: "Tamno",
@@ -440,6 +454,7 @@ const hr: Copy = {
   english: "English",
   croatian: "Hrvatski",
   noSlots: "Nema blokova za danas.",
+  noSlotsDay: "Nema blokova.",
   addInAdmin: "Dodaj ih u Adminu",
   onAir: "trenutno se prikazuje",
   waiting: "Čeka",
@@ -567,7 +582,7 @@ const hr: Copy = {
     sat: "Subota",
     sun: "Nedjelja",
   },
-  saved: "Spremljeno. Današnji raspored je obnovljen.",
+  saved: "Spremljeno. TV raspored je ponovno složen.",
   start: "Početak",
   end: "Kraj",
   mode: "Način",

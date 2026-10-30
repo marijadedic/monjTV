@@ -7,6 +7,7 @@ import type {
   SlotLength,
   SlotMiss,
   TodayRundown,
+  TvBoard,
 } from "../shared/types.ts";
 
 async function req<T>(url: string, init?: RequestInit): Promise<T> {
@@ -29,17 +30,17 @@ async function req<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  today: () => req<TodayRundown>("/api/today"),
+  tv: () => req<TvBoard>("/api/tv"),
   schedule: () => req<Schedule>("/api/schedule"),
   saveSchedule: (schedule: Schedule) =>
     req<{ schedule: Schedule; today: TodayRundown; misses: SlotMiss[] }>("/api/schedule", {
       method: "PUT",
       body: JSON.stringify(schedule),
     }),
-  shuffle: (id: string) =>
-    req<TodayRundown>(`/api/today/items/${id}/shuffle`, { method: "POST" }),
-  stepEpisode: (id: string, direction: "prev" | "next") =>
-    req<TodayRundown>(`/api/today/items/${id}/episode`, {
+  shuffle: (date: string, id: string) =>
+    req<TvBoard>(`/api/tv/${date}/items/${id}/shuffle`, { method: "POST" }),
+  stepEpisode: (date: string, id: string, direction: "prev" | "next") =>
+    req<TvBoard>(`/api/tv/${date}/items/${id}/episode`, {
       method: "POST",
       body: JSON.stringify({ direction }),
     }),

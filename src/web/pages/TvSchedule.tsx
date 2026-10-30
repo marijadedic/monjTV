@@ -1,5 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
-import type { ItemStatus, PlayerStatus, RundownItem, TodayRundown } from "../../shared/types.ts";
+import { dateOffset, weekdayOfKey } from "../../shared/dates.ts";
+import type { ItemStatus, PlayerStatus, RundownItem, TvBoard } from "../../shared/types.ts";
 import { itemCoversNow, itemHasPassed, itemProgress, itemStartsLater, secondsOf } from "../../shared/window.ts";
 import { canonicalYoutubeIntermission, youtubeId } from "../../shared/youtube.ts";
 import { api } from "../api.ts";
@@ -11,7 +12,7 @@ function showsFrame(mode: RundownItem["mode"]): boolean {
 }
 
 function stillSrc(item: RundownItem): string {
-  return `/api/today/items/${encodeURIComponent(item.id)}/still?file=${encodeURIComponent(item.path)}`;
+  return `/api/tv/items/${encodeURIComponent(item.id)}/still?file=${encodeURIComponent(item.path)}`;
 }
 
 function gapStillSrc(filePath: string): string {
@@ -68,7 +69,7 @@ function heldItem(items: RundownItem[], sec: number): RundownItem | null {
   return null;
 }
 
-export function Today() {
+export function TvSchedule() {
   const { t } = useI18n();
   const pill: Record<ItemStatus, string> = {
     planned: t.planned,
@@ -76,7 +77,8 @@ export function Today() {
     done: t.done,
     skipped: t.skipped,
   };
-  const [today, setToday] = useState<TodayRundown | null>(null);
+  const [board, setBoard] = useState<TvBoard | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
   const [status, setStatus] = useState<PlayerStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -85,8 +87,8 @@ export function Today() {
   const [watchTitle, setWatchTitle] = useState<string | null>(null);
 
   async function refresh() {
-    const [nextToday, nextStatus] = await Promise.all([api.today(), api.status()]);
-    setToday(nextToday);
+    const [nextBoard, nextStatus] = await Promise.all([api.tv(), api.status()]);
+    setBoard(nextBoard);
     setStatus(nextStatus);
   }
 
@@ -122,12 +124,21 @@ export function Today() {
     };
   }, [status?.intermissionKind, status?.intermissionSource]);
 
+  const day = board
+    ? (board.days.find((entry) => entry.date === selected) ??
+      board.days.find((entry) => entry.date === board.today) ??
+      board.days[0] ??
+      null)
+    : null;
+  const live = Boolean(day && board && day.date === board.today);
+  const past = Boolean(day && board && day.date < board.today);
+
   async function start() {
     setBusy("start");
     setError(null);
     try {
       setStatus(await api.startPlayer());
-      setToday(await api.today());
+      setBoard(await api.tv());
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -136,10 +147,11 @@ export function Today() {
   }
 
   async function shuffle(item: RundownItem) {
+    if (!day) return;
     setBusy(item.id);
     setError(null);
     try {
-      setToday(await api.shuffle(item.id));
+      setBoard(await api.shuffle(day.date, item.id));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -148,10 +160,11 @@ export function Today() {
   }
 
   async function step(item: RundownItem, direction: "prev" | "next") {
+    if (!day) return;
     setBusy(`${item.id}:${direction}`);
     setError(null);
     try {
-      setToday(await api.stepEpisode(item.id, direction));
+      setBoard(await api.stepEpisode(day.date, item.id, direction));
       setStatus(await api.status());
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -160,14 +173,15 @@ export function Today() {
     }
   }
 
-  const current = today?.items.find((item) => item.id === status?.currentItemId) ?? null;
+  const items = day?.items ?? [];
+  const current = live ? (items.find((item) => item.id === status?.currentItemId) ?? null) : null;
   const sec = nowSec(now);
-  const next = today ? nextPlanned(today.items, sec) : null;
-  const due = !current && !status?.fallbackTitle && today ? onNowPlanned(today.items, sec) : null;
-  const held = today && !current ? heldItem(today.items, sec) : null;
-  const liveFiller = !current && status?.fallbackTitle ? status.fallbackTitle : null;
+  const next = live ? nextPlanned(items, sec) : null;
+  const due = live && !current && !status?.fallbackTitle ? onNowPlanned(items, sec) : null;
+  const held = live && !current ? heldItem(items, sec) : null;
+  const liveFiller = live && !current && status?.fallbackTitle ? status.fallbackTitle : null;
   const namedLive = liveFiller && !liveFiller.startsWith("YouTube · ") ? liveFiller : null;
-  const fillerName = watchTitle || status?.intermissionTitle || null;
+  const fillerName = live ? watchTitle || status?.intermissionTitle || null : null;
   const gapTitle = namedLive || (!current && !due ? fillerName : null) || liveFiller;
   const gapFile =
     gapTitle && status?.fallbackPath
@@ -200,7 +214,21 @@ export function Today() {
     return folderName(item.path);
   }
 
-  const showColumn = Boolean(today && (today.items.length > 0 || gapTitle));
+  function capitalise(label: string): string {
+    const first = label.charAt(0).toLocaleUpperCase();
+    return first + label.slice(1);
+  }
+
+  function tabLabel(date: string): string {
+    if (!board) return date;
+    const offset = dateOffset(board.today, date);
+    if (offset === -1) return t.yesterday;
+    if (offset === 0) return t.today;
+    if (offset === 1) return t.tomorrow;
+    return capitalise(t.day[weekdayOfKey(date)]);
+  }
+
+  const showColumn = Boolean(day && (items.length > 0 || gapTitle));
   const episodeItem = current?.mode === "next-episode" ? current : due?.mode === "next-episode" ? due : null;
 
   function episodeButtons(item: RundownItem) {
@@ -217,18 +245,96 @@ export function Today() {
     );
   }
 
+  const rail =
+    day && items.length > 0 ? (
+      <div class="rail">
+        {items.map((item) => {
+          const passed = past || (live && itemHasPassed(item, sec));
+          const shown: ItemStatus = past ? (item.mode === "next-episode" ? "skipped" : "done") : item.status;
+          const canEdit = !past && (live || !item.overnight);
+          const cardStill = showsFrame(item.mode) && !missed[item.path];
+          const airing = Boolean(live && air?.id === item.id);
+          const coming = Boolean(live && gapTitle && next?.id === item.id);
+          const wontStart = Boolean(live && held?.id === item.id);
+          return (
+            <div key={item.id} class={`rail-item ${shown}${airing ? " playing" : ""}${passed ? " passed" : ""}`}>
+              <i class="dot" />
+              <article class={`card ${shown}${airing ? " playing" : ""}${passed ? " passed" : ""}${cardStill ? " has-still" : ""}`}>
+                {cardStill && (
+                  <img
+                    key={item.path}
+                    class="still"
+                    src={stillSrc(item)}
+                    alt=""
+                    onError={() => hideStill(item.path)}
+                  />
+                )}
+                <div class="time">
+                  {item.start}–{item.end}
+                </div>
+                <div>
+                  <div class="title-row">
+                    {coming && <span class="next-plain">{t.nextMark}</span>}
+                    <div class="title">{item.title}</div>
+                    {airing && <span class="pill on-air">{t.onAir}</span>}
+                    {shown !== "planned" && shown !== "playing" && !airing && (
+                      <span class={`pill ${shown}`}>{pill[shown]}</span>
+                    )}
+                  </div>
+                  <div class="muted" title={item.path}>
+                    {modeLabel(item.mode)} · {sourceLabel(item)}
+                    {wontStart ? ` · ${t.willNotStart}` : ""}
+                  </div>
+                  {canEdit && canStepEpisode(item, passed) && episodeButtons(item)}
+                </div>
+                {canEdit && item.mode === "random-file" && !airing && !passed && (
+                  <div>
+                    <button onClick={() => shuffle(item)} disabled={busy === item.id}>
+                      {t.shuffle}
+                    </button>
+                  </div>
+                )}
+              </article>
+            </div>
+          );
+        })}
+      </div>
+    ) : null;
+
   return (
-    <section class="today">
+    <section class={`tv${past ? " is-past" : ""}`}>
       {status?.error && <p class="error">{t.error(status.error)}</p>}
       {error && <p class="error">{t.error(error)}</p>}
-      {today && today.items.length === 0 && !gapTitle && (
-        <div class="empty">
-          <p>{t.noSlots}</p>
+      {board && (
+        <div class="day-tabs" role="tablist" aria-label={t.days}>
+          {board.days.map((entry) => {
+            const on = entry.date === day?.date;
+            const offset = dateOffset(board.today, entry.date);
+            return (
+              <button
+                key={entry.date}
+                type="button"
+                role="tab"
+                id={`day-${entry.date}`}
+                aria-selected={on}
+                aria-controls="tv-day"
+                class={`${on ? "on" : ""}${offset < 0 ? " past" : ""}`}
+                onClick={() => setSelected(entry.date)}
+              >
+                {tabLabel(entry.date)}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {day && items.length === 0 && !gapTitle && (
+        <div class="empty" id="tv-day" role="tabpanel">
+          <p>{live ? t.noSlots : t.noSlotsDay}</p>
           <a href={pageHref("/admin")}>{t.addInAdmin}</a>
         </div>
       )}
-      {showColumn && today && (
-        <>
+      {live && showColumn && day && (
+        <div id="tv-day" role="tabpanel" aria-labelledby={`day-${day.date}`}>
           <div class={`now-strip${stripStill || gapPath || watchStill ? " has-still" : ""}`}>
             {stripStill && (
               <img
@@ -307,62 +413,18 @@ export function Today() {
               </button>
             </div>
           </div>
-          {today.items.length > 0 && (
+          {rail && (
             <>
-              <hr class="today-break" />
-              <div class="rail">
-                {today.items.map((item) => {
-                  const passed = itemHasPassed(item, sec);
-                  const cardStill = showsFrame(item.mode) && !missed[item.path];
-                  const airing = air?.id === item.id;
-                  const coming = Boolean(gapTitle && next?.id === item.id);
-                  const wontStart = held?.id === item.id;
-                  return (
-                    <div key={item.id} class={`rail-item ${item.status}${airing ? " playing" : ""}${passed ? " passed" : ""}`}>
-                      <i class="dot" />
-                      <article class={`card ${item.status}${airing ? " playing" : ""}${passed ? " passed" : ""}${cardStill ? " has-still" : ""}`}>
-                        {cardStill && (
-                          <img
-                            key={item.path}
-                            class="still"
-                            src={stillSrc(item)}
-                            alt=""
-                            onError={() => hideStill(item.path)}
-                          />
-                        )}
-                        <div class="time">
-                          {item.start}–{item.end}
-                        </div>
-                        <div>
-                          <div class="title-row">
-                            {coming && <span class="next-plain">{t.nextMark}</span>}
-                            <div class="title">{item.title}</div>
-                            {airing && <span class="pill on-air">{t.onAir}</span>}
-                            {item.status !== "planned" && item.status !== "playing" && !airing && (
-                              <span class={`pill ${item.status}`}>{pill[item.status]}</span>
-                            )}
-                          </div>
-                          <div class="muted" title={item.path}>
-                            {modeLabel(item.mode)} · {sourceLabel(item)}
-                            {wontStart ? ` · ${t.willNotStart}` : ""}
-                          </div>
-                          {canStepEpisode(item, passed) && episodeButtons(item)}
-                        </div>
-                        {item.mode === "random-file" && !airing && !passed && (
-                          <div>
-                            <button onClick={() => shuffle(item)} disabled={busy === item.id}>
-                              {t.shuffle}
-                            </button>
-                          </div>
-                        )}
-                      </article>
-                    </div>
-                  );
-                })}
-              </div>
+              <hr class="tv-break" />
+              {rail}
             </>
           )}
-        </>
+        </div>
+      )}
+      {!live && rail && (
+        <div id="tv-day" role="tabpanel" aria-labelledby={day ? `day-${day.date}` : undefined}>
+          {rail}
+        </div>
       )}
     </section>
   );

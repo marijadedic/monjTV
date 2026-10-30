@@ -157,13 +157,13 @@ a {
   padding-right: 32px;
 }
 
-.shell.today-chrome {
+.shell.tv-chrome {
   max-width: none;
   padding-left: 32px;
   padding-right: 32px;
 }
 
-.shell.today-chrome main {
+.shell.tv-chrome main {
   width: 100%;
   max-width: 1280px;
   margin-right: auto;
@@ -576,7 +576,7 @@ html[data-theme="dusk"] .pill.playing {
   padding: 4px 10px;
 }
 
-.today-break {
+.tv-break {
   border: 0;
   border-top: 1px solid var(--line);
   margin: 40px 0 32px;
@@ -988,6 +988,36 @@ html[data-theme="light"] .app-scrim {
   border-color: var(--line);
 }
 
+.day-tabs {
+  display: flex;
+  gap: 2px;
+  margin: 0 0 1.25rem;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+
+.day-tabs button {
+  flex: 0 0 auto;
+  margin-bottom: -1px;
+  padding: 6px 12px 8px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+  background: transparent;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.day-tabs button.on {
+  background: var(--panel);
+  color: var(--text);
+  border-color: var(--line);
+}
+
+.day-tabs button.past:not(.on) {
+  opacity: 0.55;
+}
+
 .rail {
   display: flex;
   flex-direction: column;
@@ -1047,19 +1077,19 @@ html[data-theme="dusk"] .now-strip .track > i {
   background: #8ea384;
 }
 
-.today button {
+.tv button {
   appearance: none;
   box-shadow: none;
 }
 
-html[data-theme="dusk"] .today .time,
-html[data-theme="dusk"] .today .pill,
-html[data-theme="dusk"] .today button,
-html[data-theme="dusk"] .today .muted {
+html[data-theme="dusk"] .tv .time,
+html[data-theme="dusk"] .tv .pill,
+html[data-theme="dusk"] .tv button,
+html[data-theme="dusk"] .tv .muted {
   font-family: Palatino, "Palatino Linotype", "Iowan Old Style", Georgia, serif;
 }
 
-html[data-theme="dusk"] .today button.primary {
+html[data-theme="dusk"] .tv button.primary {
   background: #5a6e4a;
   border-color: #5a6e4a;
   color: #fff;
@@ -2205,6 +2235,7 @@ html[data-theme="teletext"] .add-form,
 html[data-theme="teletext"] .prefs summary,
 html[data-theme="teletext"] .prefs-body,
 html[data-theme="teletext"] .folders a,
+html[data-theme="teletext"] .day-tabs button,
 html[data-theme="teletext"] .seg,
 html[data-theme="teletext"] .themes,
 html[data-theme="teletext"] .themes button,
@@ -2252,7 +2283,8 @@ html[data-theme="teletext"] a {
   color: #00ffff;
 }
 
-html[data-theme="teletext"] .folders a.on {
+html[data-theme="teletext"] .folders a.on,
+html[data-theme="teletext"] .day-tabs button.on {
   color: #ffff00;
   background: #0000ff;
   border-color: #0000ff;

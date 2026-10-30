@@ -85,9 +85,18 @@ export interface RundownItem {
   overnight?: boolean;
 }
 
-export interface TodayRundown {
+export interface DayRundown {
   date: string;
   items: RundownItem[];
+}
+
+/** One saved day. The player still treats the live day as today's rundown. */
+export type TodayRundown = DayRundown;
+
+/** Yesterday through six days ahead. `today` is the date the live day uses. */
+export interface TvBoard {
+  today: string;
+  days: DayRundown[];
 }
 
 export interface SlotMiss {

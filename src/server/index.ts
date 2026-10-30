@@ -11,7 +11,8 @@ import { clientDir } from "./paths.ts";
 import { getStatus, intermissionStillAllowed, replayItem, shutdownPlayer, startPlayer, syncIntermission } from "./player.ts";
 import { forgetRandomPlayed, forgetUnusedFolders, loadProgress, recentPlays } from "./progress.ts";
 import {
-  ensureToday,
+  ensureBoard,
+  findRundownItem,
   loadToday,
   missesForBlocks,
   rebuildTodayPreservingPlayback,
@@ -106,15 +107,14 @@ app.get("/api/slot-length", async (c) => {
   }
 });
 
-// Return today's rundown, building it if the date changed.
-app.get("/api/today", async (c) => {
-  return c.json(await ensureToday());
+// The eight saved days, building any day that is not on disk yet.
+app.get("/api/tv", async (c) => {
+  return c.json(await ensureBoard());
 });
 
 // Serve one cached frame for a local-file rundown item.
-app.get("/api/today/items/:id/still", async (c) => {
-  const today = await ensureToday();
-  const item = today.items.find((entry) => entry.id === c.req.param("id"));
+app.get("/api/tv/items/:id/still", async (c) => {
+  const item = await findRundownItem(c.req.param("id"));
   if (!item || item.mode === "youtube") return c.notFound();
   const file = await frameOf(item.path);
   if (!file) return c.notFound();
@@ -139,24 +139,25 @@ app.get("/api/player/intermission-still", async (c) => {
 });
 
 // Swap one random rundown item for another file.
-app.post("/api/today/items/:id/shuffle", async (c) => {
+app.post("/api/tv/:date/items/:id/shuffle", async (c) => {
   try {
-    return c.json(await shuffleItem(c.req.param("id")));
+    return c.json(await shuffleItem(c.req.param("date"), c.req.param("id")));
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
   }
 });
 
 // Move a next-episode item to the previous or next file in its folder.
-app.post("/api/today/items/:id/episode", async (c) => {
+app.post("/api/tv/:date/items/:id/episode", async (c) => {
   const body = await c.req.json().catch(() => null);
   const direction = body?.direction === "prev" ? -1 : body?.direction === "next" ? 1 : 0;
   if (!direction) return c.json({ error: "direction must be prev or next" }, 400);
   try {
+    const date = c.req.param("date");
     const itemId = c.req.param("id");
-    const today = await stepEpisode(itemId, direction);
+    const board = await stepEpisode(date, itemId, direction);
     await replayItem(itemId);
-    return c.json(today);
+    return c.json(board);
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
   }
@@ -247,7 +248,7 @@ if (existsSync(clientIndex)) {
   app.use("*", async (c, next) => {
     await next();
     if (c.req.path.startsWith("/api") || c.req.path.startsWith("/assets/")) return;
-    // Today is always "/", so a cached copy of that document hides a new build.
+    // The TV schedule is always "/", so a cached copy of that document hides a new build.
     // Admin is a different address and was loading the new files.
     c.res.headers.set("Cache-Control", "no-store");
   });
@@ -268,8 +269,7 @@ if (existsSync(clientIndex)) {
 async function main(): Promise<void> {
   await loadSchedule();
   await loadProgress();
-  const today = await loadToday();
-  if (!today.date) await ensureToday();
+  await loadToday();
 
   httpServer = serve({ fetch: app.fetch, port: PORT, hostname: "0.0.0.0" }, (info) => {
     console.log(`monjTV on http://0.0.0.0:${info.port}`);

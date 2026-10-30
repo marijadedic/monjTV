@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { api } from "./api.ts";
 import { GroveFrame } from "./Grove.tsx";
 import { pageHref } from "./href.ts";
-import { Today } from "./pages/Today.tsx";
+import { TvSchedule } from "./pages/TvSchedule.tsx";
 import { Admin } from "./pages/Admin.tsx";
 import { RecentWindow } from "./Recent.tsx";
 import { useI18n, type Lang } from "./i18n.tsx";
@@ -95,7 +95,7 @@ export function App() {
   return (
     <>
       {theme === "dusk" && <GroveFrame />}
-      <div class={admin ? "shell wide" : "shell today-chrome"}>
+      <div class={admin ? "shell wide" : "shell tv-chrome"}>
         <header class="top">
           <a class="brand" href={pageHref("/")}>
             monjTV
@@ -162,13 +162,13 @@ export function App() {
         </header>
         <nav class="folders" aria-label={t.sections}>
           <a href={pageHref("/")} class={admin ? "" : "on"} aria-current={admin ? undefined : "page"}>
-            {t.today}
+            {t.tv}
           </a>
           <a href={pageHref("/admin")} class={admin ? "on" : ""} aria-current={admin ? "page" : undefined}>
             {t.admin}
           </a>
         </nav>
-        <main>{off ? <p class="empty">{t.off}</p> : admin ? <Admin /> : <Today />}</main>
+        <main>{off ? <p class="empty">{t.off}</p> : admin ? <Admin /> : <TvSchedule />}</main>
       </div>
       {recentOpen && <RecentWindow onClose={() => setRecentOpen(false)} />}
     </>
