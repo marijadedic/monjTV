@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { Hono } from "hono";
-import { isBlockMode } from "../shared/types.ts";
+import { isItemMode, type PlaylistEntry, type ScheduleBlock } from "../shared/types.ts";
 import { PORT } from "../shared/constants.ts";
 import { assertVideo, browse, isDir, isVideoFile, pickFile, pickFolder, suggestPaths } from "./files.ts";
 import { clientDir } from "./paths.ts";
@@ -46,9 +46,7 @@ app.put("/api/schedule", async (c) => {
     const previous = await loadSchedule();
     for (const block of body.blocks ?? []) {
       if (!sourceChanged(previous.blocks, block)) continue;
-      if (block.mode === "specific-file") await assertVideo(block.file ?? "");
-      else if (block.mode === "youtube") await assertYoutubeVideo(block.file ?? "");
-      else await assertFolder(block.folder);
+      await assertBlockSource(block);
     }
     const saved = await saveSchedule(body);
     const playbackSame =
@@ -89,7 +87,7 @@ app.get("/api/video-count", async (c) => {
 
 app.get("/api/slot-length", async (c) => {
   const mode = c.req.query("mode");
-  if (!isBlockMode(mode)) {
+  if (!isItemMode(mode)) {
     return c.json(
       { error: "mode must be next-episode, random-file, specific-file, or youtube" },
       400,
@@ -263,6 +261,23 @@ if (existsSync(clientIndex)) {
     if (c.req.path.startsWith("/api")) return c.notFound();
     return c.html(await readFile(clientIndex, "utf8"));
   });
+}
+
+// A new or edited slot still points at a real folder, video, or YouTube URL.
+async function assertBlockSource(block: ScheduleBlock): Promise<void> {
+  if (block.mode === "playlist") {
+    for (const item of block.items ?? []) await assertEntrySource(item);
+    return;
+  }
+  if (block.mode === "specific-file") await assertVideo(block.file ?? "");
+  else if (block.mode === "youtube") await assertYoutubeVideo(block.file ?? "");
+  else await assertFolder(block.folder);
+}
+
+async function assertEntrySource(item: PlaylistEntry): Promise<void> {
+  if (item.mode === "specific-file") await assertVideo(item.file ?? "");
+  else if (item.mode === "youtube") await assertYoutubeVideo(item.file ?? "");
+  else await assertFolder(item.folder);
 }
 
 // Create the local data files, then start the server.

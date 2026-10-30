@@ -1313,6 +1313,18 @@ html[data-theme="dusk"] .week-scale button.gap:hover {
   color: #2c1010;
 }
 
+.week-scale button.slot.stack,
+.week-scale .ghost.stack {
+  background: #8ecfc4;
+  color: #10302c;
+}
+
+html[data-theme="dusk"] .week-scale button.slot.stack,
+html[data-theme="dusk"] .week-scale .ghost.stack {
+  background: #7eb8a8;
+  color: #142824;
+}
+
 .week-scale .ghost {
   position: relative;
   flex: 0 0 auto;
@@ -1368,6 +1380,61 @@ html[data-theme="light"] .week-wrap .scrim {
   border: 1px solid var(--line);
   border-radius: 14px;
   box-shadow: 0 6px 16px rgba(60, 70, 40, 0.1);
+}
+
+.add-form.playlist-form {
+  width: min(34rem, calc(100% - 48px));
+}
+
+.playlist {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.playlist-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--browse);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.playlist-item b {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.playlist-item span {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.playlist-tools {
+  display: flex;
+  gap: 4px;
+}
+
+.playlist-tools button {
+  padding: 4px 8px;
+  background: var(--panel);
+}
+
+.playlist-add {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.playlist-kind {
+  flex-wrap: wrap;
+  border-radius: 12px;
 }
 
 .add-form header {
@@ -1848,6 +1915,11 @@ html[data-theme="dark"] .add-form .mode.on.tube {
   background: color-mix(in srgb, #a33a3a 28%, var(--panel));
 }
 
+html[data-theme="dark"] .add-form .mode.on.stack {
+  border-color: #3a8a7a;
+  background: color-mix(in srgb, #3a8a7a 28%, var(--panel));
+}
+
 html[data-theme="light"] .add-form .mode.on.movie {
   border-color: #2f62a0;
   background: color-mix(in srgb, #2f62a0 28%, var(--panel));
@@ -1868,6 +1940,11 @@ html[data-theme="light"] .add-form .mode.on.tube {
   background: color-mix(in srgb, #b44a4a 28%, var(--panel));
 }
 
+html[data-theme="light"] .add-form .mode.on.stack {
+  border-color: #2f7a6c;
+  background: color-mix(in srgb, #2f7a6c 28%, var(--panel));
+}
+
 html[data-theme="dusk"] .add-form .mode.on.movie {
   border-color: #8ea384;
   background: color-mix(in srgb, #8ea384 28%, var(--panel));
@@ -1881,6 +1958,11 @@ html[data-theme="dusk"] .add-form .mode.on.shows {
 html[data-theme="dusk"] .add-form .mode.on.film {
   border-color: #c45c28;
   background: color-mix(in srgb, #c45c28 28%, var(--panel));
+}
+
+html[data-theme="dusk"] .add-form .mode.on.stack {
+  border-color: #4a8a78;
+  background: color-mix(in srgb, #4a8a78 28%, var(--panel));
 }
 
 html[data-theme="dusk"] .add-form .mode.on.tube {
@@ -2258,6 +2340,7 @@ html[data-theme="teletext"] .browse,
 html[data-theme="teletext"] .path-suggest,
 html[data-theme="teletext"] .block-form,
 html[data-theme="teletext"] .add-form .mode,
+html[data-theme="teletext"] .playlist-item,
 html[data-theme="teletext"] .week-scale .ghost {
   border-radius: 0;
 }
@@ -2372,6 +2455,12 @@ html[data-theme="teletext"] .week-scale .ghost.tube {
   color: #000;
 }
 
+html[data-theme="teletext"] .week-scale button.slot.stack,
+html[data-theme="teletext"] .week-scale .ghost.stack {
+  background: #00ff00;
+  color: #000;
+}
+
 html[data-theme="teletext"] .week-scale button.slot.pick,
 html[data-theme="teletext"] .week-scale button.gap.pick {
   box-shadow: inset 0 0 0 2px #fff;
@@ -2425,6 +2514,12 @@ html[data-theme="teletext"] .add-form .mode.on.film {
 html[data-theme="teletext"] .add-form .mode.on.tube {
   border-color: #00ffff;
   background: #00ffff;
+  color: #000;
+}
+
+html[data-theme="teletext"] .add-form .mode.on.stack {
+  border-color: #00ff00;
+  background: #00ff00;
   color: #000;
 }
 

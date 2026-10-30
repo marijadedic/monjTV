@@ -1,5 +1,5 @@
 import type {
-  BlockMode,
+  ItemMode,
   BrowseResult,
   PlayerStatus,
   RecentPlays,
@@ -61,7 +61,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ urls }),
     }),
-  slotLength: (mode: BlockMode, folder: string, file = "") =>
+  slotLength: (mode: ItemMode, folder: string, file = "") =>
     req<{ length: SlotLength | null }>(
       `/api/slot-length?mode=${encodeURIComponent(mode)}&folder=${encodeURIComponent(folder)}&file=${encodeURIComponent(file)}`,
     ),

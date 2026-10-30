@@ -221,11 +221,18 @@ async function onEndFile(reason: string): Promise<void> {
       const schedule = await loadSchedule();
       const block = schedule.blocks.find((b) => b.id === current.blockId);
       if (block) {
-        if (current.mode === "next-episode") {
-          await markEpisodeDone(block.folder, current.path);
-        } else if (current.mode === "random-file") {
-          await markRandomPlayed(block.folder, current.path);
+        const folder = current.folder || block.folder;
+        if (current.mode === "next-episode" && folder) {
+          await markEpisodeDone(folder, current.path);
+        } else if (current.mode === "random-file" && folder) {
+          await markRandomPlayed(folder, current.path);
         }
+      }
+      const next = nextPlaylistItem(today, current, schedule);
+      if (next) {
+        const offset = joinOffset(next, nowSec());
+        await playItem(next, offset < next.durationSec ? offset : 0);
+        return;
       }
     } else if (finishedIntermission) {
       if (finishedIntermission.kind === "folder") {
@@ -586,6 +593,25 @@ function fallbackTitleOf(filePath: string): string {
 function selectedFillerTitle(item: IntermissionItem): string {
   if (item.kind === "youtube") return cachedYoutubeTitle(item.source) ?? youtubeLabel(item.source);
   return titleFromPath(item.source);
+}
+
+// The next stacked video in this playlist, still waiting to play.
+function nextPlaylistItem(
+  today: TodayRundown,
+  current: RundownItem,
+  schedule: Awaited<ReturnType<typeof loadSchedule>>,
+): RundownItem | null {
+  const block = schedule.blocks.find((entry) => entry.id === current.blockId);
+  if (block?.mode !== "playlist") return null;
+  const siblings = today.items
+    .filter(
+      (item) => item.blockId === current.blockId && Boolean(item.overnight) === Boolean(current.overnight),
+    )
+    .sort((a, b) => parseHm(a.start) - parseHm(b.start));
+  const index = siblings.findIndex((item) => item.id === current.id);
+  if (index < 0) return null;
+  const next = siblings[index + 1];
+  return next?.status === "planned" ? next : null;
 }
 
 function hasStarted(item: RundownItem, now: number): boolean {

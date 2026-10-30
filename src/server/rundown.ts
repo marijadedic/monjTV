@@ -3,9 +3,10 @@ import { readFile } from "node:fs/promises";
 import { GRACE_SEC, MIN_REMAINING_SEC, RECENT_RANDOM_LIMIT } from "../shared/constants.ts";
 import { dateOffset, shiftDateKey, weekdayOfKey } from "../shared/dates.ts";
 import type {
-  BlockMode,
   Day,
   DayRundown,
+  ItemMode,
+  PlaylistEntry,
   Progress,
   RundownItem,
   Schedule,
@@ -86,10 +87,12 @@ function notePicks(
     if (item.overnight && !includeOvernight) continue;
     const block = schedule.blocks.find((entry) => entry.id === item.blockId);
     if (!block) continue;
-    if (item.mode === "next-episode") next.lastCompleted[block.folder] = item.path;
+    const folder = sourceFolder(item, block);
+    if (!folder) continue;
+    if (item.mode === "next-episode") next.lastCompleted[folder] = item.path;
     else if (item.mode === "random-file") {
-      const prev = next.recentRandom[block.folder] ?? [];
-      next.recentRandom[block.folder] = [item.path, ...prev.filter((file) => file !== item.path)].slice(
+      const prev = next.recentRandom[folder] ?? [];
+      next.recentRandom[folder] = [item.path, ...prev.filter((file) => file !== item.path)].slice(
         0,
         RECENT_RANDOM_LIMIT,
       );
@@ -217,8 +220,15 @@ async function reflowSeries(board: BoardFile): Promise<boolean> {
 
 function seriesFolder(item: RundownItem, schedule: Schedule): string | undefined {
   if (item.mode !== "next-episode") return undefined;
+  if (item.folder) return item.folder;
   const block = schedule.blocks.find((entry) => entry.id === item.blockId);
   return block?.folder || undefined;
+}
+
+// Folder this row uses for episode or random history.
+function sourceFolder(item: RundownItem, block: ScheduleBlock): string {
+  if (item.folder) return item.folder;
+  return block.folder;
 }
 
 // Later than this slot on the saved week. Overnight leftovers sit before that morning's own slots.
@@ -423,10 +433,12 @@ async function buildOwnItems(
     );
     items.push(...built);
     for (const item of built) {
-      if (item.mode === "next-episode") shadow.lastCompleted[block.folder] = item.path;
+      const folder = sourceFolder(item, block);
+      if (!folder) continue;
+      if (item.mode === "next-episode") shadow.lastCompleted[folder] = item.path;
       else if (item.mode === "random-file") {
-        const prev = shadow.recentRandom[block.folder] ?? [];
-        shadow.recentRandom[block.folder] = [item.path, ...prev.filter((file) => file !== item.path)].slice(
+        const prev = shadow.recentRandom[folder] ?? [];
+        shadow.recentRandom[folder] = [item.path, ...prev.filter((file) => file !== item.path)].slice(
           0,
           RECENT_RANDOM_LIMIT,
         );
@@ -674,6 +686,10 @@ async function itemsForWindow(
   blockEnd: number,
   progress: Progress,
 ): Promise<RundownItem[]> {
+  if (block.mode === "playlist") {
+    return itemsForPlaylist(block, cursorStart, progress);
+  }
+
   const items: RundownItem[] = [];
 
   if (block.mode === "youtube") {
@@ -686,7 +702,7 @@ async function itemsForWindow(
       return items;
     }
     if (!itemFits(meta.durationSec, blockEnd - cursorStart)) return items;
-    items.push(makeItem(block, meta.url, cursorStart, meta.durationSec, meta.title));
+    items.push(makeItem(block, meta.url, cursorStart, meta.durationSec, { title: meta.title }));
     return items;
   }
 
@@ -740,6 +756,77 @@ async function itemsForWindow(
   }
 
   return items;
+}
+
+// One file per stacked entry, back to back, so the player never fills a gap.
+async function itemsForPlaylist(
+  block: ScheduleBlock,
+  cursorStart: number,
+  progress: Progress,
+): Promise<RundownItem[]> {
+  const items: RundownItem[] = [];
+  const shadow = cloneProgress(progress);
+  const usedByFolder = new Map<string, string[]>();
+  let cursor = cursorStart;
+  for (const entry of block.items ?? []) {
+    const used = usedByFolder.get(entry.folder) ?? [];
+    const picked = await pickEntry(entry, shadow, used);
+    if (!picked) continue;
+    items.push(
+      makeItem(block, picked.path, cursor, picked.durationSec, {
+        title: picked.title,
+        mode: entry.mode,
+        folder: entry.folder,
+      }),
+    );
+    if (entry.folder) {
+      usedByFolder.set(entry.folder, [...used, picked.path]);
+      if (entry.mode === "next-episode") shadow.lastCompleted[entry.folder] = picked.path;
+      else if (entry.mode === "random-file") {
+        const prev = shadow.recentRandom[entry.folder] ?? [];
+        shadow.recentRandom[entry.folder] = [picked.path, ...prev.filter((file) => file !== picked.path)].slice(
+          0,
+          RECENT_RANDOM_LIMIT,
+        );
+      }
+    }
+    cursor += picked.durationSec;
+  }
+  return items;
+}
+
+// The one file this stacked entry will play.
+async function pickEntry(
+  entry: PlaylistEntry,
+  progress: Progress,
+  used: string[],
+): Promise<{ path: string; durationSec: number; title: string } | null> {
+  if (entry.mode === "youtube") {
+    const url = parseYoutubeUrl(entry.file ?? "");
+    if (!url) return null;
+    try {
+      const meta = await probeYoutube(url);
+      return { path: meta.url, durationSec: meta.durationSec, title: meta.title };
+    } catch {
+      return null;
+    }
+  }
+  if (entry.mode === "specific-file") {
+    const file = entry.file;
+    if (!file || !(await isVideoFile(file))) return null;
+    return { path: file, durationSec: await probeDuration(file), title: titleFromPath(file) };
+  }
+  const files = await videosIn(entry.folder);
+  if (files.length === 0) return null;
+  if (entry.mode === "next-episode") {
+    const file = nextFrom(files, progress.lastCompleted[entry.folder]);
+    if (!file) return null;
+    return { path: file, durationSec: await probeDuration(file), title: titleFromPath(file) };
+  }
+  const recent = progress.recentRandom[entry.folder] ?? [];
+  const file = randomFile(files, [...recent, ...used]);
+  if (!file) return null;
+  return { path: file, durationSec: await probeDuration(file), title: titleFromPath(file) };
 }
 
 function leftoverCarry(
@@ -807,14 +894,16 @@ function makeItem(
   file: string,
   startSec: number,
   durationSec: number,
-  title = titleFromPath(file),
+  extra?: { title?: string; mode?: ItemMode; folder?: string },
 ): RundownItem {
+  const mode = extra?.mode ?? (block.mode === "playlist" ? "specific-file" : block.mode);
   return {
     id: randomUUID(),
     blockId: block.id,
     path: file,
-    title,
-    mode: block.mode,
+    title: extra?.title ?? titleFromPath(file),
+    mode,
+    folder: extra?.folder ?? (mode === "youtube" ? "" : block.folder),
     start: formatHm(startSec),
     end: formatHm(startSec + durationSec),
     durationSec,
@@ -860,7 +949,7 @@ export function maxPlayableSec(slotSec: number): number {
 
 // Length of the file a new slot will play. A random folder uses its longest video.
 export async function slotLength(opts: {
-  mode: BlockMode;
+  mode: ItemMode;
   folder: string;
   file?: string;
 }): Promise<SlotLength | null> {
@@ -946,6 +1035,7 @@ export async function missesForBlocks(blocks: ScheduleBlock[]): Promise<SlotMiss
 
 // The file this block would start, when that file is too long for the slot.
 async function missForBlock(block: ScheduleBlock, progress: Progress): Promise<SlotMiss | null> {
+  if (block.mode === "playlist") return null;
   const slotSec = tightestSlotSec(block);
   const limitSec = maxPlayableSec(slotSec);
   if (block.mode === "youtube") {
@@ -1023,12 +1113,18 @@ export function shuffleItem(date: string, itemId: string): Promise<TvBoard> {
     const block = schedule.blocks.find((entry) => entry.id === item.blockId);
     if (!block) throw new Error("Block missing from schedule");
 
-    const files = await videosIn(block.folder);
+    const folder = sourceFolder(item, block);
+    const files = await videosIn(folder);
     const used = rundown.items
-      .filter((entry) => entry.blockId === item.blockId && entry.id !== item.id)
+      .filter(
+        (entry) =>
+          entry.blockId === item.blockId &&
+          entry.id !== item.id &&
+          sourceFolder(entry, block) === folder,
+      )
       .map((entry) => entry.path);
     const progress = await loadProgress();
-    const recent = progress.recentRandom[block.folder] ?? [];
+    const recent = progress.recentRandom[folder] ?? [];
     const next = randomFile(files, [...recent, ...used, item.path]);
     if (!next || next === item.path) throw new Error("No other files in this folder");
 
@@ -1064,7 +1160,8 @@ export function stepEpisode(date: string, itemId: string, direction: -1 | 1): Pr
     const block = schedule.blocks.find((entry) => entry.id === item.blockId);
     if (!block) throw new Error("Slot missing from schedule");
 
-    const files = await videosIn(block.folder);
+    const folder = sourceFolder(item, block);
+    const files = await videosIn(folder);
     const index = files.indexOf(item.path);
     if (index === -1) throw new Error("Episode is no longer in this folder");
     const startIndex = index + direction;
@@ -1074,6 +1171,7 @@ export function stepEpisode(date: string, itemId: string, direction: -1 | 1): Pr
     const tail = rundown.items.filter((row) => {
       if (row.blockId !== item.blockId || Boolean(row.overnight) !== Boolean(item.overnight)) return false;
       if (row.mode !== "next-episode") return false;
+      if (sourceFolder(row, block) !== folder) return false;
       if (row.id === item.id) return true;
       if (parseHm(row.start) <= parseHm(item.start)) return false;
       if (row.status !== "planned") return false;
@@ -1109,7 +1207,7 @@ export function stepEpisode(date: string, itemId: string, direction: -1 | 1): Pr
     recomputeBlockTimes(rundown, block);
     const remaining = tail.filter((row) => !drop.has(row.id));
     const last = remaining[remaining.length - 1] ?? item;
-    await continueShowAfter(board, schedule, block.folder, files, {
+    await continueShowAfter(board, schedule, folder, files, {
       date,
       start: last.start,
       overnight: Boolean(last.overnight),

@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import {
   DAYS,
+  ITEM_MODES,
   type BlockMode,
   type Day,
   type IntermissionItem,
   type IntermissionKind,
+  type ItemMode,
+  type PlaylistEntry,
   type Schedule,
   type ScheduleBlock,
   type SlotLength,
@@ -44,6 +47,16 @@ type Piece =
   | { kind: "gap"; start: number; end: number }
   | { kind: "slot"; block: ScheduleBlock; start: number; end: number; origin: Day };
 
+type DraftItem = {
+  id: string;
+  mode: ItemMode;
+  folder: string;
+  file: string;
+  title: string;
+  durationSec: number | null;
+  error?: string;
+};
+
 type Draft = {
   id: string | null;
   origin: Day;
@@ -54,11 +67,47 @@ type Draft = {
   folder: string;
   file: string;
   mode: BlockMode;
+  name: string;
+  items: DraftItem[];
+  addMode: ItemMode;
+  addFolder: string;
+  addFile: string;
   lengthChoice: LengthChoice;
   customMin: string;
   freeEnd: number;
   gapStart: number;
 };
+
+function emptyStack(): Pick<Draft, "name" | "items" | "addMode" | "addFolder" | "addFile"> {
+  return { name: "", items: [], addMode: "specific-file", addFolder: "", addFile: "" };
+}
+
+function toEntry(item: DraftItem): PlaylistEntry {
+  const file = item.file.trim();
+  return {
+    id: item.id,
+    mode: item.mode,
+    folder: item.mode === "youtube" ? "" : item.mode === "specific-file" ? parentDir(file) : item.folder.trim(),
+    ...(item.mode === "specific-file" || item.mode === "youtube" ? { file } : {}),
+  };
+}
+
+function fromEntry(item: PlaylistEntry): DraftItem {
+  return {
+    id: item.id,
+    mode: item.mode,
+    folder: item.folder,
+    file: item.file ?? "",
+    title: "",
+    durationSec: null,
+  };
+}
+
+function stackSeconds(items: DraftItem[]): number | null {
+  if (items.length === 0 || items.some((item) => item.durationSec == null || item.error)) return null;
+  const total = items.reduce((sum, item) => sum + (item.durationSec ?? 0), 0);
+  return total > 0 ? total : null;
+}
 
 function isPreset(value: number): value is PresetMin {
   return (PRESETS as readonly number[]).includes(value);
@@ -180,9 +229,10 @@ function fileTitle(file: string): string {
 }
 
 function slotLabel(
-  block: { folder: string; file?: string; mode: BlockMode },
+  block: { folder: string; file?: string; mode: BlockMode; name?: string },
   titles: Readonly<Record<string, string>> = {},
 ): string {
+  if (block.mode === "playlist") return (block.name ?? "").trim() || "Playlist";
   if (block.mode === "youtube" && block.file) {
     const url = parseYoutubeUrl(block.file);
     if (url && titles[url]) return titles[url];
@@ -193,9 +243,14 @@ function slotLabel(
 }
 
 function slotHover(
-  block: { folder: string; file?: string; mode: BlockMode },
+  block: { folder: string; file?: string; mode: BlockMode; name?: string; items?: PlaylistEntry[] },
   titles: Readonly<Record<string, string>>,
 ): string {
+  if (block.mode === "playlist") {
+    const name = (block.name ?? "").trim();
+    const count = block.items?.length ?? 0;
+    return name && count ? `${name}\n${count}` : name || String(count);
+  }
   if (block.mode === "youtube" && block.file) {
     const url = parseYoutubeUrl(block.file);
     const title = url ? titles[url] : "";
@@ -222,12 +277,21 @@ function youtubeScheduleKey(schedule: Schedule, extra = ""): string {
     const url = canonicalYoutubeIntermission(item.source);
     if (url) urls.add(url);
   }
-  const draft = canonicalYoutubeIntermission(extra);
-  if (draft) urls.add(draft);
-  for (const block of schedule.blocks) {
-    if (block.mode !== "youtube") continue;
-    const url = parseYoutubeUrl(block.file ?? "");
+  for (const piece of extra.split("\n")) {
+    const url = canonicalYoutubeIntermission(piece) ?? parseYoutubeUrl(piece);
     if (url) urls.add(url);
+  }
+  for (const block of schedule.blocks) {
+    const files =
+      block.mode === "playlist"
+        ? (block.items ?? []).filter((item) => item.mode === "youtube").map((item) => item.file ?? "")
+        : block.mode === "youtube"
+          ? [block.file ?? ""]
+          : [];
+    for (const file of files) {
+      const url = parseYoutubeUrl(file);
+      if (url) urls.add(url);
+    }
   }
   return [...urls].sort().join("\n");
 }
@@ -383,11 +447,44 @@ function FolderPath({
 }
 
 function slotKind(block: { folder: string; mode: BlockMode }): string {
+  if (block.mode === "playlist") return " stack";
   const name = folderLabel(block.folder).toLowerCase();
   if (name === "shows" || block.mode === "next-episode") return " shows";
   if (block.mode === "specific-file") return " film";
   if (block.mode === "youtube") return " tube";
   return "";
+}
+
+function modeHint(mode: ItemMode, t: ReturnType<typeof useI18n>["t"]): string {
+  if (mode === "next-episode") return t.nextHint;
+  if (mode === "specific-file") return t.oneHint;
+  if (mode === "youtube") return t.youtubeHint;
+  return t.randomHint;
+}
+
+function modeLabel(mode: ItemMode, t: ReturnType<typeof useI18n>["t"]): string {
+  if (mode === "next-episode") return t.nextEpisode;
+  if (mode === "specific-file") return t.oneVideo;
+  if (mode === "youtube") return t.youtube;
+  return t.randomFile;
+}
+
+function modeClass(mode: ItemMode): string {
+  if (mode === "next-episode") return "shows";
+  if (mode === "specific-file") return "film";
+  if (mode === "youtube") return "tube";
+  return "movie";
+}
+
+function itemLabel(item: DraftItem, titles: Readonly<Record<string, string>>): string {
+  if (item.title) return item.title;
+  if (item.mode === "youtube" && item.file) {
+    const url = parseYoutubeUrl(item.file);
+    if (url && titles[url]) return titles[url];
+    return youtubeLabel(item.file);
+  }
+  if (item.mode === "specific-file" && item.file) return fileTitle(item.file);
+  return folderLabel(item.folder);
 }
 
 function rowStyle(span: number): Record<string, string> {
@@ -466,16 +563,20 @@ function spillsPastDay(start: string, durationSec: number): boolean {
 }
 
 function measureKey(draft: Draft): string {
-  if (draft.mode === "specific-file" || draft.mode === "youtube") {
-    return `video:${draft.file.trim()}`;
+  const mode = draft.mode === "playlist" ? draft.addMode : draft.mode;
+  const folder = draft.mode === "playlist" ? draft.addFolder : draft.folder;
+  const file = draft.mode === "playlist" ? draft.addFile : draft.file;
+  if (mode === "specific-file" || mode === "youtube") {
+    return `video:${file.trim()}`;
   }
-  return `${draft.mode}:${draft.folder.trim()}`;
+  return `${mode}:${folder.trim()}`;
 }
 
 function chosenSeconds(
   draft: Draft,
   measured: { key: string; length: SlotLength | null } | null,
 ): number | null {
+  if (draft.mode === "playlist") return stackSeconds(draft.items);
   if (draft.lengthChoice !== "longest") {
     const mins = fixedMinutes(draft);
     return mins ? mins * 60 : null;
@@ -543,6 +644,9 @@ function draftAsBlock(draft: Draft, durationSec: number): ScheduleBlock {
     folder: draft.folder,
     file: draft.file,
     mode: draft.mode,
+    ...(draft.mode === "playlist"
+      ? { name: draft.name.trim(), items: draft.items.map(toEntry) }
+      : {}),
   };
 }
 
@@ -633,7 +737,17 @@ export function Admin() {
       .catch((e: Error) => setError(e.message));
   }, []);
 
-  const titleKey = youtubeScheduleKey(schedule, addKind === "youtube" ? addDraft : "");
+  const titleKey = youtubeScheduleKey(
+    schedule,
+    [
+      addKind === "youtube" ? addDraft : "",
+      draft?.mode === "youtube" ? draft.file : "",
+      draft?.mode === "playlist" && draft.addMode === "youtube" ? draft.addFile : "",
+      ...(draft?.items ?? []).filter((item) => item.mode === "youtube").map((item) => item.file),
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  );
   useEffect(() => {
     const urls = titleKey ? titleKey.split("\n") : [];
     if (urls.length === 0) return;
@@ -679,7 +793,7 @@ export function Admin() {
   }, [panelToken]);
 
   useEffect(() => {
-    if (!draft?.id || draft.mode === "youtube") {
+    if (!draft?.id || draft.mode === "youtube" || draft.mode === "playlist") {
       setSourceMissing(false);
       return;
     }
@@ -704,19 +818,18 @@ export function Admin() {
   }, [draft?.id, draft?.mode, draft?.folder, draft?.file]);
 
   useEffect(() => {
-    if (!draft || draft.lengthChoice !== "longest") {
+    if (!draft || (draft.mode !== "playlist" && draft.lengthChoice !== "longest")) {
       setMeasured(null);
       setMeasuring(false);
       setFileCount(0);
       return;
     }
+    const mode = draft.mode === "playlist" ? draft.addMode : draft.mode;
+    const folder = draft.mode === "playlist" ? draft.addFolder : draft.folder;
+    const file = draft.mode === "playlist" ? draft.addFile : draft.file;
     const key = measureKey(draft);
     const empty =
-      draft.mode === "youtube"
-        ? !parseYoutubeUrl(draft.file)
-        : draft.mode === "specific-file"
-          ? !draft.file.trim()
-          : !draft.folder.trim();
+      mode === "youtube" ? !parseYoutubeUrl(file) : mode === "specific-file" ? !file.trim() : !folder.trim();
     if (empty) {
       setMeasured({ key, length: null });
       setMeasuring(false);
@@ -727,9 +840,9 @@ export function Admin() {
     setMeasuring(true);
     setMeasured(null);
     setFileCount(0);
-    if (draft.mode === "random-file") {
+    if (mode === "random-file") {
       api
-        .videoCount(draft.folder)
+        .videoCount(folder)
         .then((res) => {
           if (!cancel) setFileCount(res.count);
         })
@@ -737,7 +850,7 @@ export function Admin() {
     }
     const timer = setTimeout(() => {
       api
-        .slotLength(draft.mode, draft.folder, draft.file)
+        .slotLength(mode, folder, file)
         .then((res) => {
           if (cancel) return;
           setMeasured({ key, length: res.length });
@@ -754,7 +867,63 @@ export function Admin() {
       cancel = true;
       clearTimeout(timer);
     };
-  }, [draft?.mode, draft?.folder, draft?.file, draft?.lengthChoice, panelToken]);
+  }, [
+    draft?.mode,
+    draft?.folder,
+    draft?.file,
+    draft?.addMode,
+    draft?.addFolder,
+    draft?.addFile,
+    draft?.lengthChoice,
+    panelToken,
+  ]);
+
+  const stackKey = draft?.mode === "playlist" ? draft.items.map((item) => item.id).join("\n") : "";
+
+  useEffect(() => {
+    if (!draft || draft.mode !== "playlist") return;
+    const pending = draft.items.filter((item) => item.durationSec == null && !item.error);
+    if (pending.length === 0) return;
+    let cancel = false;
+    void Promise.all(
+      pending.map(async (item) => {
+        try {
+          const res = await api.slotLength(item.mode, item.folder, item.file);
+          return { id: item.id, length: res.length, error: undefined as string | undefined };
+        } catch (err: unknown) {
+          return {
+            id: item.id,
+            length: null,
+            error: err instanceof Error ? err.message : String(err),
+          };
+        }
+      }),
+    ).then((results) => {
+      if (cancel) return;
+      const byId = new Map(results.map((result) => [result.id, result]));
+      setDraft((current) => {
+        if (!current || current.mode !== "playlist") return current;
+        return {
+          ...current,
+          items: current.items.map((item) => {
+            const result = byId.get(item.id);
+            if (!result) return item;
+            if (result.error) return { ...item, error: result.error, durationSec: null };
+            if (!result.length) return { ...item, durationSec: null, error: "No video found there." };
+            return {
+              ...item,
+              durationSec: result.length.durationSec,
+              title: result.length.title,
+              error: undefined,
+            };
+          }),
+        };
+      });
+    });
+    return () => {
+      cancel = true;
+    };
+  }, [draft?.mode, stackKey, panelToken]);
 
   useEffect(() => {
     if (!slotOp) {
@@ -786,6 +955,12 @@ export function Admin() {
   useEffect(() => {
     setDraft((current) => {
       if (!current) return current;
+      if (current.mode === "playlist") {
+        const sec = stackSeconds(current.items);
+        if (!sec) return current.end === "" ? current : { ...current, end: "" };
+        const end = endFromDuration(current.start, sec);
+        return current.end === end ? current : { ...current, end };
+      }
       if (current.lengthChoice !== "longest") {
         const mins = fixedMinutes(current);
         if (!mins) return current.end === "" ? current : { ...current, end: "" };
@@ -800,7 +975,7 @@ export function Admin() {
       const end = endFromDuration(current.start, measured.length.durationSec);
       return current.end === end ? current : { ...current, end };
     });
-  }, [measured, draft?.start, draft?.lengthChoice, draft?.customMin]);
+  }, [measured, draft?.start, draft?.lengthChoice, draft?.customMin, draft?.items, draft?.mode]);
 
   function openPanel() {
     setPanelToken((token) => token + 1);
@@ -832,6 +1007,7 @@ export function Admin() {
       folder: "",
       file: "",
       mode: "random-file",
+      ...emptyStack(),
       lengthChoice: "longest",
       customMin: "",
       freeEnd: endMin,
@@ -865,7 +1041,12 @@ export function Admin() {
       folder: block.folder,
       file: block.file ?? "",
       mode: block.mode,
-      ...(block.mode === "youtube"
+      name: block.name ?? "",
+      items: block.mode === "playlist" ? (block.items ?? []).map(fromEntry) : [],
+      addMode: "specific-file",
+      addFolder: "",
+      addFile: "",
+      ...(block.mode === "youtube" || block.mode === "playlist"
         ? { lengthChoice: "longest" as const, customMin: "" }
         : block.mode === "next-episode"
           ? fixedChoice(block.lengthMin)
@@ -895,30 +1076,45 @@ export function Admin() {
   function chooseMode(mode: BlockMode) {
     setDraft((current) => {
       if (!current || current.mode === mode) return current;
-      if (mode === "youtube") {
-        const kept = isYoutubeUrl(current.file)
-          ? current.file
-          : isYoutubeUrl(current.folder)
-            ? current.folder
-            : "";
-        return { ...current, mode, file: kept, folder: "", lengthChoice: "longest" };
+      if (mode === "playlist") {
+        return {
+          ...current,
+          mode,
+          folder: "",
+          file: "",
+          items: current.mode === "playlist" ? current.items : [],
+          addMode: "specific-file",
+          addFolder: "",
+          addFile: "",
+          lengthChoice: "longest",
+          end: current.items.length ? current.end : "",
+        };
       }
-      if (current.mode === "youtube") {
-        const next = { ...current, mode, file: "", folder: "" };
+      const cleared = current.mode === "playlist" ? { ...current, items: [] as DraftItem[], name: current.name } : current;
+      if (mode === "youtube") {
+        const kept = isYoutubeUrl(cleared.file)
+          ? cleared.file
+          : isYoutubeUrl(cleared.folder)
+            ? cleared.folder
+            : "";
+        return { ...cleared, mode, file: kept, folder: "", lengthChoice: "longest" };
+      }
+      if (cleared.mode === "youtube") {
+        const next = { ...cleared, mode, file: "", folder: "" };
         return mode === "next-episode" && next.lengthChoice === "longest"
           ? { ...next, lengthChoice: 60 }
           : next;
       }
       if (mode === "specific-file") {
-        const folder = current.folder.trim().replace(/[\\/]+$/, "");
-        const kept = current.file && parentDir(current.file) === folder;
-        return { ...current, mode, file: kept ? current.file : current.folder };
+        const folder = cleared.folder.trim().replace(/[\\/]+$/, "");
+        const kept = cleared.file && parentDir(cleared.file) === folder;
+        return { ...cleared, mode, file: kept ? cleared.file : cleared.folder };
       }
       const folder =
-        current.mode === "specific-file" && current.file
-          ? parentDir(current.file) || current.folder
-          : current.folder;
-      const next = { ...current, mode, folder };
+        cleared.mode === "specific-file" && cleared.file
+          ? parentDir(cleared.file) || cleared.folder
+          : cleared.folder;
+      const next = { ...cleared, mode, folder };
       return mode === "next-episode" && next.lengthChoice === "longest"
         ? { ...next, lengthChoice: 60 }
         : next;
@@ -927,7 +1123,8 @@ export function Admin() {
   }
 
   async function choosePath() {
-    const video = draft?.mode === "specific-file";
+    const video =
+      draft?.mode === "playlist" ? draft.addMode === "specific-file" : draft?.mode === "specific-file";
     setPicking("draft");
     setFieldError((current) => ({ ...current, folder: undefined, form: undefined }));
     try {
@@ -936,6 +1133,12 @@ export function Admin() {
       const chosen = picked.path;
       setDraft((current) => {
         if (!current) return current;
+        if (current.mode === "playlist") {
+          if (current.addMode === "specific-file") {
+            return { ...current, addFile: chosen, addFolder: parentDir(chosen) };
+          }
+          return { ...current, addFolder: chosen };
+        }
         if (current.mode === "specific-file") {
           return { ...current, file: chosen, folder: parentDir(chosen) };
         }
@@ -947,6 +1150,52 @@ export function Admin() {
     } finally {
       setPicking(null);
     }
+  }
+
+  function addStackItem() {
+    if (!draft || draft.mode !== "playlist" || !measured?.length || measured.key !== measureKey(draft)) return;
+    const file =
+      draft.addMode === "youtube"
+        ? (parseYoutubeUrl(draft.addFile) ?? draft.addFile.trim())
+        : draft.addFile.trim();
+    const folder =
+      draft.addMode === "specific-file"
+        ? parentDir(file)
+        : draft.addMode === "youtube"
+          ? ""
+          : draft.addFolder.trim();
+    const item: DraftItem = {
+      id: crypto.randomUUID(),
+      mode: draft.addMode,
+      folder,
+      file,
+      title: measured.length.title,
+      durationSec: measured.length.durationSec,
+    };
+    setDraft({
+      ...draft,
+      items: [...draft.items, item],
+      addFolder: "",
+      addFile: "",
+    });
+    setFieldError((current) => ({ ...current, folder: undefined, time: undefined }));
+  }
+
+  function moveStackItem(id: string, dir: -1 | 1) {
+    setDraft((current) => {
+      if (!current) return current;
+      const index = current.items.findIndex((item) => item.id === id);
+      const swap = index + dir;
+      if (index < 0 || swap < 0 || swap >= current.items.length) return current;
+      const items = [...current.items];
+      const [row] = items.splice(index, 1);
+      items.splice(swap, 0, row!);
+      return { ...current, items };
+    });
+  }
+
+  function removeStackItem(id: string) {
+    setDraft((current) => (current ? { ...current, items: current.items.filter((item) => item.id !== id) } : current));
   }
 
   function editAddDraft(value: string) {
@@ -1056,10 +1305,21 @@ export function Admin() {
   async function commit() {
     if (!draft) return;
     const next: FieldError = {};
-    if (measuring) {
+    const stackBusy =
+      draft.mode === "playlist" && draft.items.some((item) => item.durationSec == null && !item.error);
+    if (measuring && draft.mode !== "playlist") {
       next.time = "Still measuring the video.";
+    } else if (stackBusy) {
+      next.time = "Still measuring the video.";
+    } else if (draft.mode === "playlist" && !draft.name.trim()) {
+      next.folder = "Each playlist needs a name";
+    } else if (draft.mode === "playlist" && draft.items.length === 0) {
+      next.folder = "Each playlist needs at least one video";
     } else if (!draft.end) {
-      next.time = "Choose a video, folder, or YouTube URL to set the length.";
+      next.time =
+        draft.mode === "playlist"
+          ? "Each playlist needs at least one video"
+          : "Choose a video, folder, or YouTube URL to set the length.";
     } else if (!/^\d{2}:\d{2}$/.test(draft.start) || !/^\d{2}:\d{2}$/.test(draft.end)) {
       next.time = "start and end must be HH:mm";
     } else {
@@ -1077,7 +1337,11 @@ export function Admin() {
     }
     const video = draft.mode === "specific-file";
     const youtube = draft.mode === "youtube";
-    if (video) {
+    const playlist = draft.mode === "playlist";
+    if (playlist) {
+      const broken = draft.items.find((item) => item.error);
+      if (broken?.error) next.folder = broken.error;
+    } else if (video) {
       if (!draft.file.trim()) next.folder = "Each specific-file block needs a video";
     } else if (youtube) {
       if (!parseYoutubeUrl(draft.file)) next.folder = "Each YouTube slot needs a YouTube video URL";
@@ -1108,9 +1372,10 @@ export function Admin() {
       end: draft.end,
       ...(slotMin > 0 ? { lengthMin: slotMin } : {}),
       ...(Object.keys(starts).length > 0 ? { starts } : {}),
-      folder: video ? parentDir(file) : youtube ? "" : draft.folder.trim(),
-      ...((video || youtube) ? { file } : {}),
+      folder: playlist ? "" : video ? parentDir(file) : youtube ? "" : draft.folder.trim(),
+      ...((video || youtube) && !playlist ? { file } : {}),
       mode: draft.mode,
+      ...(playlist ? { name: draft.name.trim(), items: draft.items.map(toEntry) } : {}),
     };
     const blocks = draft.id
       ? schedule.blocks.map((item) => (item.id === draft.id ? block : item))
@@ -1183,12 +1448,21 @@ export function Admin() {
   const length = matched?.length ?? null;
   const lengthMins = length ? Math.ceil(length.durationSec / 60) : 0;
   const pathChosen = draft
-    ? draft.mode === "youtube"
-      ? Boolean(parseYoutubeUrl(draft.file))
-      : draft.mode === "specific-file"
-        ? Boolean(draft.file.trim())
-        : Boolean(draft.folder.trim())
+    ? draft.mode === "playlist"
+      ? draft.addMode === "youtube"
+        ? Boolean(parseYoutubeUrl(draft.addFile))
+        : draft.addMode === "specific-file"
+          ? Boolean(draft.addFile.trim())
+          : Boolean(draft.addFolder.trim())
+      : draft.mode === "youtube"
+        ? Boolean(parseYoutubeUrl(draft.file))
+        : draft.mode === "specific-file"
+          ? Boolean(draft.file.trim())
+          : Boolean(draft.folder.trim())
     : false;
+  const stackSec = draft?.mode === "playlist" ? stackSeconds(draft.items) : null;
+  const stackBusy =
+    draft?.mode === "playlist" && draft.items.some((item) => item.durationSec == null && !item.error);
   const activeSec = draft ? (chosenSeconds(draft, matched) ?? 0) : 0;
   const fixedMin = draft && draft.lengthChoice !== "longest" ? fixedMinutes(draft) : null;
   const clashes = draft && activeSec ? dayClashes(draft, schedule.blocks, activeSec, youtubeTitles) : [];
@@ -1196,11 +1470,13 @@ export function Admin() {
   const lengthCh = Math.max(...lengthLabels.map((label) => label.length));
   const addDisabled = !draft
     ? true
-    : sourceMissing
-      ? true
-      : draft.lengthChoice === "longest"
-        ? measuring || !pathChosen || !length || Boolean(matched?.error)
-        : !pathChosen || fixedMin === null;
+    : draft.mode === "playlist"
+      ? !draft.name.trim() || !stackSec || Boolean(stackBusy) || draft.items.some((item) => Boolean(item.error))
+      : sourceMissing
+        ? true
+        : draft.lengthChoice === "longest"
+          ? measuring || !pathChosen || !length || Boolean(matched?.error)
+          : !pathChosen || fixedMin === null;
   const ghostsByDay = draft
     ? Object.fromEntries(DAYS.map((day) => [day, ghostsOn(draft, day, schedule.blocks)]))
     : null;
@@ -1467,7 +1743,7 @@ export function Admin() {
         {draft && (
           <form
             ref={formRef}
-            class="add-form"
+            class={draft.mode === "playlist" ? "add-form playlist-form" : "add-form"}
             aria-busy={slotOp ? "true" : undefined}
             onSubmit={(event) => {
               event.preventDefault();
@@ -1520,8 +1796,187 @@ export function Admin() {
                   <b>{t.youtube}</b>
                   <span>{t.youtubeHint}</span>
                 </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={draft.mode === "playlist"}
+                  class={draft.mode === "playlist" ? "mode on stack" : "mode"}
+                  onClick={() => chooseMode("playlist")}
+                >
+                  <b>{t.playlist}</b>
+                  <span>{t.playlistHint}</span>
+                </button>
               </div>
             </div>
+            {draft.mode === "playlist" ? (
+              <div class="folder-block">
+                <label>
+                  <span class="k">{t.playlistName}</span>
+                  <input
+                    value={draft.name}
+                    placeholder={t.playlistNamePlaceholder}
+                    aria-invalid={fieldError.folder && !draft.name.trim() ? "true" : undefined}
+                    onInput={(event) => {
+                      setDraft({ ...draft, name: (event.target as HTMLInputElement).value });
+                      setFieldError((current) => ({ ...current, folder: undefined }));
+                    }}
+                  />
+                </label>
+                <span class="k">{t.playlistStack}</span>
+                {draft.items.length === 0 ? (
+                  <p class="mode-note">{t.playlistEmpty}</p>
+                ) : (
+                  <ol class="playlist">
+                    {draft.items.map((item, index) => (
+                      <li key={item.id} class="playlist-item">
+                        <div>
+                          <b>{itemLabel(item, youtubeTitles)}</b>
+                          <span>
+                            {modeLabel(item.mode, t)}
+                            {item.durationSec != null
+                              ? ` · ${t.slotDurationOf(Math.max(1, Math.ceil(item.durationSec / 60)))}`
+                              : item.error
+                                ? ` · ${t.error(item.error)}`
+                                : ` · ${t.measuring}`}
+                          </span>
+                        </div>
+                        <div class="playlist-tools">
+                          <button
+                            type="button"
+                            disabled={index === 0}
+                            aria-label={t.moveUp}
+                            title={t.moveUp}
+                            onClick={() => moveStackItem(item.id, -1)}
+                          >
+                            ↑
+                          </button>
+                          <button
+                            type="button"
+                            disabled={index === draft.items.length - 1}
+                            aria-label={t.moveDown}
+                            title={t.moveDown}
+                            onClick={() => moveStackItem(item.id, 1)}
+                          >
+                            ↓
+                          </button>
+                          <button
+                            type="button"
+                            class="x"
+                            aria-label={t.remove}
+                            title={t.remove}
+                            onClick={() => removeStackItem(item.id)}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                {stackSec ? (
+                  <div class="picked">
+                    <div>
+                      <span class="k">{t.slotDuration}</span>
+                      <span class="value">{t.slotDurationOf(Math.max(1, Math.ceil(stackSec / 60)))}</span>
+                    </div>
+                  </div>
+                ) : null}
+                <span class="k">{t.addToPlaylist}</span>
+                <div class="seg playlist-kind" role="radiogroup" aria-label={t.addToPlaylist}>
+                  {ITEM_MODES.map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      role="radio"
+                      aria-checked={draft.addMode === mode}
+                      class={draft.addMode === mode ? `on ${modeClass(mode)}` : ""}
+                      onClick={() =>
+                        setDraft({
+                          ...draft,
+                          addMode: mode,
+                          addFolder: mode === "youtube" ? "" : draft.addFolder,
+                          addFile: mode === "youtube" || mode === "specific-file" ? draft.addFile : "",
+                        })
+                      }
+                    >
+                      {modeLabel(mode, t)}
+                    </button>
+                  ))}
+                </div>
+                {draft.addMode === "youtube" ? (
+                  <div class="path-field">
+                    <div class="field">
+                      <input
+                        value={draft.addFile}
+                        placeholder={t.youtubePlaceholder}
+                        onInput={(event) => {
+                          setDraft({
+                            ...draft,
+                            addFile: (event.target as HTMLInputElement).value,
+                            addFolder: "",
+                          });
+                          setFieldError((current) => ({ ...current, folder: undefined }));
+                        }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <FolderPath
+                    key={draft.addMode}
+                    kind={draft.addMode === "specific-file" ? "video" : "folder"}
+                    value={draft.addMode === "specific-file" ? draft.addFile : draft.addFolder}
+                    placeholder={draft.addMode === "specific-file" ? t.videoPlaceholder : t.folderPlaceholder}
+                    invalid={Boolean(fieldError.folder)}
+                    actionLabel={picking === "draft" ? t.choosing : t.browse}
+                    actionBusy={picking === "draft"}
+                    listLabel={draft.addMode === "specific-file" ? t.video : t.folder}
+                    onChange={(value) => {
+                      setDraft(
+                        draft.addMode === "specific-file"
+                          ? { ...draft, addFile: value, addFolder: parentDir(value) }
+                          : { ...draft, addFolder: value },
+                      );
+                      setFieldError((current) => ({ ...current, folder: undefined }));
+                    }}
+                    onAction={() => void choosePath()}
+                  />
+                )}
+                {draft.addMode === "youtube" && <p class="mode-note">{t.youtubeCaveat}</p>}
+                {draft.addMode !== "youtube" && <p class="mode-note">{modeHint(draft.addMode, t)}</p>}
+                {measuring && pathChosen ? (
+                  <div class="wait">
+                    <div class="wait-line">
+                      <span class="spin" aria-hidden="true" />
+                      <span class="measure-label">{t.measuringVideos}</span>
+                    </div>
+                  </div>
+                ) : length ? (
+                  <div class="picked">
+                    <div>
+                      <span class="k">{t.slotDuration}</span>
+                      <span class="value">
+                        {length.title} · {t.slotDurationOf(lengthMins)}
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
+                {matched?.error && <p class="field-error">{t.error(matched.error)}</p>}
+                {pathChosen && !measuring && matched && !length && !matched.error && (
+                  <p class="field-error">{t.noVideo}</p>
+                )}
+                <div class="playlist-add">
+                  <button
+                    type="button"
+                    class="primary"
+                    disabled={!length || measuring || !pathChosen || Boolean(matched?.error)}
+                    onClick={addStackItem}
+                  >
+                    {t.add}
+                  </button>
+                </div>
+                {fieldError.folder && <p class="field-error">{t.error(fieldError.folder)}</p>}
+              </div>
+            ) : (
             <div class="folder-block">
               <span class="k">
                 {draft.mode === "youtube"
@@ -1724,6 +2179,7 @@ export function Admin() {
                 </div>
               )}
             </div>
+            )}
             <div class="also">
               <span class="k">{t.alsoOn}</span>
               <div class="days">
@@ -1817,10 +2273,18 @@ export function Admin() {
                 );
               })}
             </div>
-            {draft.lengthChoice === "longest" && !measuring && pathChosen && matched && !length && !matched.error && (
+            {draft.mode !== "playlist" &&
+              draft.lengthChoice === "longest" &&
+              !measuring &&
+              pathChosen &&
+              matched &&
+              !length &&
+              !matched.error && (
               <p class="field-error">{t.noVideo}</p>
             )}
-            {matched?.error && <p class="field-error">{t.error(matched.error)}</p>}
+            {draft.mode !== "playlist" && matched?.error && (
+              <p class="field-error">{t.error(matched.error)}</p>
+            )}
             {fieldError.time && <p class="field-error">{t.error(fieldError.time)}</p>}
             <div class="actions">
               {draft.id && (

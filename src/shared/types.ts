@@ -1,11 +1,26 @@
 export const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 export type Day = (typeof DAYS)[number];
 
-export const BLOCK_MODES = ["next-episode", "random-file", "specific-file", "youtube"] as const;
+export const ITEM_MODES = ["next-episode", "random-file", "specific-file", "youtube"] as const;
+export type ItemMode = (typeof ITEM_MODES)[number];
+
+export const BLOCK_MODES = [...ITEM_MODES, "playlist"] as const;
 export type BlockMode = (typeof BLOCK_MODES)[number];
+
+export function isItemMode(value: string | undefined): value is ItemMode {
+  return ITEM_MODES.includes(value as ItemMode);
+}
 
 export function isBlockMode(value: string | undefined): value is BlockMode {
   return BLOCK_MODES.includes(value as BlockMode);
+}
+
+/** One video in a playlist slot. Uses the same four play modes as a normal slot. */
+export interface PlaylistEntry {
+  id: string;
+  mode: ItemMode;
+  folder: string;
+  file?: string;
 }
 export type ItemStatus = "planned" | "playing" | "done" | "skipped";
 
@@ -21,6 +36,10 @@ export interface ScheduleBlock {
   folder: string;
   file?: string;
   mode: BlockMode;
+  /** Name shown on the weekly grid. Playlist slots use this. */
+  name?: string;
+  /** Stacked videos. A playlist slot plays these in order with no gap. */
+  items?: PlaylistEntry[];
 }
 
 export const INTERMISSION_KINDS = ["folder", "video", "youtube"] as const;
@@ -76,7 +95,9 @@ export interface RundownItem {
   blockId: string;
   path: string;
   title: string;
-  mode: BlockMode;
+  mode: ItemMode;
+  /** Folder used for next-episode and random progress. Empty for YouTube. */
+  folder?: string;
   start: string;
   end: string;
   durationSec: number;

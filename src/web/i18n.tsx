@@ -96,6 +96,15 @@ type Copy = {
   oneHint: string;
   youtube: string;
   youtubeHint: string;
+  playlist: string;
+  playlistHint: string;
+  playlistName: string;
+  playlistNamePlaceholder: string;
+  playlistStack: string;
+  addToPlaylist: string;
+  playlistEmpty: string;
+  moveUp: string;
+  moveDown: string;
   chooseYoutube: string;
   youtubePlaceholder: string;
   youtubeCaveat: string;
@@ -260,6 +269,15 @@ const en: Copy = {
   oneHint: "Plays a specific file.",
   youtube: "YouTube",
   youtubeHint: "Plays one YouTube video in mpv.",
+  playlist: "Playlist",
+  playlistHint: "Videos play one after another, with no intermission between them.",
+  playlistName: "Name on the schedule",
+  playlistNamePlaceholder: "Saturday night",
+  playlistStack: "Videos in this slot",
+  addToPlaylist: "Add a video",
+  playlistEmpty: "Add videos to this playlist.",
+  moveUp: "Move up",
+  moveDown: "Move down",
   chooseYoutube: "YouTube URL",
   youtubePlaceholder: "https://www.youtube.com/watch?v=…",
   youtubeCaveat:
@@ -372,6 +390,13 @@ const hrExact: Record<string, string> = {
   "start and end must be HH:mm": "Početak i kraj moraju biti u obliku HH:mm.",
   "mode must be next-episode, random-file, specific-file, or youtube":
     "Način mora biti sljedeća epizoda, nasumična datoteka, jedan video ili YouTube.",
+  "mode must be next-episode, random-file, specific-file, youtube, or playlist":
+    "Način mora biti sljedeća epizoda, nasumična datoteka, jedan video, YouTube ili popis.",
+  "Each playlist needs a name": "Popis treba ime.",
+  "Each playlist needs at least one video": "Popis treba barem jedan video.",
+  "playlist items must be next-episode, random-file, specific-file, or youtube":
+    "Stavke popisa moraju biti sljedeća epizoda, nasumična datoteka, jedan video ili YouTube.",
+  "Invalid playlist item": "Neispravna stavka popisa.",
   "Each specific-file slot needs a video": "Blok s jednim videom treba odabranu datoteku.",
   "Each YouTube slot needs a YouTube video URL": "YouTube blok treba YouTube URL videa.",
   "Not a YouTube video URL": "To nije YouTube URL videa.",
@@ -547,6 +572,15 @@ const hr: Copy = {
   oneHint: "Pušta određenu datoteku.",
   youtube: "YouTube",
   youtubeHint: "Pušta jedan YouTube video u mpv-u.",
+  playlist: "Popis",
+  playlistHint: "Pušta videe redom, bez pauze između.",
+  playlistName: "Ime na rasporedu",
+  playlistNamePlaceholder: "Subotnja večer",
+  playlistStack: "Videi u ovom bloku",
+  addToPlaylist: "Dodaj video",
+  playlistEmpty: "Dodajte videe na ovaj popis.",
+  moveUp: "Gore",
+  moveDown: "Dolje",
   chooseYoutube: "YouTube URL",
   youtubePlaceholder: "https://www.youtube.com/watch?v=…",
   youtubeCaveat:

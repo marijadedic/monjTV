@@ -1,4 +1,4 @@
-import type { BlockMode } from "../shared/types.ts";
+import type { ItemMode } from "../shared/types.ts";
 import { isVideoFile, listVideos } from "./files.ts";
 import { loadProgress } from "./progress.ts";
 
@@ -27,7 +27,7 @@ export function randomFile(files: string[], exclude: string[]): string | null {
 // Next episode, a random file, or the chosen video, based on the block mode.
 export async function pick(opts: {
   folder: string;
-  mode: BlockMode;
+  mode: ItemMode;
   file?: string;
   exclude?: string[];
   lastCompletedOverride?: string;

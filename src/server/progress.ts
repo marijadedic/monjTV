@@ -1,6 +1,7 @@
 import path from "node:path";
 import { RECENT_RANDOM_LIMIT } from "../shared/constants.ts";
 import type { Progress, RecentPlays, ScheduleBlock } from "../shared/types.ts";
+import { foldersOf } from "./schedule.ts";
 import { titleFromPath } from "./files.ts";
 import { progressPath } from "./paths.ts";
 import { readJson, writeJson } from "./store.ts";
@@ -33,8 +34,8 @@ export async function forgetUnusedFolders(
   before: ScheduleBlock[],
   after: ScheduleBlock[],
 ): Promise<void> {
-  const used = new Set(after.map((block) => block.folder.trim()).filter(Boolean));
-  const drop = [...new Set(before.map((block) => block.folder.trim()))].filter(
+  const used = new Set(after.flatMap(foldersOf));
+  const drop = [...new Set(before.flatMap(foldersOf))].filter(
     (folder) => folder.length > 0 && !used.has(folder),
   );
   if (drop.length === 0) return;
