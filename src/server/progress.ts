@@ -70,6 +70,21 @@ export async function recentPlays(): Promise<RecentPlays> {
   return presentRecent(await loadProgress());
 }
 
+// Drop this file from every recently played list.
+export async function forgetRandomPath(filePath: string): Promise<RecentPlays> {
+  const progress = await loadProgress();
+  let changed = false;
+  for (const [folder, files] of Object.entries(progress.recentRandom)) {
+    if (!files.includes(filePath)) continue;
+    const next = files.filter((entry) => entry !== filePath);
+    if (next.length === 0) delete progress.recentRandom[folder];
+    else progress.recentRandom[folder] = next;
+    changed = true;
+  }
+  if (changed) await saveProgress(progress);
+  return presentRecent(progress);
+}
+
 // Drop one file from a folder's recent list so a random slot can pick it again.
 export async function forgetRandomPlayed(folder: string, filePath: string): Promise<RecentPlays> {
   const progress = await loadProgress();

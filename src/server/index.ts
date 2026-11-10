@@ -8,20 +8,24 @@ import { isItemMode, type PlaylistEntry, type ScheduleBlock } from "../shared/ty
 import { PORT } from "../shared/constants.ts";
 import { assertVideo, browse, isDir, isVideoFile, pickFile, pickFolder, suggestPaths } from "./files.ts";
 import { clientDir } from "./paths.ts";
-import { getStatus, intermissionStillAllowed, replayItem, shutdownPlayer, startPlayer, syncIntermission } from "./player.ts";
+import { getStatus, intermissionStillAllowed, joinRundown, replayItem, shutdownPlayer, startPlayer, syncIntermission } from "./player.ts";
 import { forgetRandomPlayed, forgetUnusedFolders, loadProgress, recentPlays } from "./progress.ts";
 import {
   ensureBoard,
   findRundownItem,
   loadToday,
   missesForBlocks,
+  markBuilding,
   rebuildTodayPreservingPlayback,
+  savedToday,
+  markItemDone,
+  markItemSkipped,
   shuffleItem,
   slotLength,
   stepEpisode,
   videoCount,
 } from "./rundown.ts";
-import { assertFolder, changedBlocks, loadSchedule, saveSchedule, sourceChanged } from "./schedule.ts";
+import { assertFolder, changedBlocks, loadSchedule, sameBlocks, saveSchedule, sourceChanged } from "./schedule.ts";
 import { assertYoutubeVideo, youtubeTitles } from "./youtube.ts";
 import { frameOf } from "./still.ts";
 import { closeAppTabs, portsFrom } from "./tabs.ts";
@@ -39,7 +43,7 @@ app.get("/api/schedule", async (c) => {
   return c.json(await loadSchedule());
 });
 
-// Save the schedule and rebuild today around current playback.
+// Save the week and answer once it is stored. The rundown rebuild follows that response.
 app.put("/api/schedule", async (c) => {
   const body = (await c.req.json()) as Parameters<typeof saveSchedule>[0];
   try {
@@ -49,19 +53,18 @@ app.put("/api/schedule", async (c) => {
       await assertBlockSource(block);
     }
     const saved = await saveSchedule(body);
-    const playbackSame =
-      previous.activeIntermission === saved.activeIntermission &&
-      JSON.stringify(previous.blocks) === JSON.stringify(saved.blocks) &&
-      JSON.stringify(previous.intermissions) === JSON.stringify(saved.intermissions);
-    if (playbackSame) {
-      await syncIntermission();
-      return c.json({ schedule: saved, today: await loadToday(), misses: [] });
+    if (sameBlocks(previous.blocks, saved.blocks)) {
+      void syncIntermission().catch(() => undefined);
+      return c.json({ schedule: saved, today: await savedToday(), misses: [] });
     }
     await forgetUnusedFolders(previous.blocks, saved.blocks);
-    const today = await rebuildTodayPreservingPlayback();
-    const misses = await missesForBlocks(changedBlocks(previous.blocks, saved.blocks));
-    await syncIntermission();
-    return c.json({ schedule: saved, today, misses });
+    const changed = changedBlocks(previous.blocks, saved.blocks);
+    const misses = await missesForBlocks(changed);
+    if (changed.length) markBuilding(changed.map((block) => block.id));
+    void rebuildTodayPreservingPlayback(changed.map((block) => block.id))
+      .then(() => joinRundown())
+      .catch((err) => console.error("rundown rebuild failed", err));
+    return c.json({ schedule: saved, today: await savedToday(), misses });
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
   }
@@ -94,10 +97,13 @@ app.get("/api/slot-length", async (c) => {
     );
   }
   try {
+    const maxMinRaw = Number(c.req.query("maxMin") ?? "");
+    const maxMin = Number.isInteger(maxMinRaw) && maxMinRaw > 0 ? maxMinRaw : undefined;
     const length = await slotLength({
       mode,
       folder: c.req.query("folder") ?? "",
       file: c.req.query("file") ?? "",
+      ...(maxMin ? { maxMin } : {}),
     });
     return c.json({ length });
   } catch (err) {
@@ -105,7 +111,7 @@ app.get("/api/slot-length", async (c) => {
   }
 });
 
-// The eight saved days, building any day that is not on disk yet.
+// The saved days. Today is sent immediately; a missing later day is filled after this response.
 app.get("/api/tv", async (c) => {
   return c.json(await ensureBoard());
 });
@@ -139,7 +145,31 @@ app.get("/api/player/intermission-still", async (c) => {
 // Swap one random rundown item for another file.
 app.post("/api/tv/:date/items/:id/shuffle", async (c) => {
   try {
-    return c.json(await shuffleItem(c.req.param("date"), c.req.param("id")));
+    const itemId = c.req.param("id");
+    const board = await shuffleItem(c.req.param("date"), itemId);
+    await replayItem(itemId);
+    return c.json(board);
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+  }
+});
+
+// Mark a movie as recently played, or an episode as watched.
+app.post("/api/tv/:date/items/:id/done", async (c) => {
+  try {
+    const itemId = c.req.param("id");
+    const board = await markItemDone(c.req.param("date"), itemId);
+    await replayItem(itemId);
+    return c.json(board);
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+  }
+});
+
+// A done episode is skipped again, or a movie leaves recently played.
+app.post("/api/tv/:date/items/:id/skipped", async (c) => {
+  try {
+    return c.json(await markItemSkipped(c.req.param("date"), c.req.param("id")));
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
   }
@@ -284,13 +314,13 @@ async function assertEntrySource(item: PlaylistEntry): Promise<void> {
 async function main(): Promise<void> {
   await loadSchedule();
   await loadProgress();
-  await loadToday();
 
   httpServer = serve({ fetch: app.fetch, port: PORT, hostname: "0.0.0.0" }, (info) => {
     console.log(`monjTV on http://0.0.0.0:${info.port}`);
     if (!existsSync(clientIndex)) {
       console.log("UI dev server: http://127.0.0.1:5173 (npm run dev)");
     }
+    void loadToday().catch((err) => console.error("rundown rebuild failed", err));
   });
 }
 

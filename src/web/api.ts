@@ -39,6 +39,10 @@ export const api = {
     }),
   shuffle: (date: string, id: string) =>
     req<TvBoard>(`/api/tv/${date}/items/${id}/shuffle`, { method: "POST" }),
+  markDone: (date: string, id: string) =>
+    req<TvBoard>(`/api/tv/${date}/items/${id}/done`, { method: "POST" }),
+  markSkipped: (date: string, id: string) =>
+    req<TvBoard>(`/api/tv/${date}/items/${id}/skipped`, { method: "POST" }),
   stepEpisode: (date: string, id: string, direction: "prev" | "next") =>
     req<TvBoard>(`/api/tv/${date}/items/${id}/episode`, {
       method: "POST",
@@ -61,9 +65,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ urls }),
     }),
-  slotLength: (mode: ItemMode, folder: string, file = "") =>
+  slotLength: (mode: ItemMode, folder: string, file = "", maxMin?: number) =>
     req<{ length: SlotLength | null }>(
-      `/api/slot-length?mode=${encodeURIComponent(mode)}&folder=${encodeURIComponent(folder)}&file=${encodeURIComponent(file)}`,
+      `/api/slot-length?mode=${encodeURIComponent(mode)}&folder=${encodeURIComponent(folder)}&file=${encodeURIComponent(file)}${
+        maxMin ? `&maxMin=${encodeURIComponent(String(maxMin))}` : ""
+      }`,
     ),
   recent: () => req<RecentPlays>("/api/recent"),
   forgetRecent: (folder: string, filePath: string) =>

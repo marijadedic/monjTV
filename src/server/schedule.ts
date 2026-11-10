@@ -1,21 +1,25 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { segmentsPlaced } from "../shared/placed.ts";
 import {
   DAYS,
   isBlockMode,
   isIntermissionKind,
   isItemMode,
   type Day,
+  type DayRundown,
   type IntermissionItem,
   type PlaylistEntry,
   type Schedule,
   type ScheduleBlock,
+  type TvBoard,
 } from "../shared/types.ts";
-import { DAY_MINUTES, clockOf, minutesOf, segmentsOf, windowOn } from "../shared/window.ts";
+import { DAY_MINUTES, clockOf, minutesOf, windowOn } from "../shared/window.ts";
 import { canonicalYoutubeIntermission, isYoutubeLink, parseYoutubeUrl } from "../shared/youtube.ts";
-import { parseHm, isHm } from "./clock.ts";
+import { dateKey, parseHm, isHm } from "./clock.ts";
 import { assertVideo, isDir } from "./files.ts";
-import { schedulePath } from "./paths.ts";
+import { schedulePath, tvPath } from "./paths.ts";
 import { readJson, writeJson } from "./store.ts";
 
 const empty: Schedule = {
@@ -43,10 +47,33 @@ export async function loadSchedule(): Promise<Schedule> {
 
 // Validate the schedule and write it to disk.
 export async function saveSchedule(schedule: StoredSchedule): Promise<Schedule> {
-  const normalized = validateSchedule(schedule);
+  const previous = await loadSchedule();
+  const normalized = validateSchedule(schedule, await peekTvBoard(), previous.blocks);
   await assertIntermissions(normalized.intermissions);
   await writeJson(schedulePath, normalized);
   return normalized;
+}
+
+// Saved TV days, for playlist height. Missing or invalid JSON is ignored.
+async function peekTvBoard(): Promise<TvBoard | null> {
+  try {
+    const raw = await readFile(tvPath, "utf8");
+    if (!raw.trim()) return null;
+    const data = JSON.parse(raw) as { today?: unknown; days?: unknown };
+    if (!Array.isArray(data.days)) return null;
+    const days = data.days.filter(
+      (day): day is DayRundown =>
+        Boolean(day) &&
+        typeof day === "object" &&
+        typeof (day as DayRundown).date === "string" &&
+        Array.isArray((day as DayRundown).items),
+    );
+    if (days.length === 0) return null;
+    const today = typeof data.today === "string" && data.today ? data.today : dateKey();
+    return { today, days };
+  } catch {
+    return null;
+  }
 }
 
 // The intermission the player should fill gaps with.
@@ -67,6 +94,11 @@ export function sourceChanged(before: ScheduleBlock[], block: ScheduleBlock): bo
     (old.file ?? "").trim() !== (block.file ?? "").trim() ||
     !sameEntries(old.items, block.items)
   );
+}
+
+// True when the weekly grid is the same, even if Intermission changed.
+export function sameBlocks(before: ScheduleBlock[], after: ScheduleBlock[]): boolean {
+  return before.length === after.length && changedBlocks(before, after).length === 0;
 }
 
 // Blocks that were added or whose window, folder, file, or mode changed.
@@ -96,26 +128,45 @@ export function blocksForDay(schedule: Schedule, day: Day): ScheduleBlock[] {
     .sort((a, b) => parseHm(windowOn(a, day).start) - parseHm(windowOn(b, day).start));
 }
 
-// Normalize blocks and reject overlaps, including leftovers that run past midnight.
-export function validateSchedule(input: StoredSchedule): Schedule {
+// Name shown when two slots overlap.
+function blockLabel(block: ScheduleBlock): string {
+  if (block.mode === "playlist") return (block.name ?? "").trim() || "Playlist";
+  if (block.file) return path.basename(block.file);
+  return path.basename(block.folder) || block.folder;
+}
+
+// Normalize blocks and reject a new overlap, including leftovers that run past midnight.
+// A playlist occupies the files on the TV schedule when those exist, not a longer stored lengthMin.
+// An overlap already on the week stays until one of those slots is edited.
+export function validateSchedule(
+  input: StoredSchedule,
+  board: TvBoard | null = null,
+  before: ScheduleBlock[] | null = null,
+): Schedule {
   if (!input || !Array.isArray(input.blocks)) {
     throw new Error("Schedule must have a blocks array");
   }
   const blocks = input.blocks.map(normalizeBlock);
+  const touched = before ? new Set(changedBlocks(before, blocks).map((block) => block.id)) : null;
   for (const day of DAYS) {
     const ofDay = blocks
       .flatMap((block) =>
-        segmentsOf(block)
+        segmentsPlaced(block, board)
           .filter((seg) => seg.day === day)
-          .map((seg) => ({ start: seg.start, end: seg.end, label: `${clockOf(seg.start)}–${clockOf(seg.end)}` })),
+          .map((seg) => ({
+            id: block.id,
+            start: seg.start,
+            end: seg.end,
+            label: `${blockLabel(block)} ${clockOf(seg.start)}–${clockOf(seg.end)}`,
+          })),
       )
       .sort((a, b) => a.start - b.start);
     for (let i = 1; i < ofDay.length; i++) {
       const prev = ofDay[i - 1]!;
       const cur = ofDay[i]!;
-      if (cur.start < prev.end) {
-        throw new Error(`Overlapping blocks on ${day}: ${prev.label} and ${cur.label}`);
-      }
+      if (cur.start >= prev.end) continue;
+      if (touched && !touched.has(prev.id) && !touched.has(cur.id)) continue;
+      throw new Error(`Overlapping blocks on ${day}: ${prev.label} and ${cur.label}`);
     }
   }
   const { intermissions, activeIntermission } = intermissionsFrom(input, true);
@@ -301,7 +352,8 @@ function normalizeEntry(raw: PlaylistEntry): PlaylistEntry {
   }
   const folder = (raw.folder ?? "").trim();
   if (!folder) throw new Error("Each block needs a folder");
-  return { id, mode: raw.mode, folder };
+  const lengthMin = raw.mode === "random-file" ? cleanLength(raw) : undefined;
+  return { id, mode: raw.mode, folder, ...(lengthMin ? { lengthMin } : {}) };
 }
 
 // True when both stacks name the same videos in the same order.
@@ -315,7 +367,8 @@ function sameEntries(a: PlaylistEntry[] | undefined, b: PlaylistEntry[] | undefi
       item.id === other.id &&
       item.mode === other.mode &&
       item.folder === other.folder &&
-      (item.file ?? "") === (other.file ?? "")
+      (item.file ?? "") === (other.file ?? "") &&
+      (item.lengthMin ?? 0) === (other.lengthMin ?? 0)
     );
   });
 }
@@ -346,7 +399,7 @@ function cleanStarts(
 }
 
 // Whole minutes, when the block stores its length.
-function cleanLength(raw: ScheduleBlock): number | undefined {
+function cleanLength(raw: { lengthMin?: number }): number | undefined {
   if (raw.lengthMin == null) return undefined;
   if (typeof raw.lengthMin !== "number" || !Number.isInteger(raw.lengthMin) || raw.lengthMin < 1) {
     throw new Error("start and end must be HH:mm");

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { GRACE_SEC, MIN_REMAINING_SEC, RECENT_RANDOM_LIMIT } from "../shared/constants.ts";
 import { dateOffset, shiftDateKey, weekdayOfKey } from "../shared/dates.ts";
 import type {
@@ -31,9 +31,9 @@ import { parseYoutubeUrl } from "../shared/youtube.ts";
 import { dateKey, formatHm, nowSec, parseHm, weekday } from "./clock.ts";
 import { probeDuration } from "./duration.ts";
 import { isDir, isVideoFile, titleFromPath } from "./files.ts";
-import { todayPath, tvPath } from "./paths.ts";
+import { schedulePath, todayPath, tvPath } from "./paths.ts";
 import { nextEpisode, randomFile, videosIn } from "./picker.ts";
-import { loadProgress } from "./progress.ts";
+import { forgetRandomPath, loadProgress, markEpisodeDone, markRandomPlayed, saveProgress } from "./progress.ts";
 import { blocksForDay, loadSchedule } from "./schedule.ts";
 import { writeJson } from "./store.ts";
 import { probeYoutube } from "./youtube.ts";
@@ -47,6 +47,11 @@ type BoardFile = {
 };
 
 let tail: Promise<void> = Promise.resolve();
+let filling: Promise<void> | null = null;
+let boardWait: Promise<TvBoard> | null = null;
+let rebuildingAhead = 0;
+let aheadChain: Promise<void> = Promise.resolve();
+let buildingIds: Set<string> | null = null;
 
 // One board write at a time, so a playback save cannot drop another day.
 function exclusive<T>(task: () => Promise<T>): Promise<T> {
@@ -56,6 +61,21 @@ function exclusive<T>(task: () => Promise<T>): Promise<T> {
     () => undefined,
   );
   return run;
+}
+
+// Probe a missing later day after Today has already been sent.
+function scheduleFill(): void {
+  if (filling) return;
+  filling = exclusive(async () => {
+    await syncBoard(true);
+  })
+    .then(
+      () => undefined,
+      () => undefined,
+    )
+    .finally(() => {
+      filling = null;
+    });
 }
 
 function isDay(value: unknown): value is DayRundown {
@@ -143,15 +163,45 @@ function inWindow(today: string, date: string): boolean {
   return offset >= -TV_PAST && offset <= TV_AHEAD;
 }
 
+type SeriesCursor = {
+  last?: string;
+  consumed?: string;
+  follow: boolean;
+  day?: string;
+};
+
+// Keep a Previous or Next choice. A skipped choice stays the next episode that airs.
+function holdChosenEpisode(
+  cursor: SeriesCursor,
+  path: string,
+  files: string[],
+  missed: boolean,
+  day: string,
+): void {
+  if (missed) {
+    const index = files.indexOf(path);
+    cursor.consumed = index > 0 ? files[index - 1] : undefined;
+    cursor.last = path;
+    cursor.follow = true;
+    cursor.day = day;
+    return;
+  }
+  cursor.last = path;
+  cursor.consumed = path;
+  cursor.follow = false;
+  cursor.day = day;
+}
+
 // A next-episode slot uses its episode up only when it plays. A skip, and every
 // next-episode row on yesterday, leaves that episode for the next time the show airs.
+// A row picked with Previous or Next keeps its file across that refresh.
 async function reflowSeries(board: BoardFile): Promise<boolean> {
   const schedule = await loadSchedule();
   const progress = await loadProgress();
   const today = dateKey();
   const now = nowSec();
   const days = board.days.filter((day) => inWindow(today, day.date)).sort((a, b) => a.date.localeCompare(b.date));
-  const cursors = new Map<string, { last?: string; consumed?: string; follow: boolean; day?: string }>();
+  const cursors = new Map<string, SeriesCursor>();
   const filesCache = new Map<string, string[]>();
   const touched = new Set<string>();
   let changed = false;
@@ -166,6 +216,7 @@ async function reflowSeries(board: BoardFile): Promise<boolean> {
 
   async function place(item: RundownItem, file: string, date: string, blockId: string): Promise<void> {
     if (item.path === file) return;
+    delete item.chosen;
     item.path = file;
     item.title = titleFromPath(file);
     item.durationSec = await probeDuration(file);
@@ -198,6 +249,18 @@ async function reflowSeries(board: BoardFile): Promise<boolean> {
       }
       if (cursor.day !== day.date) cursor.last = cursor.consumed;
       const laterSameDay = cursor.day === day.date;
+      if (item.chosen && files.includes(item.path)) {
+        holdChosenEpisode(cursor, item.path, files, missed, day.date);
+        if (missed && item.status !== "skipped") {
+          item.status = "skipped";
+          changed = true;
+        }
+        continue;
+      }
+      if (item.chosen) {
+        delete item.chosen;
+        changed = true;
+      }
       if (missed || cursor.follow || laterSameDay) {
         const episode = nextFrom(files, cursor.last);
         if (!episode) continue;
@@ -333,6 +396,10 @@ async function mirrorYesterdaySkips(
     if (item.overnight) continue;
     const folder = seriesFolder(item, schedule);
     if (!folder || (folderFilter && folder !== folderFilter)) continue;
+    if (item.status === "done") {
+      skippedCursor.set(folder, item.path);
+      continue;
+    }
     const files = await filesOf(folder);
     const previous = skippedCursor.get(folder);
     const episode = previous
@@ -374,6 +441,7 @@ async function continueShowAfter(
       if (seriesFolder(item, schedule) !== folder) continue;
       if (item.overnight) continue;
       if (!laterInWeek(day.date, item, origin)) continue;
+      delete item.chosen;
       const played = item.status === "done" || item.status === "playing";
       const missed =
         item.status === "skipped" || (day.date === today && !played && itemHasPassed(item, now));
@@ -418,15 +486,34 @@ function presentBoard(board: BoardFile): TvBoard {
   const days: DayRundown[] = [];
   for (let offset = -TV_PAST; offset <= TV_AHEAD; offset++) {
     const date = shiftDateKey(today, offset);
-    days.push(board.days.find((day) => day.date === date) ?? { date, items: [] });
+    const saved = board.days.find((day) => day.date === date);
+    if (saved) days.push(saved);
+    else if (date === today) days.push({ date, items: [] });
   }
-  return { today, days };
+  return { today, days, building: buildingIds ? [...buildingIds] : [] };
+}
+
+// Mark these week slots as still being timed.
+export function markBuilding(ids: Iterable<string>): void {
+  buildingIds = new Set(ids);
+}
+
+// True while a rundown rebuild is still timing slots.
+function stillBuilding(): boolean {
+  return buildingIds !== null && buildingIds.size > 0;
+}
+
+// Clear the week spinner once later days are written.
+function clearBuilding(): void {
+  buildingIds = null;
 }
 
 // Slots that belong to this calendar day, without the previous night's leftover.
 async function buildOwnItems(
   date: string,
   progress: Progress,
+  existing?: DayRundown,
+  changedIds?: Set<string>,
 ): Promise<{ items: RundownItem[]; progress: Progress }> {
   const schedule = await loadSchedule();
   const shadow = cloneProgress(progress);
@@ -434,12 +521,17 @@ async function buildOwnItems(
   const items: RundownItem[] = [];
   for (const block of blocksForDay(schedule, day)) {
     const placed = windowOn(block, day);
-    const built = await itemsForWindow(
-      block,
-      parseHm(placed.start),
-      parseHm(placed.start) + lengthMinutes(block) * 60,
-      shadow,
-    );
+    const kept = keptForBlock(existing, block.id);
+    const built =
+      changedIds && existing && !changedIds.has(block.id)
+        ? kept
+        : await itemsForWindow(
+            block,
+            parseHm(placed.start),
+            parseHm(placed.start) + lengthMinutes(block) * 60,
+            shadow,
+            kept,
+          );
     items.push(...built);
     for (const item of built) {
       const folder = sourceFolder(item, block);
@@ -465,8 +557,7 @@ function plannedSpill(previous: DayRundown, schedule: Schedule): RundownItem[] {
     if (item.overnight) continue;
     const block = schedule.blocks.find((entry) => entry.id === item.blockId);
     if (!block?.days.includes(day)) continue;
-    const placed = windowOn(block, day);
-    if (placed.endMin <= DAY_MINUTES) continue;
+    if (blockLeftoverSec(block, day, previous.items) <= 0) continue;
     if (parseHm(item.start) + item.durationSec <= DAY_SECONDS) continue;
     out.push({ ...item, id: randomUUID(), overnight: true, status: "planned" });
   }
@@ -544,9 +635,19 @@ async function syncBoard(fillAhead: boolean): Promise<BoardFile> {
   return next;
 }
 
+// The live day as last written, without waiting for a rebuild.
+export async function savedToday(): Promise<TodayRundown> {
+  const board = await readBoard();
+  const today = dateKey();
+  return board.days.find((day) => day.date === today) ?? { date: today, items: [] };
+}
+
 // The live day, rolling the saved schedule forward when the date has changed.
 export function loadToday(): Promise<TodayRundown> {
   return exclusive(async () => {
+    if (await scheduleAheadOfBoard()) {
+      return rebuildTodayPreservingPlaybackLocked();
+    }
     const board = await syncBoard(false);
     const today = dateKey();
     return board.days.find((day) => day.date === today) ?? { date: today, items: [] };
@@ -557,9 +658,64 @@ export function ensureToday(): Promise<TodayRundown> {
   return loadToday();
 }
 
-// Yesterday through the next six days. Missing days are built once and then kept.
+// Yesterday through the next six days. Today is returned as saved; a missing later day is filled afterwards.
 export function ensureBoard(): Promise<TvBoard> {
-  return exclusive(async () => presentBoard(await syncBoard(true)));
+  if (boardWait) return boardWait;
+  const run = ensureBoardBody().finally(() => {
+    if (boardWait === run) boardWait = null;
+  });
+  boardWait = run;
+  return run;
+}
+
+// A planned row whose window has ended is skipped. Progress stays as it was.
+function closePassedSlots(board: BoardFile): boolean {
+  const today = dateKey();
+  const now = nowSec();
+  const day = board.days.find((entry) => entry.date === today);
+  if (!day) return false;
+  let changed = false;
+  for (const item of day.items) {
+    if (item.status !== "planned") continue;
+    if (!itemHasPassed(item, now)) continue;
+    item.status = "skipped";
+    changed = true;
+  }
+  return changed;
+}
+
+// Persist passed slots, then return the same board.
+async function settlePassed(board: BoardFile): Promise<BoardFile> {
+  if (closePassedSlots(board)) await writeBoard(board);
+  return board;
+}
+
+// The saved week. A later-day rebuild does not hold this up, and a failed rebuild still returns the last save.
+async function ensureBoardBody(): Promise<TvBoard> {
+  if (stillBuilding()) return presentBoard(await readBoard());
+  if (rebuildingAhead > 0 && !(await scheduleAheadOfBoard())) {
+    return presentBoard(await exclusive(async () => settlePassed(await readBoard())));
+  }
+  return exclusive(async () => {
+    if (await scheduleAheadOfBoard()) {
+      try {
+        await rebuildTodayPreservingPlaybackLocked();
+      } catch (err) {
+        console.error("rundown rebuild failed", err);
+      }
+      return presentBoard(await settlePassed(await readBoard()));
+    }
+    const today = dateKey();
+    let board = await readBoard();
+    if (!windowReady(board, today, true)) {
+      if (!windowReady(board, today, false)) board = await syncBoard(false);
+      else if (await reflowSeries(board)) await writeBoard(board);
+      scheduleFill();
+    } else if (await reflowSeries(board)) {
+      await writeBoard(board);
+    }
+    return presentBoard(await settlePassed(board));
+  });
 }
 
 // Write the live day back without dropping the other saved days.
@@ -584,39 +740,118 @@ export async function findRundownItem(id: string): Promise<RundownItem | undefin
 }
 
 // Rebuild today around playback, then rebuild the days after it. Yesterday stays as it was.
-export function rebuildTodayPreservingPlayback(): Promise<TodayRundown> {
-  return exclusive(async () => {
-    const board = await syncBoard(false);
+export function rebuildTodayPreservingPlayback(changedIds?: string[]): Promise<TodayRundown> {
+  return exclusive(() => rebuildTodayPreservingPlaybackLocked(changedIds ? new Set(changedIds) : undefined));
+}
+
+// True when the week on disk is newer than the saved TV schedule.
+async function scheduleAheadOfBoard(): Promise<boolean> {
+  try {
+    const [sched, tv] = await Promise.all([stat(schedulePath), stat(tvPath)]);
+    return sched.mtimeMs > tv.mtimeMs;
+  } catch {
+    return true;
+  }
+}
+
+async function rebuildTodayPreservingPlaybackLocked(changedIds?: Set<string>): Promise<TodayRundown> {
+  if (changedIds?.size) markBuilding(changedIds);
+  else markBuilding((await loadSchedule()).blocks.map((block) => block.id));
+  try {
+    return await rebuildTodayPreservingPlaybackBody(changedIds);
+  } catch (err) {
+    if (rebuildingAhead === 0) clearBuilding();
+    throw err;
+  }
+}
+
+// Time today's files, then queue the later days.
+async function rebuildTodayPreservingPlaybackBody(changedIds?: Set<string>): Promise<TodayRundown> {
+  const board = await syncBoard(false);
+  const today = dateKey();
+  const current = board.days.find((day) => day.date === today) ?? { date: today, items: [] };
+  const rebuilt = await rebuildLiveDay(current, changedIds);
+  const savedYesterday = board.days.find((day) => day.date === shiftDateKey(today, -1));
+  const head: DayRundown[] = [];
+  if (savedYesterday) head.push(savedYesterday);
+  head.push(rebuilt);
+  const drafted: BoardFile = { carriedInto: today, days: head };
+  await reflowSeries(drafted);
+  const later = board.days.filter((day) => day.date > today && inWindow(today, day.date));
+  await writeBoard({ carriedInto: today, days: [...drafted.days, ...later] });
+  scheduleAheadRebuild(changedIds);
+  return rebuilt;
+}
+
+// Rebuild the days after today without holding the TV schedule read.
+function scheduleAheadRebuild(changedIds?: Set<string>): void {
+  aheadChain = aheadChain.then(
+    () => rebuildDaysAfterToday(changedIds),
+    () => rebuildDaysAfterToday(changedIds),
+  );
+}
+
+// Files and times that identify a day, so a play or a skip does not drop the later days.
+function dayFiles(day: DayRundown): string {
+  return day.items
+    .map((item) => `${item.blockId}|${item.path}|${item.start}|${item.durationSec}|${item.overnight ? 1 : 0}`)
+    .join("\n");
+}
+
+// Replace the saved days after today from the live day. A newer today write wins.
+async function rebuildDaysAfterToday(changedIds?: Set<string>): Promise<void> {
+  rebuildingAhead += 1;
+  try {
     const today = dateKey();
-    const current = board.days.find((day) => day.date === today) ?? { date: today, items: [] };
-    const rebuilt = await rebuildLiveDay(current);
+    const board = await readBoard();
+    const live = board.days.find((day) => day.date === today);
+    if (!live) return;
+    const stamp = dayFiles(live);
     const schedule = await loadSchedule();
-    let progress = notePicks(await loadProgress(), rebuilt.items, schedule, true);
-    let previous = rebuilt;
+    let progress = notePicks(await loadProgress(), live.items, schedule, true);
+    let previous = live;
     const days: DayRundown[] = [];
     const savedYesterday = board.days.find((day) => day.date === shiftDateKey(today, -1));
     if (savedYesterday) days.push(savedYesterday);
-    days.push(rebuilt);
+    days.push(live);
     for (let offset = 1; offset <= TV_AHEAD; offset++) {
       const date = shiftDateKey(today, offset);
-      const own = await buildOwnItems(date, progress);
+      const saved = board.days.find((day) => day.date === date);
+      const own = await buildOwnItems(date, progress, saved, changedIds);
       const spill = plannedSpill(previous, schedule);
       const day = { date, items: sortRundown([...spill, ...own.items]) };
       days.push(day);
       previous = day;
       progress = own.progress;
     }
-    const next = { carriedInto: today, days };
+    const next: BoardFile = { carriedInto: today, days };
     await reflowSeries(next);
-    await writeBoard(next);
-    return rebuilt;
-  });
+    await exclusive(async () => {
+      const latest = await readBoard();
+      const current = latest.days.find((day) => day.date === today);
+      if (!current || dayFiles(current) !== stamp) {
+        if (current) scheduleAheadRebuild(changedIds);
+        return;
+      }
+      const yesterday = latest.days.find((day) => day.date === shiftDateKey(today, -1));
+      const days: DayRundown[] = [];
+      if (yesterday) days.push(yesterday);
+      days.push(current);
+      days.push(...next.days.filter((day) => day.date > today));
+      await writeBoard({ carriedInto: today, days });
+    });
+  } catch (err) {
+    console.error("rundown rebuild failed", err);
+  } finally {
+    rebuildingAhead -= 1;
+    if (rebuildingAhead === 0) clearBuilding();
+  }
 }
 
 // Today's slots from the timetable, keeping a file that is already playing or finished.
-async function rebuildLiveDay(current: DayRundown): Promise<DayRundown> {
+async function rebuildLiveDay(current: DayRundown, changedIds?: Set<string>): Promise<DayRundown> {
   const today = dateKey();
-  const built = await buildRundown(today);
+  const built = await buildRundown(today, current, changedIds);
   if (!current.items.some((item) => item.status === "playing")) return built;
 
   const lockedByBlock = new Map<string, RundownItem[]>();
@@ -650,7 +885,11 @@ async function rebuildLiveDay(current: DayRundown): Promise<DayRundown> {
 }
 
 // Fill today's items from the schedule and each video's length.
-export async function buildRundown(date = dateKey()): Promise<TodayRundown> {
+export async function buildRundown(
+  date = dateKey(),
+  existing?: DayRundown,
+  changedIds?: Set<string>,
+): Promise<TodayRundown> {
   const schedule = await loadSchedule();
   const stored = await loadProgress();
   const progress = cloneProgress(stored);
@@ -659,12 +898,17 @@ export async function buildRundown(date = dateKey()): Promise<TodayRundown> {
 
   for (const block of blocksForDay(schedule, day)) {
     const placed = windowOn(block, day);
-    const built = await itemsForWindow(
-      block,
-      parseHm(placed.start),
-      parseHm(placed.start) + lengthMinutes(block) * 60,
-      progress,
-    );
+    const kept = keptForBlock(existing, block.id);
+    const built =
+      changedIds && existing && !changedIds.has(block.id)
+        ? kept
+        : await itemsForWindow(
+            block,
+            parseHm(placed.start),
+            parseHm(placed.start) + lengthMinutes(block) * 60,
+            progress,
+            kept,
+          );
     items.push(...built);
     for (const item of built) {
       const folder = sourceFolder(item, block);
@@ -684,14 +928,24 @@ export async function buildRundown(date = dateKey()): Promise<TodayRundown> {
   const now = nowSec();
   for (const block of blocksForDay(schedule, yesterday)) {
     const placed = windowOn(block, yesterday);
-    if (placed.endMin <= DAY_MINUTES) continue;
-    const leftoverEndSec = leftoverMin(placed) * 60;
+    if (block.mode !== "playlist" && placed.endMin <= DAY_MINUTES) continue;
+    if (changedIds && existing && !changedIds.has(block.id)) {
+      items.push(...existing.items.filter((item) => item.blockId === block.id && item.overnight));
+      continue;
+    }
+    const existingOvernight = existing?.items.filter((item) => item.blockId === block.id && item.overnight) ?? [];
+    if (existingOvernight.length) {
+      items.push(...existingOvernight);
+      continue;
+    }
     const built = await itemsForWindow(
       block,
       parseHm(placed.start),
       parseHm(placed.start) + lengthMinutes(block) * 60,
       stored,
     );
+    const leftoverEndSec = blockLeftoverSec(block, yesterday, built);
+    if (leftoverEndSec <= 0) continue;
     for (const item of built) {
       const leftover = { ...item, overnight: true };
       if (leftoverStillActive(leftover, now, leftoverEndSec)) items.push(leftover);
@@ -706,9 +960,10 @@ async function itemsForWindow(
   cursorStart: number,
   blockEnd: number,
   progress: Progress,
+  kept: RundownItem[] = [],
 ): Promise<RundownItem[]> {
   if (block.mode === "playlist") {
-    return itemsForPlaylist(block, cursorStart, progress);
+    return itemsForPlaylist(block, cursorStart, progress, kept);
   }
 
   const items: RundownItem[] = [];
@@ -784,28 +1039,32 @@ async function itemsForPlaylist(
   block: ScheduleBlock,
   cursorStart: number,
   progress: Progress,
+  kept: RundownItem[] = [],
 ): Promise<RundownItem[]> {
   const items: RundownItem[] = [];
   const shadow = cloneProgress(progress);
   const usedByFolder = new Map<string, string[]>();
+  const unused = kept.slice();
   let cursor = cursorStart;
   for (const entry of block.items ?? []) {
     const used = usedByFolder.get(entry.folder) ?? [];
-    const picked = await pickEntry(entry, shadow, used);
+    const prev = takeKeptEntry(unused, entry);
+    let picked: { path: string; durationSec: number; title: string } | null = null;
+    if (entry.mode === "random-file" && prev && (await randomPickStillValid(entry, prev, used))) {
+      picked = { path: prev.path, durationSec: prev.durationSec, title: prev.title };
+    } else if (entry.mode === "next-episode" && prev?.chosen) {
+      picked = { path: prev.path, durationSec: prev.durationSec, title: prev.title };
+    } else {
+      picked = await pickEntry(entry, shadow, used);
+    }
     if (!picked) continue;
-    items.push(
-      makeItem(block, picked.path, cursor, picked.durationSec, {
-        title: picked.title,
-        mode: entry.mode,
-        folder: entry.folder,
-      }),
-    );
+    items.push(placePlaylistItem(block, entry, prev, picked, cursor));
     if (entry.folder) {
       usedByFolder.set(entry.folder, [...used, picked.path]);
       if (entry.mode === "next-episode") shadow.lastCompleted[entry.folder] = picked.path;
       else if (entry.mode === "random-file") {
-        const prev = shadow.recentRandom[entry.folder] ?? [];
-        shadow.recentRandom[entry.folder] = [picked.path, ...prev.filter((file) => file !== picked.path)].slice(
+        const recent = shadow.recentRandom[entry.folder] ?? [];
+        shadow.recentRandom[entry.folder] = [picked.path, ...recent.filter((file) => file !== picked.path)].slice(
           0,
           RECENT_RANDOM_LIMIT,
         );
@@ -814,6 +1073,76 @@ async function itemsForPlaylist(
     cursor += picked.durationSec;
   }
   return items;
+}
+
+// Saved rows for this slot on this day, not the leftover from yesterday.
+function keptForBlock(existing: DayRundown | undefined, blockId: string): RundownItem[] {
+  if (!existing) return [];
+  return sortRundown(existing.items).filter((item) => item.blockId === blockId && !item.overnight);
+}
+
+// Pull the saved row for this stacked video, if this day already had it.
+function takeKeptEntry(unused: RundownItem[], entry: PlaylistEntry): RundownItem | undefined {
+  const byId = unused.findIndex((item) => item.entryId === entry.id);
+  if (byId >= 0) return unused.splice(byId, 1)[0];
+  const byShape = unused.findIndex((item) => {
+    if (item.entryId) return false;
+    if (item.mode !== entry.mode) return false;
+    if (entry.mode === "youtube") {
+      const url = parseYoutubeUrl(entry.file ?? "") ?? (entry.file ?? "").trim();
+      return item.path === url;
+    }
+    if (entry.mode === "specific-file") return item.path === (entry.file ?? "").trim();
+    return (item.folder ?? "") === entry.folder;
+  });
+  if (byShape >= 0) return unused.splice(byShape, 1)[0];
+  return undefined;
+}
+
+// True when this day's random pick can stay, so a save does not shuffle it.
+async function randomPickStillValid(
+  entry: PlaylistEntry,
+  item: RundownItem,
+  used: string[],
+): Promise<boolean> {
+  if (item.mode !== "random-file" || !item.path) return false;
+  if (used.includes(item.path)) return false;
+  const files = await videosIn(entry.folder);
+  if (!files.includes(item.path)) return false;
+  const durationSec = item.durationSec > 0 ? item.durationSec : await probeDuration(item.path);
+  if (entry.lengthMin && !itemFits(durationSec, entry.lengthMin * 60)) return false;
+  return true;
+}
+
+// Keep the saved row when this stacked video is still the same pick.
+function placePlaylistItem(
+  block: ScheduleBlock,
+  entry: PlaylistEntry,
+  prev: RundownItem | undefined,
+  picked: { path: string; durationSec: number; title: string },
+  startSec: number,
+): RundownItem {
+    if (prev) {
+    const rest = { ...prev };
+    delete rest.overnight;
+    return {
+      ...rest,
+      entryId: entry.id,
+      path: picked.path,
+      title: picked.title,
+      durationSec: picked.durationSec,
+      mode: entry.mode,
+      folder: entry.folder,
+      start: formatHm(startSec),
+      end: formatHm(startSec + picked.durationSec),
+    };
+  }
+  return makeItem(block, picked.path, startSec, picked.durationSec, {
+    title: picked.title,
+    mode: entry.mode,
+    folder: entry.folder,
+    entryId: entry.id,
+  });
 }
 
 // The one file this stacked entry will play.
@@ -845,9 +1174,19 @@ async function pickEntry(
     return { path: file, durationSec: await probeDuration(file), title: titleFromPath(file) };
   }
   const recent = progress.recentRandom[entry.folder] ?? [];
-  const file = randomFile(files, [...recent, ...used]);
-  if (!file) return null;
-  return { path: file, durationSec: await probeDuration(file), title: titleFromPath(file) };
+  const remaining = entry.lengthMin ? entry.lengthMin * 60 : null;
+  const passed = new Set<string>();
+  while (true) {
+    const pool = files.filter((candidate) => !passed.has(candidate) && !used.includes(candidate));
+    if (pool.length === 0) return null;
+    const file = randomFile(pool, recent);
+    if (!file) return null;
+    const durationSec = await probeDuration(file);
+    if (remaining == null || itemFits(durationSec, remaining)) {
+      return { path: file, durationSec, title: titleFromPath(file) };
+    }
+    passed.add(file);
+  }
 }
 
 function leftoverCarry(
@@ -861,14 +1200,26 @@ function leftoverCarry(
     if (item.status === "done" || item.status === "skipped") continue;
     const block = schedule.blocks.find((entry) => entry.id === item.blockId);
     if (!block?.days.includes(yesterday)) continue;
-    const placed = windowOn(block, yesterday);
-    if (placed.endMin <= DAY_MINUTES) continue;
+    const leftoverSec = blockLeftoverSec(block, yesterday, items);
+    if (leftoverSec <= 0) continue;
     const leftover = { ...item, overnight: true };
-    if (item.status === "playing" || leftoverStillActive(leftover, now, leftoverMin(placed) * 60)) {
+    if (item.status === "playing" || leftoverStillActive(leftover, now, leftoverSec)) {
       out.push(leftover);
     }
   }
   return out;
+}
+
+// Seconds after midnight this block still occupies, from its files or its window.
+function blockLeftoverSec(block: ScheduleBlock, day: Day, items: RundownItem[]): number {
+  const placed = windowOn(block, day);
+  if (block.mode !== "playlist") return leftoverMin(placed) * 60;
+  let leftover = 0;
+  for (const item of items) {
+    if (item.blockId !== block.id || item.overnight) continue;
+    leftover = Math.max(leftover, parseHm(item.start) + item.durationSec - DAY_SECONDS);
+  }
+  return Math.max(0, leftover);
 }
 
 function mergeOvernight(built: RundownItem[], carry: RundownItem[]): RundownItem[] {
@@ -915,7 +1266,7 @@ function makeItem(
   file: string,
   startSec: number,
   durationSec: number,
-  extra?: { title?: string; mode?: ItemMode; folder?: string },
+  extra?: { title?: string; mode?: ItemMode; folder?: string; entryId?: string },
 ): RundownItem {
   const mode = extra?.mode ?? (block.mode === "playlist" ? "specific-file" : block.mode);
   return {
@@ -929,6 +1280,7 @@ function makeItem(
     end: formatHm(startSec + durationSec),
     durationSec,
     status: "planned",
+    ...(extra?.entryId ? { entryId: extra.entryId } : {}),
   };
 }
 
@@ -973,6 +1325,8 @@ export async function slotLength(opts: {
   mode: ItemMode;
   folder: string;
   file?: string;
+  /** Cap in minutes. A random folder then uses the longest file that still fits. */
+  maxMin?: number;
 }): Promise<SlotLength | null> {
   if (opts.mode === "youtube") {
     const file = parseYoutubeUrl(opts.file ?? "");
@@ -1014,10 +1368,12 @@ export async function slotLength(opts: {
     };
   }
 
+  const remaining = opts.maxMin && opts.maxMin > 0 ? opts.maxMin * 60 : null;
   let longest: { file: string; durationSec: number } | null = null;
   let shortest: { file: string; durationSec: number } | null = null;
   for (const file of files) {
     const durationSec = await probeDuration(file);
+    if (remaining != null && !itemFits(durationSec, remaining)) continue;
     if (!longest || durationSec > longest.durationSec) longest = { file, durationSec };
     if (!shortest || durationSec < shortest.durationSec) shortest = { file, durationSec };
   }
@@ -1056,7 +1412,14 @@ export async function missesForBlocks(blocks: ScheduleBlock[]): Promise<SlotMiss
 
 // The file this block would start, when that file is too long for the slot.
 async function missForBlock(block: ScheduleBlock, progress: Progress): Promise<SlotMiss | null> {
-  if (block.mode === "playlist") return null;
+  if (block.mode === "playlist") {
+    for (const entry of block.items ?? []) {
+      if (entry.mode !== "random-file" || !entry.lengthMin) continue;
+      const miss = await missForRandomFolder(block.id, entry.folder, entry.lengthMin * 60);
+      if (miss) return miss;
+    }
+    return null;
+  }
   const slotSec = tightestSlotSec(block);
   const limitSec = maxPlayableSec(slotSec);
   if (block.mode === "youtube") {
@@ -1090,6 +1453,18 @@ async function missForBlock(block: ScheduleBlock, progress: Progress): Promise<S
     return { blockId: block.id, kind: "episode", title: titleFromPath(file), durationSec, limitSec };
   }
 
+  return missForRandomFolder(block.id, block.folder, slotSec);
+}
+
+// True when every file in a random folder is too long for this window.
+async function missForRandomFolder(
+  blockId: string,
+  folder: string,
+  slotSec: number,
+): Promise<SlotMiss | null> {
+  const files = await videosIn(folder);
+  if (files.length === 0) return null;
+  const limitSec = maxPlayableSec(slotSec);
   let shortest: { title: string; durationSec: number } | null = null;
   for (const file of files) {
     const durationSec = await probeDuration(file);
@@ -1100,7 +1475,7 @@ async function missForBlock(block: ScheduleBlock, progress: Progress): Promise<S
   }
   if (!shortest) return null;
   return {
-    blockId: block.id,
+    blockId,
     kind: "folder",
     title: shortest.title,
     durationSec: shortest.durationSec,
@@ -1114,6 +1489,171 @@ function editableDay(date: string): void {
   }
 }
 
+// A slot that has not aired can take a different file.
+function stillToAir(date: string, item: RundownItem): boolean {
+  if (item.status === "playing" || item.status === "done" || item.status === "skipped") return false;
+  const offset = dateOffset(dateKey(), date);
+  if (offset < 0) return false;
+  if (offset === 0 && itemHasPassed(item, nowSec())) return false;
+  return true;
+}
+
+// Mark as skipped applies to yesterday and to today's slots that have already aired.
+function alreadyAired(date: string, item: RundownItem): boolean {
+  if (item.status === "playing") return false;
+  const offset = dateOffset(dateKey(), date);
+  if (offset < 0) return true;
+  if (offset > 0) return false;
+  if (item.status === "done") return true;
+  return itemHasPassed(item, nowSec());
+}
+
+// Record a movie as recently played, or an episode as watched so later airings move on.
+export function markItemDone(date: string, itemId: string): Promise<TvBoard> {
+  editableDay(date);
+  return exclusive(async () => {
+    const board = await syncBoard(true);
+    const rundown = board.days.find((day) => day.date === date);
+    const item = rundown?.items.find((entry) => entry.id === itemId);
+    if (!rundown || !item) throw new Error("Item not found");
+    if (item.mode !== "next-episode" && item.mode !== "random-file") {
+      throw new Error("Only an episode or a random movie can be marked done");
+    }
+    const playingMovie = item.status === "playing" && item.mode === "random-file";
+    if (item.status === "playing" && !playingMovie) {
+      throw new Error("A file that is on the air cannot be marked done");
+    }
+
+    const schedule = await loadSchedule();
+    const block = schedule.blocks.find((entry) => entry.id === item.blockId);
+    if (!block) throw new Error("Block missing from schedule");
+    const folder = sourceFolder(item, block);
+    if (!folder) throw new Error("Block missing from schedule");
+
+    if (item.mode === "random-file") {
+      const marked = item.path;
+      const replace = playingMovie || stillToAir(date, item);
+      let next: string | null = null;
+      if (replace) {
+        const files = await videosIn(folder);
+        const used = rundown.items
+          .filter(
+            (entry) =>
+              entry.blockId === item.blockId &&
+              entry.id !== item.id &&
+              sourceFolder(entry, block) === folder,
+          )
+          .map((entry) => entry.path);
+        const progress = await loadProgress();
+        const recent = progress.recentRandom[folder] ?? [];
+        next = randomFile(files, [...recent, ...used, marked]);
+        if (playingMovie && (!next || next === marked)) throw new Error("No other files in this folder");
+      }
+      await markRandomPlayed(folder, marked);
+      if (replace && next && next !== marked) {
+        item.path = next;
+        item.title = titleFromPath(next);
+        item.durationSec = await probeDuration(next);
+        item.status = playingMovie ? "playing" : "planned";
+        recomputeBlockTimes(rundown, block);
+        await writeBoard(board);
+      }
+      return presentBoard(board);
+    }
+
+    const files = await videosIn(folder);
+    if (!files.includes(item.path)) throw new Error("Episode is no longer in this folder");
+    await markEpisodeDone(folder, item.path);
+
+    const live = date === dateKey();
+    const now = nowSec();
+    const aired =
+      dateOffset(dateKey(), date) < 0 ||
+      item.status === "done" ||
+      item.status === "skipped" ||
+      Boolean(item.overnight) ||
+      (live && itemHasPassed(item, now));
+
+    if (!aired) {
+      const next = nextFrom(files, item.path);
+      if (!next) throw new Error("Episode is no longer in this folder");
+      item.path = next;
+      item.title = titleFromPath(next);
+      item.durationSec = await probeDuration(next);
+      item.status = "planned";
+      item.chosen = true;
+      recomputeBlockTimes(rundown, block);
+    } else {
+      item.status = "done";
+    }
+
+    await continueShowAfter(board, schedule, folder, files, {
+      date,
+      start: item.start,
+      overnight: Boolean(item.overnight),
+      path: item.path,
+    });
+    await writeBoard(board);
+    return presentBoard(board);
+  });
+}
+
+// A done episode goes back to skipped, and a movie leaves recently played.
+export function markItemSkipped(date: string, itemId: string): Promise<TvBoard> {
+  editableDay(date);
+  return exclusive(async () => {
+    const board = await syncBoard(true);
+    const rundown = board.days.find((day) => day.date === date);
+    const item = rundown?.items.find((entry) => entry.id === itemId);
+    if (!rundown || !item) throw new Error("Item not found");
+    if (item.mode !== "next-episode" && item.mode !== "random-file") {
+      throw new Error("Only an episode or a random movie can be marked done");
+    }
+
+    const schedule = await loadSchedule();
+    const block = schedule.blocks.find((entry) => entry.id === item.blockId);
+    if (!block) throw new Error("Block missing from schedule");
+    const folder = sourceFolder(item, block);
+    if (!folder) throw new Error("Block missing from schedule");
+
+    if (!alreadyAired(date, item)) throw new Error("Only a video that already aired can be marked skipped");
+    if (item.mode === "next-episode" && item.status !== "done") {
+      throw new Error("Only a finished episode can be marked skipped");
+    }
+
+    await forgetRandomPath(item.path);
+
+    if (item.mode === "random-file") {
+      if (item.status === "done") item.status = "skipped";
+      await writeBoard(board);
+      return presentBoard(board);
+    }
+
+    const files = await videosIn(folder);
+    const progress = await loadProgress();
+    const rewound = progress.lastCompleted[folder] === item.path;
+    if (rewound) {
+      const index = files.indexOf(item.path);
+      if (index > 0) progress.lastCompleted[folder] = files[index - 1]!;
+      else delete progress.lastCompleted[folder];
+      await saveProgress(progress);
+    }
+    item.status = "skipped";
+    delete item.chosen;
+    if (rewound) {
+      const previous = files[files.indexOf(item.path) - 1];
+      await continueShowAfter(board, schedule, folder, files, {
+        date,
+        start: item.start,
+        overnight: Boolean(item.overnight),
+        path: previous ?? "",
+      });
+    }
+    await writeBoard(board);
+    return presentBoard(board);
+  });
+}
+
 // Replace a random item on one saved day with another file, and retime its block.
 export function shuffleItem(date: string, itemId: string): Promise<TvBoard> {
   editableDay(date);
@@ -1125,10 +1665,13 @@ export function shuffleItem(date: string, itemId: string): Promise<TvBoard> {
     if (dateOffset(dateKey(), date) < 0) throw new Error("Cannot shuffle a playing or finished item");
     if (item.mode !== "random-file") throw new Error("Only random items can be shuffled");
     const live = date === dateKey();
-    if (item.status === "playing" || item.status === "done" || item.status === "skipped") {
+    const playing = item.status === "playing";
+    if (item.status === "done" || item.status === "skipped") {
       throw new Error("Cannot shuffle a playing or finished item");
     }
-    if (live && itemHasPassed(item, nowSec())) throw new Error("Cannot shuffle a playing or finished item");
+    if (!playing && live && itemHasPassed(item, nowSec())) {
+      throw new Error("Cannot shuffle a playing or finished item");
+    }
 
     const schedule = await loadSchedule();
     const block = schedule.blocks.find((entry) => entry.id === item.blockId);
@@ -1152,7 +1695,7 @@ export function shuffleItem(date: string, itemId: string): Promise<TvBoard> {
     item.path = next;
     item.title = titleFromPath(next);
     item.durationSec = await probeDuration(next);
-    item.status = "planned";
+    item.status = playing ? "playing" : "planned";
     recomputeBlockTimes(rundown, block);
     await writeBoard(board);
     return presentBoard(board);
@@ -1221,6 +1764,8 @@ export function stepEpisode(date: string, itemId: string, direction: -1 | 1): Pr
       row.title = titleFromPath(file);
       row.durationSec = await probeDuration(file);
       if (row.status !== "playing") row.status = "planned";
+      if (row.id === item.id) row.chosen = true;
+      else delete row.chosen;
       cursor += 1;
     }
     if (drop.size > 0) rundown.items = rundown.items.filter((row) => !drop.has(row.id));

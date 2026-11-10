@@ -1,6 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 import { dateOffset, weekdayOfKey } from "../../shared/dates.ts";
-import type { ItemStatus, PlayerStatus, RundownItem, TvBoard } from "../../shared/types.ts";
+import type { ItemStatus, PlayerStatus, RecentPlays, RundownItem, TvBoard } from "../../shared/types.ts";
 import { itemCoversNow, itemHasPassed, itemProgress, itemStartsLater, secondsOf } from "../../shared/window.ts";
 import { canonicalYoutubeIntermission, youtubeId } from "../../shared/youtube.ts";
 import { api } from "../api.ts";
@@ -56,6 +56,19 @@ function canStepEpisode(item: RundownItem, passed: boolean): boolean {
   return item.mode === "next-episode" && !passed;
 }
 
+function playedPaths(recent: RecentPlays): Set<string> {
+  const paths = new Set<string>();
+  for (const folder of recent.folders) {
+    for (const video of folder.videos) paths.add(video.path);
+  }
+  return paths;
+}
+
+function rowWatched(item: RundownItem, played: ReadonlySet<string>): boolean {
+  if (item.mode === "random-file") return played.has(item.path);
+  return item.status === "done";
+}
+
 function heldItem(items: RundownItem[], sec: number): RundownItem | null {
   let winner: RundownItem | null = null;
   for (const item of items) {
@@ -85,12 +98,41 @@ export function TvSchedule() {
   const [now, setNow] = useState(() => new Date());
   const [missed, setMissed] = useState<Record<string, true>>({});
   const [watchTitle, setWatchTitle] = useState<string | null>(null);
+  const [played, setPlayed] = useState<ReadonlySet<string>>(() => new Set());
+  const [menuKey, setMenuKey] = useState<string | null>(null);
 
   async function refresh() {
-    const [nextBoard, nextStatus] = await Promise.all([api.tv(), api.status()]);
-    setBoard(nextBoard);
-    setStatus(nextStatus);
+    const [boardResult, statusResult, recentResult] = await Promise.allSettled([
+      api.tv(),
+      api.status(),
+      api.recent(),
+    ]);
+    if (boardResult.status === "fulfilled") {
+      setBoard(boardResult.value);
+      setError(null);
+    }
+    if (statusResult.status === "fulfilled") setStatus(statusResult.value);
+    if (recentResult.status === "fulfilled") setPlayed(playedPaths(recentResult.value));
+    if (boardResult.status === "rejected") throw boardResult.reason;
   }
+
+  useEffect(() => {
+    if (!menuKey) return;
+    function onPointer(event: Event) {
+      const target = event.target;
+      if (target instanceof Element && target.closest(".item-menu")) return;
+      setMenuKey(null);
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setMenuKey(null);
+    }
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menuKey]);
 
   useEffect(() => {
     refresh().catch((e: Error) => setError(e.message));
@@ -152,6 +194,7 @@ export function TvSchedule() {
     setError(null);
     try {
       setBoard(await api.shuffle(day.date, item.id));
+      setStatus(await api.status());
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -166,6 +209,35 @@ export function TvSchedule() {
     try {
       setBoard(await api.stepEpisode(day.date, item.id, direction));
       setStatus(await api.status());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function markDone(item: RundownItem) {
+    if (!day) return;
+    setBusy(`${item.id}:done`);
+    setError(null);
+    try {
+      setBoard(await api.markDone(day.date, item.id));
+      setPlayed(playedPaths(await api.recent()));
+      setStatus(await api.status());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function markSkipped(item: RundownItem) {
+    if (!day) return;
+    setBusy(`${item.id}:skipped`);
+    setError(null);
+    try {
+      setBoard(await api.markSkipped(day.date, item.id));
+      setPlayed(playedPaths(await api.recent()));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -231,16 +303,105 @@ export function TvSchedule() {
   const showColumn = Boolean(day && (items.length > 0 || gapTitle));
   const episodeItem = current?.mode === "next-episode" ? current : due?.mode === "next-episode" ? due : null;
 
-  function episodeButtons(item: RundownItem) {
-    const pending = busy === `${item.id}:prev` || busy === `${item.id}:next`;
+  function itemMenu(item: RundownItem, place: string, passed: boolean, canEdit: boolean, airing: boolean) {
+    const done = rowWatched(item, played);
+    const trackable = item.mode === "next-episode" || item.mode === "random-file";
+    const canStep = canEdit && canStepEpisode(item, passed);
+    const onAirMovie = item.mode === "random-file" && (airing || item.status === "playing");
+    const canShuffle = canEdit && item.mode === "random-file" && (onAirMovie || !passed);
+    const canDone = onAirMovie || (trackable && !done && !airing && item.status !== "playing");
+    const earlier = passed || (live && item.status === "done");
+    const canSkip = trackable && done && !airing && item.status !== "playing" && earlier;
+    const hasMenu = canShuffle || canDone || canSkip;
+    if (!canStep && !hasMenu) return null;
+    const key = `${place}:${item.id}`;
+    const open = menuKey === key;
+    const pending =
+      busy === item.id ||
+      busy === `${item.id}:done` ||
+      busy === `${item.id}:skipped` ||
+      busy === `${item.id}:prev` ||
+      busy === `${item.id}:next`;
+    const upcoming = !passed && item.status !== "done" && item.status !== "skipped";
+    const doneTip =
+      item.mode === "next-episode"
+        ? upcoming
+          ? t.markDoneEpisode
+          : t.markDoneEpisodeAired
+        : upcoming
+          ? t.markDoneMovie
+          : t.markDoneMovieAired;
+    const skipTip = item.mode === "next-episode" ? t.markSkippedEpisode : t.markSkippedMovie;
+    function choose(action: () => void) {
+      setMenuKey(null);
+      action();
+    }
     return (
-      <div class="episode-step">
-        <button onClick={() => step(item, "prev")} disabled={pending} aria-label={t.previousEpisodeLabel}>
-          {t.previousEpisode}
-        </button>
-        <button onClick={() => step(item, "next")} disabled={pending} aria-label={t.nextEpisodeLabel}>
-          {t.nextEpisodeButton}
-        </button>
+      <div class="item-actions">
+        {canStep && (
+          <>
+            <button
+              type="button"
+              class="item-step"
+              data-tip={t.previousEpisodeLabel}
+              aria-label={t.previousEpisodeLabel}
+              disabled={pending}
+              onClick={() => step(item, "prev")}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M15 5 L8 12 L15 19" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="item-step"
+              data-tip={t.nextEpisodeLabel}
+              aria-label={t.nextEpisodeLabel}
+              disabled={pending}
+              onClick={() => step(item, "next")}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M9 5 L16 12 L9 19" />
+              </svg>
+            </button>
+          </>
+        )}
+        {hasMenu && (
+          <div class={`item-menu${open ? " open" : ""}`}>
+            <button
+              type="button"
+              class="item-menu-toggle"
+              aria-label={t.itemOptions}
+              aria-expanded={open}
+              aria-haspopup="menu"
+              disabled={pending}
+              onClick={() => setMenuKey(open ? null : key)}
+            >
+              <i />
+              <i />
+              <i />
+            </button>
+            {open && (
+              <div class="item-menu-list" role="menu">
+                {canShuffle && (
+                  <button type="button" role="menuitem" data-tip={t.shuffleHint} onClick={() => choose(() => shuffle(item))}>
+                    {t.shuffle}
+                  </button>
+                )}
+                {canDone && (
+                  <button type="button" role="menuitem" data-tip={doneTip} onClick={() => choose(() => markDone(item))}>
+                    {t.markDone}
+                  </button>
+                )}
+                {canSkip && (
+                  <button type="button" role="menuitem" data-tip={skipTip} onClick={() => choose(() => markSkipped(item))}>
+                    {t.markSkipped}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -250,7 +411,17 @@ export function TvSchedule() {
       <div class="rail">
         {items.map((item) => {
           const passed = past || (live && itemHasPassed(item, sec));
-          const shown: ItemStatus = past ? (item.mode === "next-episode" ? "skipped" : "done") : item.status;
+          const shown: ItemStatus = past
+            ? item.mode === "next-episode"
+              ? item.status === "done"
+                ? "done"
+                : "skipped"
+              : item.mode === "random-file"
+                ? rowWatched(item, played)
+                  ? "done"
+                  : "skipped"
+                : "done"
+            : item.status;
           const canEdit = !past && (live || !item.overnight);
           const cardStill = showsFrame(item.mode) && !missed[item.path];
           const airing = Boolean(live && air?.id === item.id);
@@ -259,7 +430,9 @@ export function TvSchedule() {
           return (
             <div key={item.id} class={`rail-item ${shown}${airing ? " playing" : ""}${passed ? " passed" : ""}`}>
               <i class="dot" />
-              <article class={`card ${shown}${airing ? " playing" : ""}${passed ? " passed" : ""}${cardStill ? " has-still" : ""}`}>
+              <article
+                class={`card ${shown}${airing ? " playing" : ""}${passed ? " passed" : ""}${cardStill ? " has-still" : ""}${menuKey === `card:${item.id}` ? " menu-open" : ""}`}
+              >
                 {cardStill && (
                   <img
                     key={item.path}
@@ -285,15 +458,8 @@ export function TvSchedule() {
                     {modeLabel(item.mode)} · {sourceLabel(item)}
                     {wontStart ? ` · ${t.willNotStart}` : ""}
                   </div>
-                  {canEdit && canStepEpisode(item, passed) && episodeButtons(item)}
                 </div>
-                {canEdit && item.mode === "random-file" && !airing && !passed && (
-                  <div>
-                    <button onClick={() => shuffle(item)} disabled={busy === item.id}>
-                      {t.shuffle}
-                    </button>
-                  </div>
-                )}
+                {itemMenu(item, "card", passed, canEdit, airing)}
               </article>
             </div>
           );
@@ -407,7 +573,7 @@ export function TvSchedule() {
               )}
             </div>
             <div class="now-actions">
-              {episodeItem && episodeButtons(episodeItem)}
+              {air && itemMenu(air, "strip", false, true, true)}
               <button class="primary" onClick={start} disabled={busy === "start"}>
                 {status?.running ? t.playNow : t.startTv}
               </button>

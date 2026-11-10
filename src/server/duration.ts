@@ -5,12 +5,19 @@ const execFileAsync = promisify(execFile);
 const FALLBACK_SEC = 45 * 60;
 const exact = new Map<string, number>();
 const failed = new Set<string>();
+let probeTail: Promise<void> = Promise.resolve();
 
-// Measured length in seconds. Null when ffprobe cannot read the file.
-export async function measureDuration(file: string): Promise<number | null> {
-  const hit = exact.get(file);
-  if (hit) return hit;
-  if (failed.has(file)) return null;
+// One ffprobe at a time so a playlist open cannot flood the machine.
+function enqueueProbe<T>(task: () => Promise<T>): Promise<T> {
+  const run = probeTail.then(task, task);
+  probeTail = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+async function probeFile(file: string): Promise<number | null> {
   try {
     const { stdout } = await execFileAsync(
       "ffprobe",
@@ -36,6 +43,19 @@ export async function measureDuration(file: string): Promise<number | null> {
   }
   failed.add(file);
   return null;
+}
+
+// Measured length in seconds. Null when ffprobe cannot read the file.
+export async function measureDuration(file: string): Promise<number | null> {
+  const hit = exact.get(file);
+  if (hit) return hit;
+  if (failed.has(file)) return null;
+  return enqueueProbe(async () => {
+    const cached = exact.get(file);
+    if (cached) return cached;
+    if (failed.has(file)) return null;
+    return probeFile(file);
+  });
 }
 
 // Video length in seconds, cached, with a fallback when probing fails.

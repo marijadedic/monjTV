@@ -21,6 +21,8 @@ export interface PlaylistEntry {
   mode: ItemMode;
   folder: string;
   file?: string;
+  /** Cap in minutes for a random-file item. Playback skips files that do not fit. Omitted when any file may play. */
+  lengthMin?: number;
 }
 export type ItemStatus = "planned" | "playing" | "done" | "skipped";
 
@@ -98,12 +100,16 @@ export interface RundownItem {
   mode: ItemMode;
   /** Folder used for next-episode and random progress. Empty for YouTube. */
   folder?: string;
+  /** Playlist row this file came from. A later save keeps that random pick. */
+  entryId?: string;
   start: string;
   end: string;
   durationSec: number;
   status: ItemStatus;
   /** Leftover of yesterday’s slot that is still on after midnight. */
   overnight?: boolean;
+  /** Previous or Next picked this episode. A refresh keeps that file. */
+  chosen?: boolean;
 }
 
 export interface DayRundown {
@@ -118,6 +124,8 @@ export type TodayRundown = DayRundown;
 export interface TvBoard {
   today: string;
   days: DayRundown[];
+  /** Block ids still being timed after a save. Empty when the rundown is current. */
+  building?: string[];
 }
 
 export interface SlotMiss {

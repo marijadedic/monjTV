@@ -43,10 +43,22 @@ type Copy = {
   done: string;
   skipped: string;
   shuffle: string;
+  markDone: string;
+  markDoneLabel: string;
+  markSkipped: string;
+  markSkippedLabel: string;
+  itemOptions: string;
   previousEpisode: string;
   nextEpisodeButton: string;
   previousEpisodeLabel: string;
   nextEpisodeLabel: string;
+  markDoneEpisode: string;
+  markDoneEpisodeAired: string;
+  markDoneMovie: string;
+  markDoneMovieAired: string;
+  markSkippedEpisode: string;
+  markSkippedMovie: string;
+  shuffleHint: string;
   playNow: string;
   startTv: string;
   options: string;
@@ -104,6 +116,9 @@ type Copy = {
   playlistStack: string;
   addToPlaylist: string;
   playlistEmpty: string;
+  playlistRandomHint: string;
+  playlistNextHint: string;
+  playlistRandomCap: string;
   moveUp: string;
   moveDown: string;
   chooseYoutube: string;
@@ -149,11 +164,13 @@ type Copy = {
   wontFitFolder: (title: string, length: string, limit: string) => string;
   startTime: string;
   slotEnds: string;
+  slotWouldEnd: string;
   prevSlotEnds: string;
   nextSlotBegins: string;
   noSlotsAfter: string;
   onlySlot: string;
   overlaps: string;
+  calculating: string;
   measuring: string;
   followsVideo: string;
   until: (time: string) => string;
@@ -197,10 +214,22 @@ const en: Copy = {
   done: "Done",
   skipped: "Skipped",
   shuffle: "Shuffle",
+  markDone: "Mark as done",
+  markDoneLabel: "Mark as done",
+  markSkipped: "Mark as skipped",
+  markSkippedLabel: "Mark as skipped",
+  itemOptions: "Options",
   previousEpisode: "Previous",
   nextEpisodeButton: "Next",
   previousEpisodeLabel: "Previous episode",
   nextEpisodeLabel: "Next episode",
+  markDoneEpisode: "Marks it watched and plays the next episode in this slot.",
+  markDoneEpisodeAired: "Marks it watched. Later airings move on.",
+  markDoneMovie: "Marks it watched and picks another movie for this slot.",
+  markDoneMovieAired: "Marks it watched.",
+  markSkippedEpisode: "Puts this episode back for the next airing.",
+  markSkippedMovie: "Takes this movie off recently played.",
+  shuffleHint: "Picks another movie for this slot. This one is not marked watched.",
   playNow: "Play now",
   startTv: "Start TV",
   options: "Options",
@@ -272,12 +301,17 @@ const en: Copy = {
   youtube: "YouTube",
   youtubeHint: "Plays one YouTube video in mpv.",
   playlist: "Playlist",
-  playlistHint: "Videos play one after another, with no intermission between them.",
+  playlistHint:
+    "Videos play one after another, with no intermission between them. The slot lasts as long as the files that air that day.",
   playlistName: "Name on the schedule",
   playlistNamePlaceholder: "Saturday night",
   playlistStack: "Videos in this slot",
   addToPlaylist: "Add a video",
   playlistEmpty: "Add videos to this playlist.",
+  playlistRandomHint:
+    "Each airing picks a different file. A fixed length only skips files that are too long. The slot uses the file that plays.",
+  playlistNextHint: "Walks the folder in order. Each airing uses that episode’s length.",
+  playlistRandomCap: "Longest file it will pick",
   moveUp: "Move up",
   moveDown: "Move down",
   chooseYoutube: "YouTube URL",
@@ -337,11 +371,13 @@ const en: Copy = {
     `The shortest video, ${title}, is ${length}. This slot can play up to ${limit}, so nothing will play.`,
   startTime: "Start time",
   slotEnds: "Slot ends at",
+  slotWouldEnd: "Slot would end at",
   prevSlotEnds: "Previous slot ends at",
   nextSlotBegins: "Next slot begins at",
   noSlotsAfter: "No slots scheduled after this slot",
   onlySlot: "Only slot today",
   overlaps: "Overlaps",
+  calculating: "Calculating...",
   measuring: "Measuring…",
   followsVideo: "Follows the video",
   until: (time) => `Until ${time}`,
@@ -377,6 +413,14 @@ const hrExact: Record<string, string> = {
   "Type the folder path.": "Upišite putanju mape.",
   "Item not found": "Stavka nije pronađena.",
   "Only random items can be shuffled": "Promiješati se mogu samo nasumične stavke.",
+  "Only an episode or a random movie can be marked done":
+    "Gotovim se mogu označiti samo epizoda ili nasumični film.",
+  "A file that is on the air cannot be marked done":
+    "Datoteka koja je na programu ne može se označiti gotovom.",
+  "Only a finished episode can be marked skipped":
+    "Preskočenom se može označiti samo gotova epizoda.",
+  "Only a video that already aired can be marked skipped":
+    "Preskočenom se može označiti samo video koji je već bio na programu.",
   "Cannot shuffle a playing or finished item": "Stavka koja svira ili je gotova ne može se promiješati.",
   "Only next-episode items can change episode": "Epizodu mogu mijenjati samo stavke sljedeće epizode.",
   "Cannot change a finished episode": "Završena epizoda ne može se promijeniti.",
@@ -451,7 +495,7 @@ function hrError(message: string): string {
   match = /^Slot (.+) must end after it starts \(same day\)$/.exec(message);
   if (match) return `Blok ${match[1]} mora završiti nakon početka (isti dan).`;
 
-  match = /^Overlapping slots on (\w+): (.+)$/.exec(message);
+  match = /^Overlapping (?:slots|blocks) on (\w+): (.+)$/.exec(message);
   if (match) {
     const day = match[1] as Day;
     const label = hrDay[day] ?? match[1];
@@ -501,10 +545,22 @@ const hr: Copy = {
   done: "Gotovo",
   skipped: "Preskočeno",
   shuffle: "Promiješaj",
+  markDone: "Označi kao gotovo",
+  markDoneLabel: "Označi kao gotovo",
+  markSkipped: "Označi kao preskočeno",
+  markSkippedLabel: "Označi kao preskočeno",
+  itemOptions: "Mogućnosti",
   previousEpisode: "Prethodna",
   nextEpisodeButton: "Sljedeća",
   previousEpisodeLabel: "Prethodna epizoda",
   nextEpisodeLabel: "Sljedeća epizoda",
+  markDoneEpisode: "Označuje gledanim i u ovom terminu pušta sljedeću epizodu.",
+  markDoneEpisodeAired: "Označuje gledanim. Sljedeća prikazivanja idu dalje.",
+  markDoneMovie: "Označuje gledanim i za ovaj termin bira drugi film.",
+  markDoneMovieAired: "Označuje gledanim.",
+  markSkippedEpisode: "Ova epizoda ostaje za sljedeće prikazivanje.",
+  markSkippedMovie: "Miče ovaj film iz nedavno puštenih.",
+  shuffleHint: "Bira drugi film za ovaj termin. Ovaj se ne označuje gledanim.",
   playNow: "Pusti sada",
   startTv: "Pokreni TV",
   options: "Opcije",
@@ -576,12 +632,16 @@ const hr: Copy = {
   youtube: "YouTube",
   youtubeHint: "Pušta jedan YouTube video u mpv-u.",
   playlist: "Popis",
-  playlistHint: "Pušta videe redom, bez pauze između.",
+  playlistHint: "Pušta videe redom, bez pauze između. Blok traje koliko videi koji se tog dana puštaju.",
   playlistName: "Ime na rasporedu",
   playlistNamePlaceholder: "Subotnja večer",
   playlistStack: "Videi u ovom bloku",
   addToPlaylist: "Dodaj video",
   playlistEmpty: "Dodajte videe na ovaj popis.",
+  playlistRandomHint:
+    "Svako puštanje bira drugi video. Fiksno trajanje samo preskače preduge datoteke. Blok traje koliko video koji ide.",
+  playlistNextHint: "Ide redom kroz mapu. Svako puštanje traje koliko ta epizoda.",
+  playlistRandomCap: "Najdulji video koji smije ići",
   moveUp: "Gore",
   moveDown: "Dolje",
   chooseYoutube: "YouTube URL",
@@ -641,11 +701,13 @@ const hr: Copy = {
     `Najkraći video, ${title}, traje ${length}. U ovaj blok stane najviše ${limit}, pa se ništa neće pustiti.`,
   startTime: "Vrijeme početka",
   slotEnds: "Blok završava u",
+  slotWouldEnd: "Blok bi završio u",
   prevSlotEnds: "Prethodni blok završava u",
   nextSlotBegins: "Sljedeći blok počinje u",
   noSlotsAfter: "Nema zakazanih blokova nakon ovog bloka",
   onlySlot: "Jedini blok danas",
   overlaps: "Preklapa se",
+  calculating: "Računanje...",
   measuring: "Mjerenje…",
   followsVideo: "Slijedi video",
   until: (time) => `Do ${time}`,

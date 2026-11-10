@@ -9,9 +9,12 @@ import {
   type PlaylistEntry,
   type Schedule,
   type ScheduleBlock,
+  type RundownItem,
   type SlotLength,
   type SlotMiss,
+  type TvBoard,
 } from "../../shared/types.ts";
+import { placedOn, playlistMinutesOn, playlistRowsOn, segmentsPlaced } from "../../shared/placed.ts";
 import {
   DAY_MINUTES,
   clockOf,
@@ -53,6 +56,7 @@ type DraftItem = {
   file: string;
   title: string;
   durationSec: number | null;
+  lengthMin?: number;
   error?: string;
 };
 
@@ -71,14 +75,33 @@ type Draft = {
   addMode: ItemMode;
   addFolder: string;
   addFile: string;
+  addLengthChoice: LengthChoice;
+  addCustomMin: string;
   lengthChoice: LengthChoice;
   customMin: string;
   freeEnd: number;
   gapStart: number;
 };
 
-function emptyStack(): Pick<Draft, "name" | "items" | "addMode" | "addFolder" | "addFile"> {
-  return { name: "", items: [], addMode: "specific-file", addFolder: "", addFile: "" };
+function emptyStack(): Pick<
+  Draft,
+  "name" | "items" | "addMode" | "addFolder" | "addFile" | "addLengthChoice" | "addCustomMin"
+> {
+  return {
+    name: "",
+    items: [],
+    addMode: "specific-file",
+    addFolder: "",
+    addFile: "",
+    addLengthChoice: 60,
+    addCustomMin: "",
+  };
+}
+
+function newItemId(): string {
+  const cryptoObj = globalThis.crypto;
+  if (cryptoObj && typeof cryptoObj.randomUUID === "function") return cryptoObj.randomUUID();
+  return `item-${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
 }
 
 function toEntry(item: DraftItem): PlaylistEntry {
@@ -88,38 +111,65 @@ function toEntry(item: DraftItem): PlaylistEntry {
     mode: item.mode,
     folder: item.mode === "youtube" ? "" : item.mode === "specific-file" ? parentDir(file) : item.folder.trim(),
     ...(item.mode === "specific-file" || item.mode === "youtube" ? { file } : {}),
+    ...(item.mode === "random-file" && item.lengthMin ? { lengthMin: item.lengthMin } : {}),
   };
 }
 
-function fromEntry(item: PlaylistEntry): DraftItem {
+function fromEntry(item: PlaylistEntry, durationSec: number | null = null, title = ""): DraftItem {
+  const lengthMin = item.mode === "random-file" ? item.lengthMin : undefined;
   return {
     id: item.id,
     mode: item.mode,
     folder: item.folder,
     file: item.file ?? "",
-    title: "",
-    durationSec: null,
+    title: item.mode === "random-file" ? "" : title,
+    durationSec,
+    ...(lengthMin ? { lengthMin } : {}),
   };
 }
 
+function itemSeconds(item: DraftItem): number | null {
+  if (item.durationSec != null) return item.durationSec;
+  if (item.mode === "random-file" && item.lengthMin) return item.lengthMin * 60;
+  return null;
+}
+
 function stackSeconds(items: DraftItem[]): number | null {
-  if (items.length === 0 || items.some((item) => item.durationSec == null || item.error)) return null;
-  const total = items.reduce((sum, item) => sum + (item.durationSec ?? 0), 0);
+  if (items.length === 0 || items.some((item) => item.error)) return null;
+  if (items.some((item) => itemSeconds(item) == null && item.mode !== "random-file")) return null;
+  const total = items.reduce((sum, item) => sum + (itemSeconds(item) ?? 0), 0);
   return total > 0 ? total : null;
+}
+
+function stackItemNeedsProbe(item: DraftItem): boolean {
+  if (item.durationSec != null || item.error) return false;
+  return item.mode === "next-episode" || item.mode === "specific-file" || item.mode === "youtube";
+}
+
+function knownStackSeconds(items: DraftItem[]): number {
+  return items.reduce((sum, item) => sum + (itemSeconds(item) ?? 0), 0);
 }
 
 function isPreset(value: number): value is PresetMin {
   return (PRESETS as readonly number[]).includes(value);
 }
 
-function fixedMinutes(draft: Draft): number | null {
-  if (draft.lengthChoice === "longest") return null;
-  if (draft.lengthChoice === "custom") {
-    if (!/^\d+$/.test(draft.customMin.trim())) return null;
-    const mins = Number(draft.customMin);
+function minutesOfChoice(choice: LengthChoice, customMin: string): number | null {
+  if (choice === "longest") return null;
+  if (choice === "custom") {
+    if (!/^\d+$/.test(customMin.trim())) return null;
+    const mins = Number(customMin);
     return mins >= 1 ? mins : null;
   }
-  return draft.lengthChoice;
+  return choice;
+}
+
+function fixedMinutes(draft: Draft): number | null {
+  return minutesOfChoice(draft.lengthChoice, draft.customMin);
+}
+
+function addFixedMinutes(draft: Draft): number | null {
+  return minutesOfChoice(draft.addLengthChoice, draft.addCustomMin);
 }
 
 function choiceFromLength(lengthMin?: number): { lengthChoice: LengthChoice; customMin: string } {
@@ -140,32 +190,92 @@ function elapsedClock(sec: number): string {
   return `${mins}:${String(rest).padStart(2, "0")}`;
 }
 
+let tipEl: HTMLSpanElement | null = null;
+let tipHost: HTMLElement | null = null;
+let tipWatch: MutationObserver | null = null;
+let tipFrame: HTMLElement | null = null;
+
+function tipNode(): HTMLSpanElement {
+  if (!tipEl) {
+    tipEl = document.createElement("span");
+    tipEl.className = "cloud lifted";
+    tipEl.setAttribute("role", "tooltip");
+    document.body.appendChild(tipEl);
+  }
+  return tipEl;
+}
+
+function dismissTip() {
+  tipWatch?.disconnect();
+  tipWatch = null;
+  tipHost = null;
+  tipFrame?.removeEventListener("scroll", onTipScroll);
+  tipFrame = null;
+  if (!tipEl) return;
+  tipEl.style.display = "none";
+  tipEl.classList.remove("below");
+}
+
+function onTipScroll() {
+  if (tipHost) placeCloud({ currentTarget: tipHost });
+}
+
+function placeCloud(event: { currentTarget: EventTarget | null }) {
+  const host = event.currentTarget as HTMLElement | null;
+  const source = host?.querySelector(":scope > .cloud") as HTMLElement | null;
+  if (!host || !source) return;
+  const tip = tipNode();
+  tipHost = host;
+  tipWatch?.disconnect();
+  const sync = () => {
+    tip.textContent = source.textContent ?? "";
+  };
+  sync();
+  tipWatch = new MutationObserver(sync);
+  tipWatch.observe(source, { subtree: true, characterData: true, childList: true });
+  const frame = host.closest(".add-form") as HTMLElement | null;
+  if (tipFrame !== frame) {
+    tipFrame?.removeEventListener("scroll", onTipScroll);
+    tipFrame = frame;
+    tipFrame?.addEventListener("scroll", onTipScroll, { passive: true });
+  }
+  tip.style.display = "block";
+  tip.style.visibility = "hidden";
+  const hostRect = host.getBoundingClientRect();
+  const width = tip.offsetWidth;
+  const height = tip.offsetHeight;
+  const pad = 12;
+  let left = hostRect.left;
+  if (left + width > window.innerWidth - pad) left = window.innerWidth - pad - width;
+  if (left < pad) left = pad;
+  let top = hostRect.top - height - 12;
+  const below = top < pad;
+  if (below) top = Math.min(hostRect.bottom + 12, window.innerHeight - height - pad);
+  tip.classList.toggle("below", below);
+  tip.style.left = `${left}px`;
+  tip.style.top = `${top}px`;
+  const tail = hostRect.left + hostRect.width / 2 - left;
+  tip.style.setProperty("--tail", `${Math.min(Math.max(tail, 14), Math.max(14, width - 14))}px`);
+  tip.style.visibility = "";
+}
+
 function showCloud(event: { currentTarget: EventTarget | null }) {
   const node = event.currentTarget as HTMLElement | null;
   const host = node?.closest(".cloud-host");
   if (host) placeCloud({ currentTarget: host });
 }
 
-function placeCloud(event: { currentTarget: EventTarget | null }) {
+function hideCloud(event: { currentTarget: EventTarget | null }) {
   const host = event.currentTarget as HTMLElement | null;
-  const cloud = host?.querySelector(":scope > .cloud") as HTMLElement | null;
-  if (!host || !cloud) return;
-  cloud.style.display = "block";
-  cloud.style.position = "fixed";
-  cloud.style.bottom = "auto";
-  const hostRect = host.getBoundingClientRect();
-  const width = cloud.offsetWidth;
-  const height = cloud.offsetHeight;
-  const pad = 12;
-  let left = hostRect.left;
-  if (left + width > window.innerWidth - pad) left = window.innerWidth - pad - width;
-  if (left < pad) left = pad;
-  const top = Math.max(pad, hostRect.top - height - 12);
-  cloud.style.left = `${left}px`;
-  cloud.style.top = `${top}px`;
-  const tail = hostRect.left + hostRect.width / 2 - left;
-  cloud.style.setProperty("--tail", `${Math.min(Math.max(tail, 14), Math.max(14, width - 14))}px`);
-  cloud.style.display = "";
+  if (!host || tipHost !== host || host.contains(document.activeElement)) return;
+  dismissTip();
+}
+
+function blurCloud(event: { currentTarget: EventTarget | null }) {
+  const node = event.currentTarget as HTMLElement | null;
+  const host = node?.closest(".cloud-host");
+  if (!host || host.matches(":hover")) return;
+  if (tipHost === host) dismissTip();
 }
 
 function InfoMark() {
@@ -175,6 +285,73 @@ function InfoMark() {
       <path d="M8 7.15v4" stroke="currentColor" stroke-width="1.15" stroke-linecap="round" />
       <circle cx="8" cy="4.7" r="0.7" fill="currentColor" />
     </svg>
+  );
+}
+
+function DurationPick({
+  lengthChoice,
+  customMin,
+  lengthCh,
+  t,
+  onChoice,
+  onCustom,
+}: {
+  lengthChoice: LengthChoice;
+  customMin: string;
+  lengthCh: number;
+  t: ReturnType<typeof useI18n>["t"];
+  onChoice: (value: PresetMin | "custom") => void;
+  onCustom: (value: string) => void;
+}) {
+  if (lengthChoice === "longest") return null;
+  const label = lengthChoice === "custom" ? t.customLength : t.minutes(lengthChoice);
+  const tipKey: TipKey = lengthChoice === "custom" ? "custom" : (`${lengthChoice}` as TipKey);
+  return (
+    <div class="dur-pick">
+      <select
+        aria-label={t.chooseLength}
+        value={String(lengthChoice)}
+        style={{ width: `calc(${lengthCh + 1}ch + 2.2rem)` }}
+        onChange={(event) => {
+          const value = (event.target as HTMLSelectElement).value;
+          if (value === "custom") onChoice("custom");
+          else {
+            const mins = Number(value);
+            if (isPreset(mins)) onChoice(mins);
+          }
+        }}
+      >
+        {PRESETS.map((mins) => (
+          <option key={mins} value={String(mins)}>
+            {t.minutes(mins)}
+          </option>
+        ))}
+        <option value="custom">{t.customLength}</option>
+      </select>
+      {lengthChoice === "custom" && (
+        <label class="custom">
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            step={1}
+            value={customMin}
+            placeholder="45"
+            aria-label={t.customLength}
+            onInput={(event) => onCustom((event.target as HTMLInputElement).value)}
+          />
+          <em>{t.minutesUnit}</em>
+        </label>
+      )}
+      <span class="cloud-host" onMouseEnter={placeCloud} onMouseLeave={hideCloud}>
+        <button type="button" class="info" onFocus={showCloud} onBlur={blurCloud} aria-label={t.aboutLength(label)}>
+          <InfoMark />
+        </button>
+        <span class="cloud" role="tooltip">
+          {t.durationTip[tipKey]}
+        </span>
+      </span>
+    </div>
   );
 }
 
@@ -504,21 +681,96 @@ function itemLabel(item: DraftItem, titles: Readonly<Record<string, string>>): s
   return folderLabel(item.folder);
 }
 
+function stackItemLine(
+  item: DraftItem,
+  t: ReturnType<typeof useI18n>["t"],
+): string {
+  const kind = modeLabel(item.mode, t);
+  if (item.durationSec != null) {
+    return `${kind} · ${t.slotDurationOf(Math.max(1, Math.ceil(item.durationSec / 60)))}`;
+  }
+  if (item.error) return `${kind} · ${t.error(item.error)}`;
+  if (stackItemNeedsProbe(item)) return `${kind} · ${t.measuring}`;
+  if (item.mode === "random-file" && item.lengthMin) return `${kind} · ${t.minutes(item.lengthMin)}`;
+  return kind;
+}
+
+function itemGridDuration(
+  item: DraftItem,
+  t: ReturnType<typeof useI18n>["t"],
+): string {
+  if (item.durationSec != null) return t.lengthOf(Math.max(1, Math.ceil(item.durationSec / 60)));
+  if (item.mode === "random-file" && item.lengthMin) return t.lengthOf(item.lengthMin);
+  return "–";
+}
+
+function clipLabel(name: string, max = 28): string {
+  const text = name.trim();
+  if (text.length <= max) return text;
+  return `${text.slice(0, Math.max(1, max - 3)).trimEnd()}...`;
+}
+
+function playlistGridName(
+  item: DraftItem,
+  titles: Readonly<Record<string, string>>,
+): string {
+  if (item.mode === "specific-file" || item.mode === "youtube") return itemLabel(item, titles);
+  return folderLabel(item.folder);
+}
+
+function playlistGridLine(
+  item: DraftItem,
+  t: ReturnType<typeof useI18n>["t"],
+  titles: Readonly<Record<string, string>> = {},
+): string {
+  const kind = modeLabel(item.mode, t);
+  const duration = itemGridDuration(item, t);
+  const name = playlistGridName(item, titles);
+  const shown =
+    item.mode === "specific-file" || item.mode === "youtube" ? clipLabel(name) : name;
+  return `${kind} - ${shown} - ${duration}`;
+}
+
 function rowStyle(span: number): Record<string, string> {
   return { "--mins": String(Math.max(0, span)) };
 }
 
-function piecesFor(day: Day, blocks: ScheduleBlock[]): Piece[] {
+function takePlaylistRow(unused: RundownItem[], entry: PlaylistEntry): RundownItem | undefined {
+  const byId = unused.findIndex((item) => item.entryId === entry.id);
+  if (byId >= 0) return unused.splice(byId, 1)[0];
+  const byShape = unused.findIndex((item) => {
+    if (item.entryId) return false;
+    if (item.mode !== entry.mode) return false;
+    if (entry.mode === "specific-file") return item.path === (entry.file ?? "").trim();
+    if (entry.mode === "youtube") {
+      const url = parseYoutubeUrl(entry.file ?? "") ?? (entry.file ?? "").trim();
+      return item.path === url;
+    }
+    return (item.folder ?? "") === entry.folder;
+  });
+  if (byShape >= 0) return unused.splice(byShape, 1)[0];
+  return undefined;
+}
+
+function fromPlaylist(block: ScheduleBlock, day: Day, board: TvBoard | null): DraftItem[] {
+  const unused = playlistRowsOn(block, day, board);
+  return (block.items ?? []).map((entry) => {
+    const row = takePlaylistRow(unused, entry);
+    return fromEntry(entry, row?.durationSec ?? null, row?.title ?? "");
+  });
+}
+
+function piecesFor(day: Day, blocks: ScheduleBlock[], board: TvBoard | null): Piece[] {
   const mine: { block: ScheduleBlock; start: number; end: number; origin: Day }[] = [];
   for (const block of blocks) {
     if (block.days.includes(day)) {
-      const placed = windowOn(block, day);
+      const placed = placedOn(block, day, board);
       const end = Math.min(placed.endMin, DAY_MINUTES);
       if (end > placed.startMin) mine.push({ block, start: placed.startMin, end, origin: day });
     }
     const prev = prevDay(day);
     if (block.days.includes(prev)) {
-      const leftover = leftoverMin(windowOn(block, prev));
+      const leftover = leftoverMin(placedOn(block, prev, board));
       if (leftover > 0) mine.push({ block, start: 0, end: leftover, origin: prev });
     }
   }
@@ -545,11 +797,17 @@ function draftSpanMin(draft: Draft): number {
   return 0;
 }
 
-function ghostsOn(draft: Draft, day: Day, blocks: ScheduleBlock[]): { start: number; end: number }[] {
+function ghostsOn(
+  draft: Draft,
+  day: Day,
+  blocks: ScheduleBlock[],
+  board: TvBoard | null,
+): { start: number; end: number }[] {
   const span = draftSpanMin(draft);
   if (span < 1) return [];
   const saved = draft.id ? blocks.find((block) => block.id === draft.id) : undefined;
-  if (saved && windowOn(saved, draft.origin).start === draft.start && lengthMinutes(saved) === span) {
+  const shown = saved ? (playlistMinutesOn(saved, draft.origin, board) ?? lengthMinutes(saved)) : 0;
+  if (saved && windowOn(saved, draft.origin).start === draft.start && shown === span) {
     return [];
   }
   const out: { start: number; end: number }[] = [];
@@ -579,6 +837,16 @@ function spillsPastDay(start: string, durationSec: number): boolean {
   return toMin(start) + Math.max(1, Math.ceil(durationSec / 60)) > DAY_MINUTES;
 }
 
+function addMeasureCap(draft: Draft): number | undefined {
+  if (draft.mode !== "playlist" || draft.addMode !== "random-file") return undefined;
+  if (draft.addLengthChoice === "longest") return undefined;
+  return addFixedMinutes(draft) ?? undefined;
+}
+
+function playlistAddNeedsMeasure(draft: Draft): boolean {
+  return draft.addMode !== "random-file" || draft.addLengthChoice === "longest";
+}
+
 function measureKey(draft: Draft): string {
   const mode = draft.mode === "playlist" ? draft.addMode : draft.mode;
   const folder = draft.mode === "playlist" ? draft.addFolder : draft.folder;
@@ -586,7 +854,20 @@ function measureKey(draft: Draft): string {
   if (mode === "specific-file" || mode === "youtube") {
     return `video:${file.trim()}`;
   }
-  return `${mode}:${folder.trim()}`;
+  const cap = addMeasureCap(draft);
+  return cap ? `${mode}:${folder.trim()}:${cap}` : `${mode}:${folder.trim()}`;
+}
+
+function addSeconds(
+  draft: Draft,
+  measured: { key: string; length: SlotLength | null } | null,
+): number | null {
+  if (draft.addMode === "random-file" && draft.addLengthChoice !== "longest") {
+    const mins = addFixedMinutes(draft);
+    return mins ? mins * 60 : null;
+  }
+  if (measured?.key === measureKey(draft) && measured.length) return measured.length.durationSec;
+  return null;
 }
 
 function chosenSeconds(
@@ -672,12 +953,14 @@ function dayClashes(
   blocks: ScheduleBlock[],
   durationSec: number,
   titles: Readonly<Record<string, string>> = {},
+  board: TvBoard | null = null,
 ): { day: Day; title: string; start: string; end: string }[] {
   const clashes: { day: Day; title: string; start: string; end: string }[] = [];
-  const draftSegs = segmentsOf(draftAsBlock(draft, durationSec));
+  const next = draftAsBlock(draft, durationSec);
+  const draftSegs = segmentsOf(next);
   for (const block of blocks) {
-    if (block.id === draft.id) continue;
-    for (const other of segmentsOf(block)) {
+    if (block.id === next.id) continue;
+    for (const other of segmentsPlaced(block, board)) {
       for (const mine of draftSegs) {
         if (mine.day !== other.day) continue;
         if (mine.start < other.end && other.start < mine.end) {
@@ -698,10 +981,34 @@ function emptySchedule(): Schedule {
   return { blocks: [], intermissions: [], activeIntermission: "", intermissionRandomStart: false };
 }
 
+function occupancyOf(board: TvBoard | null, id: string): string {
+  if (!board) return "";
+  return board.days
+    .filter((day) => day.date >= board.today)
+    .flatMap((day) => day.items.filter((item) => item.blockId === id && !item.overnight))
+    .map((item) => `${item.path}:${item.durationSec}:${item.start}`)
+    .join("|");
+}
+
+function changedBlockIds(before: ScheduleBlock[], after: ScheduleBlock[]): string[] {
+  return after
+    .filter((block) => {
+      const old = before.find((item) => item.id === block.id);
+      return !old || JSON.stringify(old) !== JSON.stringify(block);
+    })
+    .map((block) => block.id);
+}
+
+function slotIsBuilding(board: TvBoard | null, id: string, local: string[]): boolean {
+  if (board && Array.isArray(board.building)) return board.building.includes(id);
+  return local.includes(id);
+}
+
 export function Admin() {
   const { t } = useI18n();
   const today = WEEKDAY[new Date().getDay()]!;
   const [schedule, setSchedule] = useState<Schedule>(emptySchedule);
+  const [board, setBoard] = useState<TvBoard | null>(null);
   const [youtubeTitles, setYoutubeTitles] = useState<Record<string, string>>({});
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -724,8 +1031,11 @@ export function Admin() {
   } | null>(null);
   const [measuring, setMeasuring] = useState(false);
   const [fileCount, setFileCount] = useState(0);
+  const measureEpoch = useRef(0);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [sourceMissing, setSourceMissing] = useState(false);
+  const [building, setBuilding] = useState<string[]>([]);
+  const occupancyRef = useRef<Record<string, string>>({});
   const scheduleRef = useRef(schedule);
   const addKindRef = useRef<IntermissionKind>("folder");
   const addDraftRef = useRef("");
@@ -753,6 +1063,35 @@ export function Admin() {
       })
       .catch((e: Error) => setError(e.message));
   }, []);
+
+  function applyBoard(loaded: TvBoard) {
+    setBoard(loaded);
+    if (Array.isArray(loaded.building)) {
+      setBuilding(loaded.building);
+      return;
+    }
+    setBuilding((current) =>
+      current.filter((id) => occupancyOf(loaded, id) === occupancyRef.current[id]),
+    );
+  }
+
+  useEffect(() => {
+    let cancel = false;
+    function loadBoard() {
+      api
+        .tv()
+        .then((loaded) => {
+          if (!cancel) applyBoard(loaded);
+        })
+        .catch(() => undefined);
+    }
+    loadBoard();
+    const id = window.setInterval(loadBoard, building.length > 0 ? 500 : 2000);
+    return () => {
+      cancel = true;
+      window.clearInterval(id);
+    };
+  }, [building.length]);
 
   const titleKey = youtubeScheduleKey(
     schedule,
@@ -795,8 +1134,10 @@ export function Admin() {
       if (!(target instanceof Node)) return;
       if (intermissionButtonRef.current?.contains(target)) return;
       if (intermissionPanelRef.current?.contains(target)) return;
-      event.preventDefault();
       setIntermissionOpen(false);
+      if (target instanceof Element && target.closest(".week-scale, .intermission-dismiss")) {
+        event.preventDefault();
+      }
     }
     window.addEventListener("keydown", onKey);
     document.addEventListener("pointerdown", onPointerDown);
@@ -812,6 +1153,7 @@ export function Admin() {
     formRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
     function cancel() {
       if (slotOpRef.current) return;
+      dismissTip();
       setDraft(null);
       setFieldError({});
     }
@@ -849,7 +1191,13 @@ export function Admin() {
   }, [draft?.id, draft?.mode, draft?.folder, draft?.file]);
 
   useEffect(() => {
-    if (!draft || (draft.mode !== "playlist" && draft.lengthChoice !== "longest")) {
+    const needsMeasure = draft
+      ? draft.mode === "playlist"
+        ? playlistAddNeedsMeasure(draft)
+        : draft.lengthChoice === "longest"
+      : false;
+    if (!draft || !needsMeasure) {
+      measureEpoch.current += 1;
       setMeasured(null);
       setMeasuring(false);
       setFileCount(0);
@@ -862,11 +1210,13 @@ export function Admin() {
     const empty =
       mode === "youtube" ? !parseYoutubeUrl(file) : mode === "specific-file" ? !file.trim() : !folder.trim();
     if (empty) {
+      measureEpoch.current += 1;
       setMeasured({ key, length: null });
       setMeasuring(false);
       setFileCount(0);
       return;
     }
+    const epoch = ++measureEpoch.current;
     let cancel = false;
     setMeasuring(true);
     setMeasured(null);
@@ -881,14 +1231,14 @@ export function Admin() {
     }
     const timer = setTimeout(() => {
       api
-        .slotLength(mode, folder, file)
+        .slotLength(mode, folder, file, addMeasureCap(draft))
         .then((res) => {
-          if (cancel) return;
+          if (cancel || measureEpoch.current !== epoch) return;
           setMeasured({ key, length: res.length });
           setMeasuring(false);
         })
         .catch((err: unknown) => {
-          if (cancel) return;
+          if (cancel || measureEpoch.current !== epoch) return;
           const message = err instanceof Error ? err.message : String(err);
           setMeasured({ key, length: null, error: message });
           setMeasuring(false);
@@ -906,6 +1256,8 @@ export function Admin() {
     draft?.addFolder,
     draft?.addFile,
     draft?.lengthChoice,
+    draft?.addLengthChoice,
+    draft?.addCustomMin,
     panelToken,
   ]);
 
@@ -913,44 +1265,40 @@ export function Admin() {
 
   useEffect(() => {
     if (!draft || draft.mode !== "playlist") return;
-    const pending = draft.items.filter((item) => item.durationSec == null && !item.error);
+    const pending = draft.items.filter(stackItemNeedsProbe);
     if (pending.length === 0) return;
     let cancel = false;
-    void Promise.all(
-      pending.map(async (item) => {
+    void (async () => {
+      for (const item of pending) {
+        if (cancel) return;
+        let length: SlotLength | null = null;
+        let error: string | undefined;
         try {
           const res = await api.slotLength(item.mode, item.folder, item.file);
-          return { id: item.id, length: res.length, error: undefined as string | undefined };
+          length = res.length;
         } catch (err: unknown) {
-          return {
-            id: item.id,
-            length: null,
-            error: err instanceof Error ? err.message : String(err),
-          };
+          error = err instanceof Error ? err.message : String(err);
         }
-      }),
-    ).then((results) => {
-      if (cancel) return;
-      const byId = new Map(results.map((result) => [result.id, result]));
-      setDraft((current) => {
-        if (!current || current.mode !== "playlist") return current;
-        return {
-          ...current,
-          items: current.items.map((item) => {
-            const result = byId.get(item.id);
-            if (!result) return item;
-            if (result.error) return { ...item, error: result.error, durationSec: null };
-            if (!result.length) return { ...item, durationSec: null, error: "No video found there." };
-            return {
-              ...item,
-              durationSec: result.length.durationSec,
-              title: result.length.title,
-              error: undefined,
-            };
-          }),
-        };
-      });
-    });
+        if (cancel) return;
+        setDraft((current) => {
+          if (!current || current.mode !== "playlist") return current;
+          return {
+            ...current,
+            items: current.items.map((row) => {
+              if (row.id !== item.id || row.durationSec != null) return row;
+              if (error) return { ...row, error, durationSec: null };
+              if (!length) return { ...row, durationSec: null, error: "No video found there." };
+              return {
+                ...row,
+                durationSec: length.durationSec,
+                title: length.title,
+                error: undefined,
+              };
+            }),
+          };
+        });
+      }
+    })();
     return () => {
       cancel = true;
     };
@@ -988,7 +1336,10 @@ export function Admin() {
       if (!current) return current;
       if (current.mode === "playlist") {
         const sec = stackSeconds(current.items);
-        if (!sec) return current.end === "" ? current : { ...current, end: "" };
+        if (!sec) {
+          if (current.items.length > 0 && !current.items.some((item) => item.error)) return current;
+          return current.end === "" ? current : { ...current, end: "" };
+        }
         const end = endFromDuration(current.start, sec);
         return current.end === end ? current : { ...current, end };
       }
@@ -1016,11 +1367,20 @@ export function Admin() {
     setFieldError({});
   }
 
-  async function persist(next: Schedule) {
+  async function persist(next: Schedule, notice = true) {
     setError(null);
+    const ids = changedBlockIds(schedule.blocks, next.blocks);
+    if (ids.length) {
+      occupancyRef.current = Object.fromEntries(ids.map((id) => [id, occupancyOf(board, id)]));
+      setBuilding(ids);
+    }
     const res = await api.saveSchedule(next);
     setSchedule(res.schedule);
-    setSaved(true);
+    api
+      .tv()
+      .then((loaded) => applyBoard(loaded))
+      .catch(() => undefined);
+    if (notice) setSaved(true);
     return res;
   }
 
@@ -1028,18 +1388,22 @@ export function Admin() {
     let start = startMin + Math.round((at - startMin) / 30) * 30;
     start = Math.min(Math.max(start, startMin), endMin);
     if (endMin - start < 30) start = startMin;
+    const startClock = inputTime(start);
+    measureEpoch.current += 1;
+    setMeasuring(false);
+    setMeasured(null);
     setDraft({
       id: null,
       origin: day,
       days: [day],
-      start: inputTime(start),
-      end: "",
+      start: startClock,
+      end: endFromDuration(startClock, 60 * 60),
       starts: {},
       folder: "",
       file: "",
       mode: "random-file",
       ...emptyStack(),
-      lengthChoice: "longest",
+      lengthChoice: 60,
       customMin: "",
       freeEnd: endMin,
       gapStart: startMin,
@@ -1048,10 +1412,10 @@ export function Admin() {
   }
 
   function openSlot(block: ScheduleBlock, day: Day) {
-    const placed = windowOn(block, day);
+    const placed = placedOn(block, day, board);
     const others = schedule.blocks
       .filter((item) => item.id !== block.id && item.days.includes(day))
-      .map((item) => windowOn(item, day))
+      .map((item) => placedOn(item, day, board))
       .sort((a, b) => toMin(a.start) - toMin(b.start));
     let freeEnd = DAY_MINUTES;
     for (const other of others) {
@@ -1060,7 +1424,7 @@ export function Admin() {
     const starts: Partial<Record<Day, string>> = {};
     for (const item of block.days) {
       if (item === day) continue;
-      starts[item] = windowOn(block, item).start;
+      starts[item] = placedOn(block, item, board).start;
     }
     setDraft({
       id: block.id,
@@ -1073,10 +1437,12 @@ export function Admin() {
       file: block.file ?? "",
       mode: block.mode,
       name: block.name ?? "",
-      items: block.mode === "playlist" ? (block.items ?? []).map(fromEntry) : [],
+      items: block.mode === "playlist" ? fromPlaylist(block, day, board) : [],
       addMode: "specific-file",
       addFolder: "",
       addFile: "",
+      addLengthChoice: 60,
+      addCustomMin: "",
       ...(block.mode === "youtube" || block.mode === "playlist"
         ? { lengthChoice: "longest" as const, customMin: "" }
         : block.mode === "next-episode"
@@ -1117,6 +1483,8 @@ export function Admin() {
           addMode: "specific-file",
           addFolder: "",
           addFile: "",
+          addLengthChoice: 60,
+          addCustomMin: "",
           lengthChoice: "longest",
           end: current.items.length ? current.end : "",
         };
@@ -1184,7 +1552,14 @@ export function Admin() {
   }
 
   function addStackItem() {
-    if (!draft || draft.mode !== "playlist" || !measured?.length || measured.key !== measureKey(draft)) return;
+    if (!draft || draft.mode !== "playlist") return;
+    const randomFixed = draft.addMode === "random-file" && draft.addLengthChoice !== "longest";
+    const mins = randomFixed ? addFixedMinutes(draft) : null;
+    if (randomFixed) {
+      if (!draft.addFolder.trim() || mins == null) return;
+    } else if (!measured?.length || measured.key !== measureKey(draft)) {
+      return;
+    }
     const file =
       draft.addMode === "youtube"
         ? (parseYoutubeUrl(draft.addFile) ?? draft.addFile.trim())
@@ -1195,13 +1570,16 @@ export function Admin() {
         : draft.addMode === "youtube"
           ? ""
           : draft.addFolder.trim();
+    const measuredSec =
+      measured?.key === measureKey(draft) && measured.length ? measured.length.durationSec : null;
     const item: DraftItem = {
-      id: crypto.randomUUID(),
+      id: newItemId(),
       mode: draft.addMode,
       folder,
       file,
-      title: measured.length.title,
-      durationSec: measured.length.durationSec,
+      title: draft.addMode === "random-file" ? "" : (measured?.length?.title ?? ""),
+      durationSec: measuredSec,
+      ...(randomFixed && mins ? { lengthMin: mins } : {}),
     };
     setDraft({
       ...draft,
@@ -1265,7 +1643,7 @@ export function Admin() {
     setIntermissionSaving(true);
     setIntermissionError(null);
     try {
-      await persist({ ...current, ...next });
+      await persist({ ...current, ...next }, false);
       return true;
     } catch (e) {
       setIntermissionError(e instanceof Error ? e.message : String(e));
@@ -1336,9 +1714,12 @@ export function Admin() {
   async function commit() {
     if (!draft) return;
     const next: FieldError = {};
-    const stackBusy =
-      draft.mode === "playlist" && draft.items.some((item) => item.durationSec == null && !item.error);
-    if (measuring && draft.mode !== "playlist") {
+    const stackBusy = draft.mode === "playlist" && draft.items.some(stackItemNeedsProbe);
+    const waitsForMeasure =
+      draft.mode !== "playlist" &&
+      measuring &&
+      (draft.mode === "youtube" || draft.lengthChoice === "longest");
+    if (waitsForMeasure) {
       next.time = "Still measuring the video.";
     } else if (stackBusy) {
       next.time = "Still measuring the video.";
@@ -1415,6 +1796,7 @@ export function Admin() {
     try {
       const res = await persist({ ...schedule, blocks });
       setFitMiss(res.misses.find((miss) => miss.blockId === block.id) ?? null);
+      dismissTip();
       setDraft(null);
       setFieldError({});
     } catch (e) {
@@ -1437,31 +1819,59 @@ export function Admin() {
 
   async function removeDraft() {
     if (!draft?.id || slotOpRef.current) return;
+    const removed = draft;
+    const previous = schedule;
+    const next = {
+      ...schedule,
+      blocks: schedule.blocks.filter((item) => item.id !== removed.id),
+    };
     beginSlotOp("remove");
+    setSchedule(next);
+    dismissTip();
+    setDraft(null);
+    setFieldError({});
     try {
-      await persist({
-        ...schedule,
-        blocks: schedule.blocks.filter((item) => item.id !== draft.id),
-      });
-      setDraft(null);
-      setFieldError({});
+      await persist(next);
     } catch (e) {
+      setSchedule(previous);
+      setDraft(removed);
       setFieldError({ form: e instanceof Error ? e.message : String(e) });
     } finally {
       endSlotOp();
     }
   }
 
+  function stopMeasuring() {
+    measureEpoch.current += 1;
+    setMeasuring(false);
+    setMeasured(null);
+    setFileCount(0);
+  }
+
   function chooseLength(source: "fixed" | "longest") {
+    if (source === "fixed") stopMeasuring();
     setDraft((current) => {
       if (!current) return current;
       if (source === "longest") {
         return current.lengthChoice === "longest" ? current : { ...current, lengthChoice: "longest", end: "" };
       }
       if (current.lengthChoice !== "longest") return current;
-      return { ...current, lengthChoice: 60 };
+      const mins = 60;
+      return { ...current, lengthChoice: mins, end: endFromDuration(current.start, mins * 60) };
     });
     setFieldError((current) => ({ ...current, time: undefined }));
+  }
+
+  function chooseAddLength(source: "fixed" | "longest") {
+    if (source === "fixed") stopMeasuring();
+    setDraft((current) => {
+      if (!current) return current;
+      if (source === "longest") {
+        return current.addLengthChoice === "longest" ? current : { ...current, addLengthChoice: "longest" };
+      }
+      if (current.addLengthChoice !== "longest") return current;
+      return { ...current, addLengthChoice: 60 };
+    });
   }
 
   const selectedIntermission =
@@ -1492,24 +1902,31 @@ export function Admin() {
           : Boolean(draft.folder.trim())
     : false;
   const stackSec = draft?.mode === "playlist" ? stackSeconds(draft.items) : null;
-  const stackBusy =
-    draft?.mode === "playlist" && draft.items.some((item) => item.durationSec == null && !item.error);
+  const addSec = draft?.mode === "playlist" && pathChosen ? addSeconds(draft, matched) : null;
+  const addPreviewSec =
+    draft?.mode === "playlist" && addSec != null ? knownStackSeconds(draft.items) + addSec : null;
+  const addPreviewEnd = draft && addPreviewSec != null ? endFace(draft.start, addPreviewSec) : undefined;
+  const addPreviewSpill = draft && addPreviewSec != null ? spillsPastDay(draft.start, addPreviewSec) : false;
+  const stackBusy = draft?.mode === "playlist" && draft.items.some(stackItemNeedsProbe);
   const activeSec = draft ? (chosenSeconds(draft, matched) ?? 0) : 0;
   const fixedMin = draft && draft.lengthChoice !== "longest" ? fixedMinutes(draft) : null;
-  const clashes = draft && activeSec ? dayClashes(draft, schedule.blocks, activeSec, youtubeTitles) : [];
+  const clashes = draft && activeSec ? dayClashes(draft, schedule.blocks, activeSec, youtubeTitles, board) : [];
   const lengthLabels = [...PRESETS.map((mins) => t.minutes(mins)), t.customLength];
   const lengthCh = Math.max(...lengthLabels.map((label) => label.length));
   const addDisabled = !draft
     ? true
     : draft.mode === "playlist"
-      ? !draft.name.trim() || !stackSec || Boolean(stackBusy) || draft.items.some((item) => Boolean(item.error))
+      ? !draft.name.trim() ||
+        draft.items.length === 0 ||
+        Boolean(stackBusy) ||
+        draft.items.some((item) => Boolean(item.error))
       : sourceMissing
         ? true
         : draft.lengthChoice === "longest"
           ? measuring || !pathChosen || !length || Boolean(matched?.error)
           : !pathChosen || fixedMin === null;
   const ghostsByDay = draft
-    ? Object.fromEntries(DAYS.map((day) => [day, ghostsOn(draft, day, schedule.blocks)]))
+    ? Object.fromEntries(DAYS.map((day) => [day, ghostsOn(draft, day, schedule.blocks, board)]))
     : null;
 
   return (
@@ -1541,6 +1958,15 @@ export function Admin() {
         </p>
       )}
       <div class={draft ? "week-wrap drafting" : "week-wrap"}>
+        {!draft && intermissionOpen && (
+          <div
+            class="intermission-dismiss"
+            onPointerDown={(event) => {
+              event.preventDefault();
+              setIntermissionOpen(false);
+            }}
+          />
+        )}
         {!draft && intermissionOpen && (
           <div class="intermission-open" ref={intermissionPanelRef}>
             <span>{t.ifEmpty}</span>
@@ -1674,7 +2100,7 @@ export function Admin() {
         )}
         <div class="week-scale">
           {DAYS.map((day) => {
-            const pieces = piecesFor(day, schedule.blocks);
+            const pieces = piecesFor(day, schedule.blocks, board);
             const emptyDay = pieces.length === 1 && pieces[0]?.kind === "gap";
             const editing = draft?.origin === day;
             const rows = [
@@ -1740,13 +2166,18 @@ export function Admin() {
                         </button>
                       );
                     }
-                    const placed = windowOn(piece.block, piece.origin);
+                    const placed = placedOn(piece.block, piece.origin, board);
                     const draftTime = draft ? startOnDraft(draft, piece.origin) : "";
                     const picked =
                       draft?.id === piece.block.id &&
                       draft.origin === piece.origin &&
                       draftTime === placed.start;
                     const spill = piece.origin !== day;
+                    const calculating = slotIsBuilding(board, piece.block.id, building);
+                    const stackLines =
+                      piece.block.mode === "playlist"
+                        ? fromPlaylist(piece.block, piece.origin, board)
+                        : [];
                     return (
                       <button
                         key={`${piece.block.id}-${piece.origin}-${piece.start}`}
@@ -1754,13 +2185,27 @@ export function Admin() {
                         class={`slot${slotKind(piece.block)}${picked ? " pick" : ""}${spill ? " spill" : ""}`}
                         style={rowStyle(span)}
                         title={slotHover(piece.block, youtubeTitles)}
+                        aria-busy={calculating ? "true" : undefined}
                         onClick={() => openSlot(piece.block, piece.origin)}
                       >
+                        {calculating ? (
+                          <span class="slot-calc">
+                            <span class="spin" aria-hidden="true" />
+                            {t.calculating}
+                          </span>
+                        ) : null}
                         <span class="tm">
                           {clockFace(piece.start)}–{clockFace(piece.end)}
                           {spill ? ` · ${t.day[piece.origin]}` : ""}
                         </span>
                         <b>{slotLabel(piece.block, youtubeTitles)}</b>
+                        {stackLines.length ? (
+                          <span class="stack-lines">
+                            {stackLines.map((item) => (
+                              <span key={item.id}>{playlistGridLine(item, t, youtubeTitles)}</span>
+                            ))}
+                          </span>
+                        ) : null}
                         <i>{t.lengthOf(span)}</i>
                       </button>
                     );
@@ -1775,6 +2220,7 @@ export function Admin() {
             class="scrim"
             onClick={() => {
               if (slotOpRef.current) return;
+              dismissTip();
               setDraft(null);
               setFieldError({});
             }}
@@ -1834,14 +2280,7 @@ export function Admin() {
                       <li key={item.id} class="playlist-item">
                         <div>
                           <b>{itemLabel(item, youtubeTitles)}</b>
-                          <span>
-                            {modeLabel(item.mode, t)}
-                            {item.durationSec != null
-                              ? ` · ${t.slotDurationOf(Math.max(1, Math.ceil(item.durationSec / 60)))}`
-                              : item.error
-                                ? ` · ${t.error(item.error)}`
-                                : ` · ${t.measuring}`}
-                          </span>
+                          <span>{stackItemLine(item, t)}</span>
                         </div>
                         <div class="playlist-tools">
                           <button
@@ -1892,14 +2331,17 @@ export function Admin() {
                         role="radio"
                         aria-checked={draft.addMode === mode}
                         class={draft.addMode === mode ? `mode on ${modeClass(mode)}` : "mode"}
-                        onClick={() =>
+                        onClick={() => {
+                          if (draft.addMode === mode) return;
                           setDraft({
                             ...draft,
                             addMode: mode,
                             addFolder: mode === "youtube" ? "" : draft.addFolder,
                             addFile: mode === "youtube" || mode === "specific-file" ? draft.addFile : "",
-                          })
-                        }
+                            addLengthChoice: mode === "random-file" ? 60 : "longest",
+                          });
+                          if (mode === "random-file") stopMeasuring();
+                        }}
                       >
                         <b>{modeLabel(mode, t)}</b>
                       </button>
@@ -1907,7 +2349,13 @@ export function Admin() {
                   </div>
 
                   {draft.addMode === "youtube" && <p class="mode-note">{t.youtubeCaveat}</p>}
-                  {draft.addMode !== "youtube" && <p class="mode-note">{modeHint(draft.addMode, t)}</p>}
+                  {draft.addMode === "random-file" && <p class="mode-note">{t.playlistRandomHint}</p>}
+                  {draft.addMode === "next-episode" && <p class="mode-note">{t.playlistNextHint}</p>}
+                  {draft.addMode !== "youtube" &&
+                    draft.addMode !== "random-file" &&
+                    draft.addMode !== "next-episode" && (
+                      <p class="mode-note">{modeHint(draft.addMode, t)}</p>
+                    )}
                   
                   {draft.addMode === "youtube" ? (
                     <div class="path-field">
@@ -1947,17 +2395,29 @@ export function Admin() {
                       onAction={() => void choosePath()}
                     />
                   )}
-                  {measuring && pathChosen ? (
+                  {measuring && pathChosen && !(draft.addMode === "random-file" && draft.addLengthChoice !== "longest") ? (
                     <div class="wait">
                       <div class="wait-line">
                         <span class="spin" aria-hidden="true" />
                         <span class="measure-label">{t.measuringVideos}</span>
                       </div>
                     </div>
-                  ) : length ? (
+                  ) : addPreviewEnd ? (
                     <div class="picked">
                       <div>
-                        <span class="k">{t.videoDuration} · {t.slotDurationOf(lengthMins)}</span>
+                        <span class="k">{t.videoDuration}</span>
+                        <span class="value">
+                          {length && draft.addMode === "random-file" && length.title
+                            ? `${length.title} · ${t.slotDurationOf(lengthMins)}`
+                            : t.slotDurationOf(Math.max(1, Math.ceil((addSec ?? 0) / 60)))}
+                        </span>
+                      </div>
+                      <div>
+                        <span class="k">{t.slotWouldEnd}</span>
+                        <span class="value">
+                          {addPreviewEnd}
+                          {addPreviewSpill ? ` ${t.day[nextDay(draft.origin)]}` : ""}
+                        </span>
                       </div>
                     </div>
                   ) : null}
@@ -1965,11 +2425,62 @@ export function Admin() {
                   {pathChosen && !measuring && matched && !length && !matched.error && (
                     <p class="field-error">{t.noVideo}</p>
                   )}
+                  {draft.addMode === "random-file" && (
+                    <fieldset class="source">
+                      <legend class="k">{t.playlistRandomCap}</legend>
+                      <div class="source-grid" role="radiogroup" aria-label={t.playlistRandomCap}>
+                        <button
+                          type="button"
+                          role="radio"
+                          aria-checked={draft.addLengthChoice !== "longest"}
+                          class={draft.addLengthChoice !== "longest" ? "mode on" : "mode"}
+                          onClick={() => chooseAddLength("fixed")}
+                        >
+                          <b>{t.fixedLength}</b>
+                          <span>{t.standardSlot}</span>
+                        </button>
+                        <button
+                          type="button"
+                          role="radio"
+                          aria-checked={draft.addLengthChoice === "longest"}
+                          class={draft.addLengthChoice === "longest" ? "mode on" : "mode"}
+                          onClick={() => chooseAddLength("longest")}
+                        >
+                          <b>{t.longestFile}</b>
+                          <span>{t.findLongest}</span>
+                        </button>
+                      </div>
+                    </fieldset>
+                  )}
+                  {draft.addMode === "random-file" && draft.addLengthChoice !== "longest" && (
+                    <div class="fixed">
+                      <span class="k">{t.playlistRandomCap}</span>
+                      <DurationPick
+                        lengthChoice={draft.addLengthChoice}
+                        customMin={draft.addCustomMin}
+                        lengthCh={lengthCh}
+                        t={t}
+                        onChoice={(value) =>
+                          setDraft((current) => (current ? { ...current, addLengthChoice: value } : current))
+                        }
+                        onCustom={(value) =>
+                          setDraft((current) => (current ? { ...current, addCustomMin: value } : current))
+                        }
+                      />
+                      {draft.addLengthChoice === "custom" &&
+                        draft.addCustomMin.trim() !== "" &&
+                        addFixedMinutes(draft) === null && <p class="field-error">{t.needMinutes}</p>}
+                    </div>
+                  )}
                   <div class="actions">
                     <button
                       type="button"
                       class="primary"
-                      disabled={!length || measuring || !pathChosen || Boolean(matched?.error)}
+                      disabled={
+                        draft.addMode === "random-file" && draft.addLengthChoice !== "longest"
+                          ? !pathChosen || addFixedMinutes(draft) == null
+                          : !length || measuring || !pathChosen || Boolean(matched?.error)
+                      }
                       onClick={addStackItem}
                     >
                       {t.add}
@@ -2065,14 +2576,14 @@ export function Admin() {
                   <div class="wait">
                     <div class="wait-line">
                       <span class="spin" aria-hidden="true" />
-                      <span class="cloud-host" onMouseEnter={placeCloud}>
+                      <span class="cloud-host" onMouseEnter={placeCloud} onMouseLeave={hideCloud}>
                         <span class="measure-label">{t.measuringVideos}</span>
                         <span class="cloud" role="tooltip">
                           {t.elapsed(elapsedClock(elapsedSec))}
                         </span>
                       </span>
-                      <span class="cloud-host" onMouseEnter={placeCloud}>
-                        <button type="button" class="info" aria-label={t.whySlow} onFocus={showCloud}>
+                      <span class="cloud-host" onMouseEnter={placeCloud} onMouseLeave={hideCloud}>
+                        <button type="button" class="info" aria-label={t.whySlow} onFocus={showCloud} onBlur={blurCloud}>
                           <InfoMark />
                         </button>
                         <span class="cloud" role="tooltip">
@@ -2118,63 +2629,18 @@ export function Admin() {
               ) : (
                 <div class="fixed">
                   <span class="k">{t.chooseLength}</span>
-                  <div class="dur-pick">
-                    <select
-                      aria-label={t.chooseLength}
-                      value={String(draft.lengthChoice)}
-                      style={{ width: `calc(${lengthCh + 1}ch + 2.2rem)` }}
-                      onChange={(event) => {
-                        const value = (event.target as HTMLSelectElement).value;
-                        setDraft((current) => {
-                          if (!current) return current;
-                          if (value === "custom") return { ...current, lengthChoice: "custom" };
-                          const mins = Number(value);
-                          if (!isPreset(mins)) return current;
-                          return { ...current, lengthChoice: mins };
-                        });
-                      }}
-                    >
-                      {PRESETS.map((mins) => (
-                        <option key={mins} value={String(mins)}>
-                          {t.minutes(mins)}
-                        </option>
-                      ))}
-                      <option value="custom">{t.customLength}</option>
-                    </select>
-                    {draft.lengthChoice === "custom" && (
-                      <label class="custom">
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          min={1}
-                          step={1}
-                          value={draft.customMin}
-                          placeholder="45"
-                          aria-label={t.customLength}
-                          onInput={(event) => {
-                            const value = (event.target as HTMLInputElement).value;
-                            setDraft((current) => (current ? { ...current, customMin: value } : current));
-                          }}
-                        />
-                        <em>{t.minutesUnit}</em>
-                      </label>
-                    )}
-                    <span class="cloud-host" onMouseEnter={placeCloud}>
-                      <button
-                        type="button"
-                        class="info"
-                        onFocus={showCloud}
-                        aria-label={t.aboutLength(
-                          draft.lengthChoice === "custom" ? t.customLength : t.minutes(draft.lengthChoice),
-                        )}
-                      >
-                        <InfoMark />
-                      </button>
-                      <span class="cloud" role="tooltip">
-                        {t.durationTip[draft.lengthChoice === "custom" ? "custom" : (`${draft.lengthChoice}` as TipKey)]}
-                      </span>
-                    </span>
-                  </div>
+                  <DurationPick
+                    lengthChoice={draft.lengthChoice}
+                    customMin={draft.customMin}
+                    lengthCh={lengthCh}
+                    t={t}
+                    onChoice={(value) =>
+                      setDraft((current) => (current ? { ...current, lengthChoice: value } : current))
+                    }
+                    onCustom={(value) =>
+                      setDraft((current) => (current ? { ...current, customMin: value } : current))
+                    }
+                  />
                   {draft.lengthChoice === "custom" && draft.customMin.trim() !== "" && fixedMin === null && (
                     <p class="field-error">{t.needMinutes}</p>
                   )}
@@ -2215,7 +2681,7 @@ export function Admin() {
                     ? [{ key: "only", label: t.onlySlot }]
                     : [
                         ...(prev
-                          ? [{ key: "prev", label: t.prevSlotEnds, time: windowOn(prev, day).end }]
+                          ? [{ key: "prev", label: t.prevSlotEnds, time: placedOn(prev, day, board).end }]
                           : []),
                         ...(next
                           ? [{ key: "next", label: t.nextSlotBegins, time: windowOn(next, day).start }]
@@ -2259,7 +2725,7 @@ export function Admin() {
                         <>
                           <span>{t.overlaps}</span>
                           <span>
-                            {clash.start}–{clash.end}
+                            {clash.title} {clash.start}–{clash.end}
                           </span>
                         </>
                       ) : (
@@ -2306,6 +2772,7 @@ export function Admin() {
                 type="button"
                 disabled={slotOp !== null}
                 onClick={() => {
+                  dismissTip();
                   setDraft(null);
                   setFieldError({});
                 }}

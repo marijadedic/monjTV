@@ -308,6 +308,12 @@ export async function syncIntermission(): Promise<void> {
   await playActiveIntermission();
 }
 
+// Join the rebuilt rundown. A new slot can cut off intermission.
+export async function joinRundown(): Promise<void> {
+  if (stopping || !mpv.running) return;
+  await playNow();
+}
+
 // Cut off an intermission file so the scheduled block has the screen.
 async function stopIntermission(): Promise<void> {
   clearFallbackRetry();
