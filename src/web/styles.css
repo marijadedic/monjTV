@@ -1547,6 +1547,10 @@ html[data-theme="dusk"] .week-scale .ghost.stack {
   backdrop-filter: blur(6px);
 }
 
+.week-wrap .scrim.gap-scrim {
+  z-index: 22;
+}
+
 html[data-theme="dusk"] .week-wrap .scrim {
   background: rgba(36, 42, 28, 0.38);
 }
@@ -1561,16 +1565,329 @@ html[data-theme="light"] .week-wrap .scrim {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  display: grid;
-  gap: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
   width: min(28rem, calc(100% - 48px));
   max-height: calc(100vh - 32px);
-  overflow: auto;
+  overflow: hidden;
   padding: 1rem 1.5rem;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 14px;
   box-shadow: 0 6px 16px rgba(60, 70, 40, 0.1);
+}
+
+.add-form.gap-form {
+  z-index: 23;
+  width: min(22rem, calc(100% - 48px));
+}
+
+.add-form.gap-form .custom,
+.add-form.gap-form .actions {
+  width: 100%;
+}
+
+.add-form header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mode-pill {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  border: 1px solid var(--line);
+}
+
+.step-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--line);
+}
+
+.step-tabs button {
+  margin: 0 0 -1px;
+  padding: 6px 14px 8px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+  background: transparent;
+  color: var(--muted);
+}
+
+.step-tabs button.on {
+  background: var(--bg);
+  color: var(--text);
+  border-color: var(--line);
+  font-weight: 650;
+}
+
+.step-body {
+  overflow: auto;
+  min-height: 0;
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+}
+
+.step-body.slide-next {
+  animation: step-next 320ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.step-body.slide-back {
+  animation: step-back 320ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@keyframes step-next {
+  from {
+    transform: translateX(28%);
+    opacity: 0.4;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@keyframes step-back {
+  from {
+    transform: translateX(-28%);
+    opacity: 0.4;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step-body.slide-next,
+  .step-body.slide-back {
+    animation: none;
+  }
+}
+
+.add-form .mode-list {
+  display: grid;
+  gap: 8px;
+}
+
+.add-form .mode-list .mode {
+  width: 100%;
+  min-height: 0;
+  padding: 10px 12px;
+  text-align: left;
+  align-items: flex-start;
+  justify-content: flex-start;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.when-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 10px;
+}
+
+.when-row input.time {
+  width: 8.2rem;
+}
+
+.when-end {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.when-note {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.when-note.warn {
+  color: var(--warn, #9a3b2f);
+}
+
+.tally {
+  margin: 18px 0;
+}
+
+.tally .slash {
+  margin: 0 0.75em;
+}
+
+.add-form .stack-head {
+  margin-top: 18px;
+}
+
+.summary {
+  display: grid;
+}
+
+.summary-row {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.summary-row .hint {
+  color: var(--muted);
+}
+
+.add-form header {
+  flex-wrap: nowrap;
+}
+
+.add-form header b {
+  min-width: 0;
+}
+
+.mode-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--primary-line);
+}
+
+.icon-btn .glyph {
+  display: block;
+  width: 16px;
+  height: 16px;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mode-pill .icon-btn {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+}
+
+.icon-btn.trash {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  margin-left: auto;
+  color: #ff4d4d;
+}
+
+.icon-btn.trash .glyph {
+  width: 24px;
+  height: 24px;
+}
+
+.summary-title {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 18px 0 16px;
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.summary-title span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.summary-title .icon-btn,
+.summary-label .icon-btn {
+  margin-left: auto;
+}
+
+.summary-fact {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.summary-fact .len {
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.summary-label {
+  display: flex;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.summary-line {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.folder-block > button.wide {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.add-form.asking > :not(.ask) {
+  filter: blur(6px);
+  pointer-events: none;
+}
+
+.ask {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+}
+
+.ask-card {
+  width: min(22rem, 100%);
+  padding: 1.1rem 1.2rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
+.ask-card p {
+  margin: 0 0 1rem;
+}
+
+.ask-card .actions {
+  margin: 0;
+}
+
+.ask-card button.danger {
+  background: #a33a3a;
+  border-color: #a33a3a;
+  color: #fff;
+}
+
+.day-start .when-row,
+.day-start .when-note {
+  grid-column: 1 / -1;
 }
 
 .playlist {
@@ -1583,15 +1900,88 @@ html[data-theme="light"] .week-wrap .scrim {
 
 .playlist-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
   align-items: center;
   padding: 8px 0;
-  border-bottom: 1px solid var(--line);
 }
 
-.playlist-item:last-child {
-  border-bottom: 0;
+.item-when {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  margin-right: 8px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.playlist-item .item-when span {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.05;
+}
+
+.playlist-item .item-when .dash {
+  text-align: center;
+}
+
+.playlist.summary .playlist-item {
+  padding-bottom: 0;
+}
+
+.playlist.summary .playlist-item hr {
+  grid-column: 1 / -1;
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 8px 0 0;
+}
+
+.playlist-copy {
+  min-width: 0;
+}
+
+.playlist-gap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+}
+
+.playlist-gap hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 0;
+}
+
+.playlist-gap .gap-mins {
+  color: var(--muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.playlist-gap .gap-plus {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  line-height: 1;
+  font-weight: 600;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.playlist-gap .gap-plus:hover,
+.playlist-gap .gap-plus:focus-visible,
+.playlist-gap .gap-plus.on {
+  color: var(--text);
+  border-color: var(--accent);
 }
 
 .playlist-item b {
@@ -2111,12 +2501,21 @@ html[data-theme="dusk"] .path-suggest {
   gap: 6px;
 }
 
-.add-form .pick-mode .mode {
+.add-form .pick-mode .modes .mode {
   grid-column: span 2;
 }
 
-.add-form .pick-mode .mode:nth-child(n + 4) {
+.add-form .pick-mode .modes .mode:nth-child(n + 4) {
   grid-column: span 3;
+}
+
+.add-form .mode-list {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.add-form .mode-list .mode {
+  grid-column: 1 / -1;
+  width: 100%;
 }
 
 .add-next .modes {
@@ -2270,7 +2669,9 @@ html[data-theme="dusk"] .week-scale button.slot .slot-calc {
   font-family: system-ui, sans-serif;
 }
 
-html[data-theme="dusk"] .playlist-tools button {
+html[data-theme="dusk"] .playlist-tools button,
+html[data-theme="dusk"] .playlist-gap .gap-plus,
+html[data-theme="dusk"] .playlist-gap .gap-mins {
   font-family: system-ui, sans-serif;
 }
 
@@ -2307,6 +2708,10 @@ html[data-theme="light"] .add-form .chip.on {
   gap: 8px;
   align-items: center;
   justify-content: flex-end;
+}
+
+.add-form .actions .cancel {
+  margin-right: auto;
 }
 
 .add-form .actions button {
@@ -2623,6 +3028,8 @@ html[data-theme="teletext"] .path-suggest,
 html[data-theme="teletext"] .block-form,
 html[data-theme="teletext"] .add-form .mode,
 html[data-theme="teletext"] .playlist-item,
+html[data-theme="teletext"] .playlist-gap .gap-plus,
+html[data-theme="teletext"] .add-form.gap-form,
 html[data-theme="teletext"] .week-scale .ghost {
   border-radius: 0;
 }

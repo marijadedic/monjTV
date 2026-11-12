@@ -5,7 +5,7 @@ import { titleFromPath } from "./files.ts";
 import { Mpv } from "./mpv.ts";
 import { pick } from "./picker.ts";
 import { markEpisodeDone, markRandomPlayed } from "./progress.ts";
-import { ensureToday, joinOffset, loadToday, onAirItem, saveToday } from "./rundown.ts";
+import { coversNow, ensureToday, joinOffset, loadToday, onAirItem, saveToday } from "./rundown.ts";
 import { DAY_SECONDS, windowOn } from "../shared/window.ts";
 import {
   isYoutubeUrl,
@@ -259,7 +259,8 @@ async function playNow(): Promise<void> {
   const day = weekday();
   const dayBlocks = blocksForDay(schedule, day);
   const now = nowSec();
-  const air = onAirItem(today.items, now);
+  const playing = today.items.find((item) => item.status === "playing" && coversNow(item, now));
+  const air = playing ?? onAirItem(today.items, now);
 
   let changed = false;
   for (const item of today.items) {
@@ -274,6 +275,7 @@ async function playNow(): Promise<void> {
   if (air) {
     const offset = joinOffset(air, nowSec());
     if (offset < air.durationSec) {
+      if (playing && (await mpv.currentPath()) === air.path) return;
       await playItem(air, offset);
       return;
     }
@@ -617,7 +619,11 @@ function nextPlaylistItem(
   const index = siblings.findIndex((item) => item.id === current.id);
   if (index < 0) return null;
   const next = siblings[index + 1];
-  return next?.status === "planned" ? next : null;
+  if (next?.status !== "planned") return null;
+  const entry = (block.items ?? []).find((item) => item.id === current.entryId);
+  const gap = entry?.gapAfterMin ?? 0;
+  if (gap > 0 && nowSec() < parseHm(next.start)) return null;
+  return next;
 }
 
 function hasStarted(item: RundownItem, now: number): boolean {

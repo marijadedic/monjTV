@@ -26,8 +26,9 @@ import {
   videoCount,
 } from "./rundown.ts";
 import { assertFolder, changedBlocks, loadSchedule, sameBlocks, saveSchedule, sourceChanged } from "./schedule.ts";
-import { assertYoutubeVideo, youtubeTitles } from "./youtube.ts";
+import { canonicalPlaylistUrl, isYoutubeLink, isYoutubeUrl, parseYoutubeUrl } from "../shared/youtube.ts";
 import { frameOf } from "./still.ts";
+import { assertYoutubePlaylist, assertYoutubeVideo, youtubeTitles } from "./youtube.ts";
 import { closeAppTabs, portsFrom } from "./tabs.ts";
 
 const app = new Hono();
@@ -84,6 +85,10 @@ app.get("/api/video-count", async (c) => {
   const file = (c.req.query("file") ?? "").trim();
   if (file) return c.json({ count: 0, exists: await isVideoFile(file) });
   const folder = (c.req.query("folder") ?? "").trim();
+  if (canonicalPlaylistUrl(folder)) {
+    const count = await videoCount(folder);
+    return c.json({ count, exists: count > 0 });
+  }
   const exists = folder.length > 0 && (await isDir(folder));
   return c.json({ count: exists ? await videoCount(folder) : 0, exists });
 });
@@ -92,7 +97,7 @@ app.get("/api/slot-length", async (c) => {
   const mode = c.req.query("mode");
   if (!isItemMode(mode)) {
     return c.json(
-      { error: "mode must be next-episode, random-file, specific-file, or youtube" },
+      { error: "mode must be next-episode, random-file, or specific-file" },
       400,
     );
   }
@@ -119,7 +124,7 @@ app.get("/api/tv", async (c) => {
 // Serve one cached frame for a local-file rundown item.
 app.get("/api/tv/items/:id/still", async (c) => {
   const item = await findRundownItem(c.req.param("id"));
-  if (!item || item.mode === "youtube") return c.notFound();
+  if (!item || isYoutubeUrl(item.path)) return c.notFound();
   const file = await frameOf(item.path);
   if (!file) return c.notFound();
   const bytes = await readFile(file);
@@ -293,21 +298,44 @@ if (existsSync(clientIndex)) {
   });
 }
 
-// A new or edited slot still points at a real folder, video, or YouTube URL.
+// A new or edited slot still points at a real folder, video, YouTube video, or playlist.
 async function assertBlockSource(block: ScheduleBlock): Promise<void> {
   if (block.mode === "playlist") {
     for (const item of block.items ?? []) await assertEntrySource(item);
     return;
   }
-  if (block.mode === "specific-file") await assertVideo(block.file ?? "");
-  else if (block.mode === "youtube") await assertYoutubeVideo(block.file ?? "");
-  else await assertFolder(block.folder);
+  await assertPlaySource(block.mode, block.folder, block.file);
 }
 
 async function assertEntrySource(item: PlaylistEntry): Promise<void> {
-  if (item.mode === "specific-file") await assertVideo(item.file ?? "");
-  else if (item.mode === "youtube") await assertYoutubeVideo(item.file ?? "");
-  else await assertFolder(item.folder);
+  await assertPlaySource(item.mode, item.folder, item.file);
+}
+
+// A local path must exist. A YouTube video or playlist must be readable.
+async function assertPlaySource(mode: ScheduleBlock["mode"], folder: string, file?: string): Promise<void> {
+  if (mode === "playlist") return;
+  if (mode === "specific-file") {
+    const youtube = parseYoutubeUrl(file ?? "");
+    if (youtube) {
+      await assertYoutubeVideo(youtube);
+      return;
+    }
+    if (isYoutubeLink(file ?? "")) throw new Error("Not a YouTube video URL");
+    await assertVideo(file ?? "");
+    return;
+  }
+  if ((mode === "next-episode" || mode === "random-file") && canonicalPlaylistUrl(folder)) {
+    await assertYoutubePlaylist(folder);
+    return;
+  }
+  if (isYoutubeLink(folder)) {
+    throw new Error(
+      mode === "next-episode" || mode === "random-file"
+        ? "Not a YouTube playlist URL"
+        : "That is a YouTube link. Choose YouTube, then add it.",
+    );
+  }
+  await assertFolder(folder);
 }
 
 // Create the local data files, then start the server.

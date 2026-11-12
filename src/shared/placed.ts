@@ -4,6 +4,7 @@ import {
   DAY_MINUTES,
   clockOf,
   leftoverMin,
+  minutesOf,
   nextDay,
   windowOn,
   type DaySegment,
@@ -31,8 +32,16 @@ export function playlistMinutesOn(
 ): number | null {
   const items = playlistRowsOn(block, day, board);
   if (items.length === 0) return null;
-  const sec = items.reduce((sum, item) => sum + item.durationSec, 0);
-  return sec > 0 ? Math.max(1, Math.ceil(sec / 60)) : null;
+  let startMin = Infinity;
+  let endMin = -Infinity;
+  for (const item of items) {
+    const start = minutesOf(item.start);
+    const end = start + item.durationSec / 60;
+    if (start < startMin) startMin = start;
+    if (end > endMin) endMin = end;
+  }
+  const span = endMin - startMin;
+  return span > 0 ? Math.max(1, Math.ceil(span)) : null;
 }
 
 // Start from the week, height from the TV schedule for a playlist.

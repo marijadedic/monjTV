@@ -92,6 +92,11 @@ export function canonicalYoutubeIntermission(raw: string): string | null {
   return parseYoutubeUrl(raw);
 }
 
+// Playlist page used as the series key. A start video on the pasted link is ignored.
+export function canonicalPlaylistUrl(raw: string): string | null {
+  return parseYoutubePlaylist(raw)?.url ?? null;
+}
+
 export function formatPlaylistSource(playlist: YoutubePlaylistRef): string {
   if (playlist.startVideoId) {
     const index = playlist.startIndex > 0 ? `&index=${playlist.startIndex + 1}` : "";

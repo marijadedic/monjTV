@@ -28,6 +28,9 @@ export type YoutubePlaylistVideo = {
   id: string;
   url: string;
   title: string;
+  /** Seconds from the playlist listing. 0 when the listing did not include a length. */
+  durationSec: number;
+  isLive: boolean;
 };
 
 export type YoutubePlaylist = {
@@ -178,6 +181,24 @@ export function loadYoutubePlaylist(raw: string): Promise<YoutubePlaylist> {
   return job;
 }
 
+// Timed videos from the playlist listing. Does not probe each video.
+export async function youtubePlaylistTimed(
+  raw: string,
+): Promise<{ url: string; title: string; durationSec: number }[]> {
+  const playlist = await loadYoutubePlaylist(raw);
+  return playlist.videos
+    .filter((video) => !video.isLive && video.durationSec > 0)
+    .map((video) => ({ url: video.url, title: video.title, durationSec: video.durationSec }));
+}
+
+// Throw unless this playlist can be listed.
+export async function assertYoutubePlaylist(raw: string): Promise<string> {
+  const url = parseYoutubePlaylist(raw)?.url;
+  if (!url) throw new Error("Not a YouTube playlist URL");
+  await loadYoutubePlaylist(url);
+  return url;
+}
+
 // Throw unless this is a finished YouTube video with a readable length.
 export async function assertYoutubeVideo(raw: string): Promise<void> {
   const trimmed = raw.trim();
@@ -274,7 +295,7 @@ async function readPlaylist(ref: YoutubePlaylistRef): Promise<YoutubePlaylist> {
     videos,
   };
   rememberTitle(ref.url, playlist.title);
-  for (const video of videos) rememberTitle(video.url, video.title);
+  for (const video of videos) rememberListedVideo(video);
   playlists.set(ref.id, playlist);
   return playlist;
 }
@@ -285,18 +306,61 @@ function playlistVideos(entries: unknown): YoutubePlaylistVideo[] {
   const seen = new Set<string>();
   for (const entry of entries) {
     if (!entry || typeof entry !== "object") continue;
-    const id = videoIdFromEntry(entry as { id?: string; url?: string });
+    const row = entry as {
+      id?: string;
+      url?: string;
+      title?: string;
+      duration?: number | string | null;
+      duration_string?: string;
+      is_live?: boolean;
+      live_status?: string;
+    };
+    const id = videoIdFromEntry(row);
     if (!id || seen.has(id)) continue;
     seen.add(id);
-    const title = (entry as { title?: string }).title?.trim() ?? "";
+    const title = row.title?.trim() ?? "";
+    const durationSec = listedDurationSec(row);
+    const isLive =
+      row.is_live === true || row.live_status === "is_live" || row.live_status === "is_upcoming";
     videos.push({
       id,
       url: `https://www.youtube.com/watch?v=${id}`,
       title: title && title !== "NA" ? title : `YouTube · ${id}`,
+      durationSec,
+      isLive,
     });
     if (videos.length >= PLAYLIST_LIMIT) break;
   }
   return videos;
+}
+
+// Seconds from a playlist dump entry. Missing or live lengths stay 0.
+function listedDurationSec(row: {
+  duration?: number | string | null;
+  duration_string?: string;
+}): number {
+  const fromSec = Math.round(Number(row.duration));
+  if (Number.isFinite(fromSec) && fromSec > 0) return fromSec;
+  const raw = row.duration_string?.trim() ?? "";
+  if (!raw || raw === "NA") return 0;
+  const parts = raw.split(":").map((part) => Number(part));
+  if (parts.length < 2 || parts.length > 3 || parts.some((part) => !Number.isFinite(part))) return 0;
+  const [first, second, third] = parts;
+  if (third != null) return Math.round(first! * 3600 + second! * 60 + third);
+  return Math.round(first! * 60 + second!);
+}
+
+// Keep the listed length so later timing does not probe each video.
+function rememberListedVideo(video: YoutubePlaylistVideo): void {
+  rememberTitle(video.url, video.title);
+  if (cache.has(video.url)) return;
+  if (!video.isLive && video.durationSec < 1) return;
+  cache.set(video.url, {
+    url: video.url,
+    title: video.title,
+    durationSec: video.isLive ? 0 : video.durationSec,
+    isLive: video.isLive,
+  });
 }
 
 function videoIdFromEntry(entry: { id?: string; url?: string }): string | null {

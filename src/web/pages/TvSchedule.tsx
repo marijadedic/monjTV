@@ -2,13 +2,14 @@ import { useEffect, useState } from "preact/hooks";
 import { dateOffset, weekdayOfKey } from "../../shared/dates.ts";
 import type { ItemStatus, PlayerStatus, RecentPlays, RundownItem, TvBoard } from "../../shared/types.ts";
 import { itemCoversNow, itemHasPassed, itemProgress, itemStartsLater, secondsOf } from "../../shared/window.ts";
-import { canonicalYoutubeIntermission, youtubeId } from "../../shared/youtube.ts";
+import { canonicalYoutubeIntermission, isYoutubeUrl, youtubeId } from "../../shared/youtube.ts";
 import { api } from "../api.ts";
 import { pageHref } from "../href.ts";
 import { useI18n } from "../i18n.tsx";
 
-function showsFrame(mode: RundownItem["mode"]): boolean {
-  return mode === "next-episode" || mode === "random-file" || mode === "specific-file";
+function showsFrame(item: RundownItem): boolean {
+  if (isYoutubeUrl(item.path)) return false;
+  return item.mode === "next-episode" || item.mode === "random-file" || item.mode === "specific-file";
 }
 
 function stillSrc(item: RundownItem): string {
@@ -268,7 +269,7 @@ export function TvSchedule() {
       : null;
   const watchStill = watchId && !missed[watchId] ? watchId : null;
   const air = current ?? due;
-  const stripStill = air && showsFrame(air.mode) && !missed[air.path] ? air : null;
+  const stripStill = air && showsFrame(air) && !missed[air.path] ? air : null;
 
   function hideStill(filePath: string) {
     setMissed((currentMissed) => ({ ...currentMissed, [filePath]: true }));
@@ -277,12 +278,11 @@ export function TvSchedule() {
   const modeLabel = (mode: RundownItem["mode"]) => {
     if (mode === "next-episode") return t.nextEpisode;
     if (mode === "specific-file") return t.oneVideo;
-    if (mode === "youtube") return t.youtube;
     return t.random;
   };
 
   function sourceLabel(item: RundownItem): string {
-    if (item.mode === "youtube") return t.youtube;
+    if (isYoutubeUrl(item.path)) return t.youtube;
     return folderName(item.path);
   }
 
@@ -423,7 +423,7 @@ export function TvSchedule() {
                 : "done"
             : item.status;
           const canEdit = !past && (live || !item.overnight);
-          const cardStill = showsFrame(item.mode) && !missed[item.path];
+          const cardStill = showsFrame(item) && !missed[item.path];
           const airing = Boolean(live && air?.id === item.id);
           const coming = Boolean(live && gapTitle && next?.id === item.id);
           const wontStart = Boolean(live && held?.id === item.id);

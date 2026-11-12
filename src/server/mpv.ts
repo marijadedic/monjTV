@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { unlink } from "node:fs/promises";
 import net from "node:net";
 import os from "node:os";
@@ -65,6 +65,19 @@ function startArgOf(start: number | string): string {
   return trimmed;
 }
 
+// Display of the logged-in session, so mpv still opens on the TV when the server was started without one.
+function sessionEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  const uid = typeof process.getuid === "function" ? process.getuid() : null;
+  if (!env.XDG_RUNTIME_DIR && uid != null) env.XDG_RUNTIME_DIR = `/run/user/${uid}`;
+  const runtime = env.XDG_RUNTIME_DIR;
+  if (runtime && !env.WAYLAND_DISPLAY && existsSync(`${runtime}/wayland-0`)) {
+    env.WAYLAND_DISPLAY = "wayland-0";
+  }
+  if (!env.DISPLAY && existsSync("/tmp/.X11-unix/X0")) env.DISPLAY = ":0";
+  return env;
+}
+
 // True when this machine is a Raspberry Pi.
 function isRaspberryPi(): boolean {
   if (process.platform !== "linux") return false;
@@ -117,7 +130,7 @@ export class Mpv {
         "--demuxer-lavf-o-append=reconnect_delay_max=5",
         ...decodeArgs(),
       ],
-      { stdio: ["ignore", "ignore", "inherit"] },
+      { stdio: ["ignore", "ignore", "inherit"], env: sessionEnv() },
     );
     this.proc.once("exit", () => {
       this.cleanup();
@@ -139,6 +152,17 @@ export class Mpv {
       return;
     }
     await this.command(["loadfile", filePath, "replace"], timeoutMs);
+  }
+
+  // Path of the file on screen. Empty when mpv is idle.
+  async currentPath(): Promise<string | null> {
+    if (!this.running || !this.sock) return null;
+    try {
+      const msg = (await this.command(["get_property", "path"])) as { data?: unknown };
+      return typeof msg.data === "string" ? msg.data : null;
+    } catch {
+      return null;
+    }
   }
 
   // Stop the current file without quitting mpv.

@@ -108,7 +108,11 @@ type Copy = {
   oneVideo: string;
   oneHint: string;
   youtube: string;
-  youtubeHint: string;
+  youtubePlaylist: string;
+  choosePlaylist: string;
+  youtubePlaylistPlaceholder: string;
+  youtubePlaylistNote: string;
+  youtubeRandomNote: string;
   playlist: string;
   playlistHint: string;
   playlistName: string;
@@ -116,6 +120,11 @@ type Copy = {
   playlistStack: string;
   addToPlaylist: string;
   playlistEmpty: string;
+  playlistGapAdd: string;
+  playlistGapTip: string;
+  playlistGapTitle: string;
+  playlistGapNote: string;
+  playlistGapLine: (mins: number) => string;
   playlistRandomHint: string;
   playlistNextHint: string;
   playlistRandomCap: string;
@@ -130,6 +139,17 @@ type Copy = {
   videoPlaceholder: string;
   alsoOn: string;
   playHow: string;
+  stepHow: string;
+  stepWhen: string;
+  stepWhat: string;
+  back: string;
+  next: string;
+  startsMark: string;
+  endsMark: string;
+  prevAt: string;
+  laterAt: string;
+  videoCount: (count: number) => string;
+  playlistLongestHint: string;
   ifEmpty: string;
   intermission: string;
   intermissionCut: string;
@@ -142,6 +162,9 @@ type Copy = {
   intermissionRandomHint: string;
   none: string;
   change: string;
+  deleteAsk: string;
+  keepSlot: string;
+  deleteSlot: string;
   clickFirst: string;
   dayWord: string;
   dayName: Record<Day, string>;
@@ -234,7 +257,7 @@ const en: Copy = {
   startTv: "Start TV",
   options: "Options",
   recentPlayed: "Recently played",
-  recentHint: "Random slots skip these. Remove one to let it be picked again.",
+  recentHint: "Random slots leave these out until the other files have played. Remove one to let it be picked again.",
   recentEmpty: "No videos are on this list.",
   recentOrder: "Most recent first",
   close: "Close",
@@ -270,7 +293,7 @@ const en: Copy = {
   fixedLength: "Fixed length",
   standardSlot: "Standard TV timeslot",
   longestFile: "Longest file",
-  findLongest: "Find the longest running video in the folder",
+  findLongest: "Find the longest running video in the folder or playlist",
   chooseLength: "Choose slot duration",
   customLength: "Custom",
   minutes: (n) => `${n} min`,
@@ -294,28 +317,41 @@ const en: Copy = {
   newSlot: (day) => `New slot · ${day}`,
   editSlot: (day) => `Edit slot · ${day}`,
   folder: "Folder",
-  randomHint: "Picks a folder. Skips recently played files.",
-  nextHint: "Walks the folder in order.",
+  randomHint: "Picks a folder, or a YouTube playlist. Each file plays once before it comes around again.",
+  nextHint: "Walks a folder in order, or a YouTube playlist.",
   oneVideo: "One video",
-  oneHint: "Plays a specific file.",
+  oneHint: "Plays one file, or one YouTube video.",
   youtube: "YouTube",
-  youtubeHint: "Plays one YouTube video in mpv.",
   playlist: "Playlist",
   playlistHint:
-    "Videos play one after another, with no intermission between them. The slot lasts as long as the files that air that day.",
+    "Videos play one after another. A plus between them can add minutes of intermission. The slot lasts as long as the files that air that day.",
   playlistName: "Name on the schedule",
   playlistNamePlaceholder: "Saturday night",
   playlistStack: "Videos in this slot",
   addToPlaylist: "Add a video",
   playlistEmpty: "Add videos to this playlist.",
-  playlistRandomHint:
-    "Each airing picks a different file. A fixed length only skips files that are too long. The slot uses the file that plays.",
-  playlistNextHint: "Walks the folder in order. Each airing uses that episode’s length.",
+  playlistGapAdd: "Add intermission between these videos",
+  playlistGapTip: "Add minutes of the selected intermission between these two videos.",
+  playlistGapTitle: "Intermission between videos",
+  playlistGapNote:
+    "Plays the selected Intermission for this many minutes, then the next video. A later slot still cuts that file off.",
+  playlistGapLine: (mins) => `${mins} min intermission`,
+  playlistRandomHint: "Skips a longer file. The file that plays sets the length.",
+  playlistLongestHint:
+    "The slot uses the file that plays. Until a day picks one, this row has no cap in the total.",
+  playlistNextHint: "Walks the folder or YouTube playlist in order. Each airing uses that episode’s length.",
   playlistRandomCap: "Longest file it will pick",
   moveUp: "Move up",
   moveDown: "Move down",
   chooseYoutube: "YouTube URL",
   youtubePlaceholder: "https://www.youtube.com/watch?v=…",
+  youtubePlaylist: "YouTube playlist",
+  choosePlaylist: "YouTube playlist URL",
+  youtubePlaylistPlaceholder: "https://www.youtube.com/playlist?list=…",
+  youtubePlaylistNote:
+    "Walks the playlist in order, like episodes in a folder. A video that finishes is remembered, so the next airing continues. This needs the internet.",
+  youtubeRandomNote:
+    "Picks a video that has not played yet this pass, and skips one that does not fit. This needs the internet.",
   youtubeCaveat:
     "Use a finished YouTube video, not a live stream. This needs the internet and will not play as offline TV.",
   youtubeProbeCache:
@@ -326,6 +362,16 @@ const en: Copy = {
   videoPlaceholder: "/path/to/video.mp4",
   alsoOn: "Also play on",
   playHow: "Choose how it plays",
+  stepHow: "How",
+  stepWhen: "When",
+  stepWhat: "What",
+  back: "Back",
+  next: "Next",
+  startsMark: "Starts",
+  endsMark: "Ends",
+  prevAt: "Prev at",
+  laterAt: "Next at",
+  videoCount: (count) => (count === 1 ? "1 video" : `${count} videos`),
   ifEmpty: "Plays when nothing is on, and after a slot’s video ends early.",
   intermission: "Intermission",
   intermissionCut: "A new slot cuts it off.",
@@ -338,6 +384,9 @@ const en: Copy = {
   intermissionRandomHint: "Each time an intermission video starts, it opens somewhere in that video.",
   none: "None",
   change: "Change",
+  deleteAsk: "Are you sure you want to delete this slot?",
+  keepSlot: "Keep",
+  deleteSlot: "Delete",
   clickFirst: "Click to add the first slot",
   dayWord: "Day",
   dayName: {
@@ -434,14 +483,15 @@ const hrExact: Record<string, string> = {
   "Invalid slot": "Neispravan blok.",
   "Each slot needs at least one day": "Svaki blok treba barem jedan dan.",
   "start and end must be HH:mm": "Početak i kraj moraju biti u obliku HH:mm.",
-  "mode must be next-episode, random-file, specific-file, or youtube":
-    "Način mora biti sljedeća epizoda, nasumična datoteka, jedan video ili YouTube.",
-  "mode must be next-episode, random-file, specific-file, youtube, or playlist":
-    "Način mora biti sljedeća epizoda, nasumična datoteka, jedan video, YouTube ili popis.",
+  "mode must be next-episode, random-file, or specific-file":
+    "Način mora biti sljedeća epizoda, nasumična datoteka ili jedan video.",
+  "mode must be next-episode, random-file, specific-file, or playlist":
+    "Način mora biti sljedeća epizoda, nasumična datoteka, jedan video ili popis.",
   "Each playlist needs a name": "Popis treba ime.",
   "Each playlist needs at least one video": "Popis treba barem jedan video.",
-  "playlist items must be next-episode, random-file, specific-file, or youtube":
-    "Stavke popisa moraju biti sljedeća epizoda, nasumična datoteka, jedan video ili YouTube.",
+  "playlist items must be next-episode, random-file, or specific-file":
+    "Stavke popisa moraju biti sljedeća epizoda, nasumična datoteka ili jedan video.",
+  "Type a YouTube playlist URL.": "Upišite URL YouTube popisa.",
   "Invalid playlist item": "Neispravna stavka popisa.",
   "Each specific-file slot needs a video": "Blok s jednim videom treba odabranu datoteku.",
   "Each YouTube slot needs a YouTube video URL": "YouTube blok treba YouTube URL videa.",
@@ -565,7 +615,7 @@ const hr: Copy = {
   startTv: "Pokreni TV",
   options: "Opcije",
   recentPlayed: "Nedavno pušteno",
-  recentHint: "Nasumični blokovi preskaču ove datoteke. Uklonite jednu da se može opet odabrati.",
+  recentHint: "Nasumični blokovi ih preskaču dok ostale datoteke ne dođu na red. Uklonite jednu da se može opet odabrati.",
   recentEmpty: "Na ovom popisu nema videa.",
   recentOrder: "Najnovije prvo",
   close: "Zatvori",
@@ -601,7 +651,7 @@ const hr: Copy = {
   fixedLength: "Fiksno trajanje",
   standardSlot: "Standardni TV termin",
   longestFile: "Najdulja datoteka",
-  findLongest: "Pronađi najdulji video u mapi",
+  findLongest: "Pronađi najdulji video u mapi ili na popisu",
   chooseLength: "Odaberi trajanje bloka",
   customLength: "Proizvoljno",
   minutes: (n) => `${n} min`,
@@ -625,27 +675,41 @@ const hr: Copy = {
   newSlot: (day) => `Novi blok · ${day}`,
   editSlot: (day) => `Uredi blok · ${day}`,
   folder: "Mapa",
-  randomHint: "Bira mapu. Preskače nedavno puštene datoteke.",
-  nextHint: "Ide redom kroz mapu.",
+  randomHint: "Bira mapu ili YouTube popis. Svaka datoteka ide jednom prije nego što opet dođe na red.",
+  nextHint: "Ide redom kroz mapu ili YouTube popis.",
   oneVideo: "Jedan video",
-  oneHint: "Pušta određenu datoteku.",
+  oneHint: "Pušta jednu datoteku ili jedan YouTube video.",
   youtube: "YouTube",
-  youtubeHint: "Pušta jedan YouTube video u mpv-u.",
   playlist: "Popis",
-  playlistHint: "Pušta videe redom, bez pauze između. Blok traje koliko videi koji se tog dana puštaju.",
+  playlistHint:
+    "Pušta videe redom. Plus između njih može dodati minute pauze. Blok traje koliko videi koji se tog dana puštaju.",
   playlistName: "Ime na rasporedu",
   playlistNamePlaceholder: "Subotnja večer",
   playlistStack: "Videi u ovom bloku",
   addToPlaylist: "Dodaj video",
   playlistEmpty: "Dodajte videe na ovaj popis.",
-  playlistRandomHint:
-    "Svako puštanje bira drugi video. Fiksno trajanje samo preskače preduge datoteke. Blok traje koliko video koji ide.",
-  playlistNextHint: "Ide redom kroz mapu. Svako puštanje traje koliko ta epizoda.",
+  playlistGapAdd: "Dodaj pauzu između ovih videa",
+  playlistGapTip: "Dodaje minute odabrane pauze između ova dva videa.",
+  playlistGapTitle: "Pauza između videa",
+  playlistGapNote:
+    "Pušta odabranu pauzu ovoliko minuta, zatim sljedeći video. Kasniji blok i dalje prekida tu datoteku.",
+  playlistGapLine: (mins) => `${mins} min pauze`,
+  playlistRandomHint: "Preskače dulji video. Trajanje bloka je video koji ide.",
+  playlistLongestHint:
+    "Blok traje koliko video koji ide. Dok dan ne odabere video, ovaj red nema granicu u zbroju.",
+  playlistNextHint: "Ide redom kroz mapu ili YouTube popis. Svako puštanje traje koliko ta epizoda.",
   playlistRandomCap: "Najdulji video koji smije ići",
   moveUp: "Gore",
   moveDown: "Dolje",
   chooseYoutube: "YouTube URL",
   youtubePlaceholder: "https://www.youtube.com/watch?v=…",
+  youtubePlaylist: "YouTube popis",
+  choosePlaylist: "URL YouTube popisa",
+  youtubePlaylistPlaceholder: "https://www.youtube.com/playlist?list=…",
+  youtubePlaylistNote:
+    "Ide redom kroz popis, kao epizode u mapi. Video koji završi se pamti, pa sljedeće puštanje nastavlja. Treba internet.",
+  youtubeRandomNote:
+    "Bira video koji još nije išao u ovom krugu i preskače onaj koji ne stane. Treba internet.",
   youtubeCaveat:
     "Stavite gotov YouTube video, ne prijenos uživo. Treba internet i neće raditi kao televizija bez mreže.",
   youtubeProbeCache:
@@ -656,6 +720,22 @@ const hr: Copy = {
   videoPlaceholder: "/putanja/do/videa.mp4",
   alsoOn: "Pusti i na",
   playHow: "Odaberi kako se pušta",
+  stepHow: "Kako",
+  stepWhen: "Kada",
+  stepWhat: "Što",
+  back: "Natrag",
+  next: "Dalje",
+  startsMark: "Počinje",
+  endsMark: "Završava",
+  prevAt: "Prije u",
+  laterAt: "Dalje u",
+  videoCount: (count) => {
+    const mod10 = count % 10;
+    const mod100 = count % 100;
+    if (mod10 === 1 && mod100 !== 11) return `${count} video`;
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${count} videa`;
+    return `${count} videa`;
+  },
   ifEmpty: "Reproducira se kad ništa nije na rasporedu, i kad video u bloku završi ranije.",
   intermission: "Pauza",
   intermissionCut: "Novi blok prekida reprodukciju.",
@@ -668,6 +748,9 @@ const hr: Copy = {
   intermissionRandomHint: "Svaki put kad video pauze krene, otvara se negdje u tom videu.",
   none: "nije odabrano",
   change: "Promijeni",
+  deleteAsk: "Jeste li sigurni da želite obrisati ovaj termin?",
+  keepSlot: "Zadrži",
+  deleteSlot: "Obriši",
   clickFirst: "Klikni za dodati prvi blok",
   dayWord: "Dan",
   dayName: {

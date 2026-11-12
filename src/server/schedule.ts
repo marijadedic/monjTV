@@ -16,7 +16,14 @@ import {
   type TvBoard,
 } from "../shared/types.ts";
 import { DAY_MINUTES, clockOf, minutesOf, windowOn } from "../shared/window.ts";
-import { canonicalYoutubeIntermission, isYoutubeLink, parseYoutubeUrl } from "../shared/youtube.ts";
+import {
+  canonicalPlaylistUrl,
+  canonicalYoutubeIntermission,
+  isYoutubeLink,
+  parseYoutubePlaylist,
+  parseYoutubeUrl,
+  youtubeLabel,
+} from "../shared/youtube.ts";
 import { dateKey, parseHm, isHm } from "./clock.ts";
 import { assertVideo, isDir } from "./files.ts";
 import { schedulePath, tvPath } from "./paths.ts";
@@ -131,8 +138,32 @@ export function blocksForDay(schedule: Schedule, day: Day): ScheduleBlock[] {
 // Name shown when two slots overlap.
 function blockLabel(block: ScheduleBlock): string {
   if (block.mode === "playlist") return (block.name ?? "").trim() || "Playlist";
+  if (block.mode === "specific-file" && block.file && parseYoutubeUrl(block.file)) return youtubeLabel(block.file);
+  if ((block.mode === "next-episode" || block.mode === "random-file") && parseYoutubePlaylist(block.folder)) {
+    return youtubeLabel(block.folder);
+  }
   if (block.file) return path.basename(block.file);
   return path.basename(block.folder) || block.folder;
+}
+
+// A saved YouTube mode becomes one video. The link stays in `file`.
+function migrateStoredBlock(block: ScheduleBlock): ScheduleBlock {
+  const mode = (block as { mode?: string }).mode;
+  if (mode === "youtube") {
+    const file = parseYoutubeUrl(block.file ?? "") ?? (block.file ?? "");
+    return { ...block, mode: "specific-file", folder: "", ...(file ? { file } : {}) };
+  }
+  if (block.mode !== "playlist" || !block.items?.some((item) => (item.mode as string) === "youtube")) {
+    return block;
+  }
+  return {
+    ...block,
+    items: block.items.map((item) => {
+      if ((item.mode as string) !== "youtube") return item;
+      const file = parseYoutubeUrl(item.file ?? "") ?? item.file;
+      return { ...item, mode: "specific-file", folder: "", ...(file ? { file } : {}) };
+    }),
+  };
 }
 
 // Normalize blocks and reject a new overlap, including leftovers that run past midnight.
@@ -181,7 +212,7 @@ export function validateSchedule(
 // Blocks plus the intermission list, without rejecting a saved block.
 function scheduleFrom(data: StoredSchedule): Schedule {
   return {
-    blocks: Array.isArray(data.blocks) ? data.blocks : [],
+    blocks: Array.isArray(data.blocks) ? data.blocks.map(migrateStoredBlock) : [],
     ...intermissionsFrom(data, false),
     intermissionRandomStart: data.intermissionRandomStart === true,
   };
@@ -268,10 +299,11 @@ function normalizeBlock(raw: ScheduleBlock): ScheduleBlock {
   if (!lengthMin && minutesOf(end) === minutesOf(raw.start)) {
     throw new Error("Block must be shorter than 24 hours");
   }
-  if (!isBlockMode(raw.mode)) {
-    throw new Error("mode must be next-episode, random-file, specific-file, youtube, or playlist");
+  const mode = (raw as { mode?: string }).mode === "youtube" ? "specific-file" : raw.mode;
+  if (!isBlockMode(mode)) {
+    throw new Error("mode must be next-episode, random-file, specific-file, or playlist");
   }
-  if (raw.mode === "playlist") {
+  if (mode === "playlist") {
     const name = (raw.name ?? "").trim();
     if (!name) throw new Error("Each playlist needs a name");
     const items = (raw.items ?? []).map(normalizeEntry);
@@ -286,27 +318,28 @@ function normalizeBlock(raw: ScheduleBlock): ScheduleBlock {
       folder: "",
       name,
       items,
-      mode: raw.mode,
+      mode,
     };
   }
-  if (raw.mode === "youtube") {
-    const file = parseYoutubeUrl(raw.file ?? "") ?? "";
-    if (!file) throw new Error("Each YouTube slot needs a YouTube video URL");
-    return {
-      id,
-      days,
-      start: raw.start,
-      end,
-      ...(lengthMin ? { lengthMin } : {}),
-      ...(starts ? { starts } : {}),
-      folder: "",
-      file,
-      mode: raw.mode,
-    };
-  }
-  if (raw.mode === "specific-file") {
+  if (mode === "specific-file") {
+    const youtube = parseYoutubeUrl(raw.file ?? "");
+    if (youtube) {
+      return {
+        id,
+        days,
+        start: raw.start,
+        end,
+        ...(lengthMin ? { lengthMin } : {}),
+        ...(starts ? { starts } : {}),
+        folder: "",
+        file: youtube,
+        mode,
+      };
+    }
     const file = (raw.file ?? "").trim();
-    if (!file) throw new Error("Each specific-file block needs a video");
+    if (!file || isYoutubeLink(file)) {
+      throw new Error(file ? "Not a YouTube video URL" : "Each specific-file block needs a video");
+    }
     return {
       id,
       days,
@@ -316,11 +349,33 @@ function normalizeBlock(raw: ScheduleBlock): ScheduleBlock {
       ...(starts ? { starts } : {}),
       folder: path.dirname(file),
       file,
-      mode: raw.mode,
+      mode,
     };
+  }
+  if (mode === "next-episode" || mode === "random-file") {
+    const playlist = canonicalPlaylistUrl(raw.folder ?? "") ?? canonicalPlaylistUrl(raw.file ?? "");
+    if (playlist) {
+      return {
+        id,
+        days,
+        start: raw.start,
+        end,
+        ...(lengthMin ? { lengthMin } : {}),
+        ...(starts ? { starts } : {}),
+        folder: playlist,
+        mode,
+      };
+    }
   }
   const folder = (raw.folder ?? "").trim();
   if (!folder) throw new Error("Each block needs a folder");
+  if (isYoutubeLink(folder)) {
+    throw new Error(
+      mode === "next-episode" || mode === "random-file"
+        ? "Not a YouTube playlist URL"
+        : "That is a YouTube link. Choose YouTube, then add it.",
+    );
+  }
   return {
     id,
     days,
@@ -329,31 +384,47 @@ function normalizeBlock(raw: ScheduleBlock): ScheduleBlock {
     ...(lengthMin ? { lengthMin } : {}),
     ...(starts ? { starts } : {}),
     folder,
-    mode: raw.mode,
+    mode,
   };
 }
 
-// One stacked video. The four play modes match a normal slot.
+// One stacked video. The three play modes match a normal slot.
 function normalizeEntry(raw: PlaylistEntry): PlaylistEntry {
   if (!raw || typeof raw !== "object") throw new Error("Invalid playlist item");
   const id = raw.id?.trim() || randomUUID();
-  if (!isItemMode(raw.mode)) {
-    throw new Error("playlist items must be next-episode, random-file, specific-file, or youtube");
+  const mode = (raw as { mode?: string }).mode === "youtube" ? "specific-file" : raw.mode;
+  if (!isItemMode(mode)) {
+    throw new Error("playlist items must be next-episode, random-file, or specific-file");
   }
-  if (raw.mode === "youtube") {
-    const file = parseYoutubeUrl(raw.file ?? "") ?? "";
-    if (!file) throw new Error("Each YouTube slot needs a YouTube video URL");
-    return { id, mode: raw.mode, folder: "", file };
-  }
-  if (raw.mode === "specific-file") {
+  const gapAfterMin = cleanGap(raw);
+  const gap = gapAfterMin ? { gapAfterMin } : {};
+  if (mode === "specific-file") {
+    const youtube = parseYoutubeUrl(raw.file ?? "");
+    if (youtube) return { id, mode, folder: "", file: youtube, ...gap };
     const file = (raw.file ?? "").trim();
-    if (!file) throw new Error("Each specific-file block needs a video");
-    return { id, mode: raw.mode, folder: path.dirname(file), file };
+    if (!file || isYoutubeLink(file)) {
+      throw new Error(file ? "Not a YouTube video URL" : "Each specific-file block needs a video");
+    }
+    return { id, mode, folder: path.dirname(file), file, ...gap };
+  }
+  if (mode === "next-episode" || mode === "random-file") {
+    const playlist = canonicalPlaylistUrl(raw.folder ?? "") ?? canonicalPlaylistUrl(raw.file ?? "");
+    if (playlist) {
+      const lengthMin = mode === "random-file" ? cleanLength(raw) : undefined;
+      return { id, mode, folder: playlist, ...(lengthMin ? { lengthMin } : {}), ...gap };
+    }
   }
   const folder = (raw.folder ?? "").trim();
   if (!folder) throw new Error("Each block needs a folder");
-  const lengthMin = raw.mode === "random-file" ? cleanLength(raw) : undefined;
-  return { id, mode: raw.mode, folder, ...(lengthMin ? { lengthMin } : {}) };
+  if (isYoutubeLink(folder)) {
+    throw new Error(
+      mode === "next-episode" || mode === "random-file"
+        ? "Not a YouTube playlist URL"
+        : "That is a YouTube link. Choose YouTube, then add it.",
+    );
+  }
+  const lengthMin = mode === "random-file" ? cleanLength(raw) : undefined;
+  return { id, mode, folder, ...(lengthMin ? { lengthMin } : {}), ...gap };
 }
 
 // True when both stacks name the same videos in the same order.
@@ -368,7 +439,8 @@ function sameEntries(a: PlaylistEntry[] | undefined, b: PlaylistEntry[] | undefi
       item.mode === other.mode &&
       item.folder === other.folder &&
       (item.file ?? "") === (other.file ?? "") &&
-      (item.lengthMin ?? 0) === (other.lengthMin ?? 0)
+      (item.lengthMin ?? 0) === (other.lengthMin ?? 0) &&
+      (item.gapAfterMin ?? 0) === (other.gapAfterMin ?? 0)
     );
   });
 }
@@ -396,6 +468,16 @@ function cleanStarts(
     starts[day] = value;
   }
   return Object.keys(starts).length ? starts : undefined;
+}
+
+// Whole minutes of intermission after a stacked video.
+function cleanGap(raw: { gapAfterMin?: number }): number | undefined {
+  if (raw.gapAfterMin == null) return undefined;
+  if (typeof raw.gapAfterMin !== "number" || !Number.isInteger(raw.gapAfterMin) || raw.gapAfterMin < 1) {
+    throw new Error("Intermission between videos must be a whole number of minutes");
+  }
+  if (raw.gapAfterMin >= DAY_MINUTES) throw new Error("Block must be shorter than 24 hours");
+  return raw.gapAfterMin;
 }
 
 // Whole minutes, when the block stores its length.
