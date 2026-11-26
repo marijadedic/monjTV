@@ -1,5 +1,5 @@
-import { endFromDuration } from "../clock/endFromDuration.ts";
-import { toEntry } from "../playlist/toEntry.ts";
+import { endFromDuration } from "@utils/clock/endFromDuration.ts";
+import { toEntry } from "@utils/playlist/toEntry.ts";
 import type { Draft } from "../../types/Draft.ts";
 import type { ScheduleBlock } from "../../../shared/types.ts";
 

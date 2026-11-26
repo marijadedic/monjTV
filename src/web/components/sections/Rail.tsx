@@ -1,15 +1,15 @@
 import "./styles/Rail.css";
 import { Fragment, type ComponentChildren } from "preact";
-import type { ItemStatus, RundownItem } from "../../../shared/types.ts";
+import type { RundownItem } from "../../../shared/types.ts";
 import { itemHasPassed } from "../../../shared/window.ts";
 import { useI18n } from "../../i18n.tsx";
-import { beganPreviousDay } from "../../utils/rundown/beganPreviousDay.ts";
-import { rowWatched } from "../../utils/rundown/rowWatched.ts";
-import { scheduleMode } from "../../utils/rundown/scheduleMode.ts";
-import { scheduleSource } from "../../utils/rundown/scheduleSource.ts";
-import { showsFrame } from "../../utils/rundown/showsFrame.ts";
-import { statusPill } from "../../utils/rundown/statusPill.ts";
-import { stillSrc } from "../../utils/rundown/stillSrc.ts";
+import { beganPreviousDay } from "@utils/rundown/beganPreviousDay.ts";
+import { shownStatus } from "@utils/rundown/shownStatus.ts";
+import { scheduleMode } from "@utils/rundown/scheduleMode.ts";
+import { scheduleSource } from "@utils/rundown/scheduleSource.ts";
+import { showsFrame } from "@utils/rundown/showsFrame.ts";
+import { statusPill } from "@utils/rundown/statusPill.ts";
+import { stillSrc } from "@utils/rundown/stillSrc.ts";
 import { ItemActions } from "./ItemActions.tsx";
 import { Pill } from "../parts/Pill.tsx";
 import { StillFrame } from "../parts/StillFrame.tsx";
@@ -57,17 +57,7 @@ export function RailCard({
 }) {
   const { t } = useI18n();
   const passed = past || (live && itemHasPassed(item, sec));
-  const shown: ItemStatus = past
-    ? item.mode === "next-episode"
-      ? item.status === "done"
-        ? "done"
-        : "skipped"
-      : item.mode === "random-file"
-        ? rowWatched(item, played)
-          ? "done"
-          : "skipped"
-        : "done"
-    : item.status;
+  const shown = shownStatus(item, past, played);
   const canEdit = !past && (live || !item.overnight);
   const cardStill = showsFrame(item) && !missed[item.path];
   const airing = Boolean(live && airId === item.id);

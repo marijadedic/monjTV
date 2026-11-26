@@ -1,4 +1,4 @@
-import { gapOf } from "../playlist/gapOf.ts";
+import { gapOf } from "@utils/playlist/gapOf.ts";
 import type { DraftItem } from "../../types/DraftItem.ts";
 
 export function stackGapSeconds(items: DraftItem[]): number {

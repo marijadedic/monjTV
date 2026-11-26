@@ -9,15 +9,15 @@ import { nextDay, windowOn } from "../../../shared/window.ts";
 import { useI18n } from "../../i18n.tsx";
 import type { Draft } from "../../types/Draft.ts";
 import type { FieldError } from "../../types/FieldError.ts";
-import { chosenSeconds } from "../../utils/length/chosenSeconds.ts";
-import { endFace } from "../../utils/clock/endFace.ts";
-import { endFromDuration } from "../../utils/clock/endFromDuration.ts";
-import { nextOnDay } from "../../utils/week/nextOnDay.ts";
-import { prevOnDay } from "../../utils/week/prevOnDay.ts";
-import { selectedDays } from "../../utils/week/selectedDays.ts";
-import { spillsPastDay } from "../../utils/week/spillsPastDay.ts";
-import { startOnDraft } from "../../utils/week/startOnDraft.ts";
-import { toMin } from "../../utils/clock/toMin.ts";
+import { chosenSeconds } from "@utils/length/chosenSeconds.ts";
+import { endFace } from "@utils/clock/endFace.ts";
+import { endFromDuration } from "@utils/clock/endFromDuration.ts";
+import { nextOnDay } from "@utils/week/nextOnDay.ts";
+import { prevOnDay } from "@utils/week/prevOnDay.ts";
+import { selectedDays } from "@utils/week/selectedDays.ts";
+import { spillsPastDay } from "@utils/week/spillsPastDay.ts";
+import { startOnDraft } from "@utils/week/startOnDraft.ts";
+import { toMin } from "@utils/clock/toMin.ts";
 
 export function WhenEditor({
   draft,

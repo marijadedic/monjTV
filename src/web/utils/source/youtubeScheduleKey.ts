@@ -1,5 +1,5 @@
 import { canonicalYoutubeIntermission, parseYoutubeUrl } from "../../../shared/youtube.ts";
-import { youtubeRefsOf } from "./youtubeRefsOf.ts";
+import { youtubeRefsOf } from "@utils/source/youtubeRefsOf.ts";
 import type { Schedule } from "../../../shared/types.ts";
 
 export function youtubeScheduleKey(schedule: Schedule, extra = ""): string {

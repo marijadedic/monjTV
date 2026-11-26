@@ -1,4 +1,4 @@
-import { folderLabel } from "./folderLabel.ts";
+import { folderLabel } from "@utils/label/folderLabel.ts";
 
 export function fileTitle(file: string): string {
   const base = folderLabel(file);

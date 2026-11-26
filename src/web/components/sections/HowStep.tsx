@@ -1,9 +1,9 @@
 import type { BlockMode } from "../../../shared/types.ts";
 import { CHIP_MODES } from "../../constants/chipModes.ts";
 import { useI18n } from "../../i18n.tsx";
-import { blockClass } from "../../utils/label/blockClass.ts";
-import { blockHint } from "../../utils/label/blockHint.ts";
-import { blockLabel } from "../../utils/label/blockLabel.ts";
+import { blockClass } from "@utils/label/blockClass.ts";
+import { blockHint } from "@utils/label/blockHint.ts";
+import { blockLabel } from "@utils/label/blockLabel.ts";
 import { ModeList } from "../inputs/ModeList.tsx";
 
 export function HowStep({ mode, onPick }: { mode: BlockMode; onPick: (mode: BlockMode) => void }) {

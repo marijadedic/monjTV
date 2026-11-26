@@ -47,16 +47,16 @@ import { blocksWith } from "./utils/admin/save/blocksWith.ts";
 import { blocksWithout } from "./utils/admin/save/blocksWithout.ts";
 import { commitErrors } from "./utils/admin/save/commitErrors.ts";
 import { draftTitleLines } from "./utils/admin/titles/draftTitleLines.ts";
-import { dismissTip } from "../utils/tip/cloud.ts";
-import { changedBlockIds } from "../utils/week/changedBlockIds.ts";
-import { emptySchedule } from "../utils/week/emptySchedule.ts";
-import { gapOf } from "../utils/playlist/gapOf.ts";
-import { ghostsOn } from "../utils/week/ghostsOn.ts";
-import { intermissionLabel } from "../utils/source/intermissionLabel.ts";
-import { occupancyOf } from "../utils/week/occupancyOf.ts";
-import { pendingSource } from "../utils/source/pendingSource.ts";
-import { stackItemNeedsProbe } from "../utils/length/stackItemNeedsProbe.ts";
-import { youtubeScheduleKey } from "../utils/source/youtubeScheduleKey.ts";
+import { dismissTip } from "@utils/tip/cloud.ts";
+import { changedBlockIds } from "@utils/week/changedBlockIds.ts";
+import { emptySchedule } from "@utils/week/emptySchedule.ts";
+import { gapOf } from "@utils/playlist/gapOf.ts";
+import { ghostsOn } from "@utils/week/ghostsOn.ts";
+import { intermissionLabel } from "@utils/source/intermissionLabel.ts";
+import { occupancyOf } from "@utils/week/occupancyOf.ts";
+import { pendingSource } from "@utils/source/pendingSource.ts";
+import { stackItemNeedsProbe } from "@utils/length/stackItemNeedsProbe.ts";
+import { youtubeScheduleKey } from "@utils/source/youtubeScheduleKey.ts";
 import { ErrorNote } from "../components/parts/ErrorNote.tsx";
 import { FitWarn } from "../components/parts/FitWarn.tsx";
 import { Scrim } from "../components/parts/Scrim.tsx";
@@ -646,6 +646,17 @@ export function Admin() {
     });
   }
 
+  function beginSlotOp(op: SlotOp) {
+    slotOpRef.current = op;
+    setSlotOp(op);
+    setFieldError((current) => ({ ...current, form: undefined }));
+  }
+
+  function endSlotOp() {
+    slotOpRef.current = null;
+    setSlotOp(null);
+  }
+
   async function commit() {
     if (!draft) return;
     const next = commitErrors(draft, measured, measuring, sourceMissing, {
@@ -672,17 +683,6 @@ export function Admin() {
     } finally {
       endSlotOp();
     }
-  }
-
-  function beginSlotOp(op: SlotOp) {
-    slotOpRef.current = op;
-    setSlotOp(op);
-    setFieldError((current) => ({ ...current, form: undefined }));
-  }
-
-  function endSlotOp() {
-    slotOpRef.current = null;
-    setSlotOp(null);
   }
 
   async function removeDraft() {

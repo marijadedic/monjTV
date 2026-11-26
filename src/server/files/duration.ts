@@ -8,13 +8,6 @@ const exact = new Map<string, number>();
 const failed = new Set<string>();
 let probeTail: Promise<void> = Promise.resolve();
 
-// One ffprobe at a time so a playlist open cannot flood the machine.
-function enqueueProbe<T>(task: () => Promise<T>): Promise<T> {
-  const run = afterProbe(task);
-  probeTail = quietProbe(run);
-  return run;
-}
-
 // Probe this file after the previous probe, even when that probe failed.
 async function afterProbe<T>(task: () => Promise<T>): Promise<T> {
   try {
@@ -32,6 +25,13 @@ async function quietProbe(run: Promise<unknown>): Promise<void> {
   } catch {
     // The caller of enqueueProbe still sees this failure.
   }
+}
+
+// One ffprobe at a time so a playlist open cannot flood the machine.
+function enqueueProbe<T>(task: () => Promise<T>): Promise<T> {
+  const run = afterProbe(task);
+  probeTail = quietProbe(run);
+  return run;
 }
 
 async function probeFile(file: string): Promise<number | null> {

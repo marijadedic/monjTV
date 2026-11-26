@@ -3,26 +3,24 @@ import type { StateUpdater } from "preact/hooks";
 import type { Schedule, SlotLength, TvBoard } from "../../../shared/types.ts";
 import { placedOn } from "../../../shared/placed.ts";
 import { DAY_MINUTES } from "../../../shared/window.ts";
-import { canonicalPlaylistUrl, parseYoutubeUrl } from "../../../shared/youtube.ts";
 import { useI18n } from "../../i18n.tsx";
 import type { Draft } from "../../types/Draft.ts";
 import type { FieldError } from "../../types/FieldError.ts";
 import { PRESETS } from "../../constants/presets.ts";
 import type { PlaySource } from "../../types/PlaySource.ts";
 import type { SlotOp } from "../../types/SlotOp.ts";
-import { addFixedMinutes } from "../../utils/length/addFixedMinutes.ts";
-import { addSeconds } from "../../utils/length/addSeconds.ts";
-import { chosenSeconds } from "../../utils/length/chosenSeconds.ts";
-import { dayClashes } from "../../utils/week/dayClashes.ts";
-import { endFace } from "../../utils/clock/endFace.ts";
-import { fixedMinutes } from "../../utils/length/fixedMinutes.ts";
-import { measureKey } from "../../utils/length/measureKey.ts";
-import { minuteFace } from "../../utils/clock/minuteFace.ts";
-import { nextItemMinute } from "../../utils/playlist/nextItemMinute.ts";
-import { stackItemNeedsProbe } from "../../utils/length/stackItemNeedsProbe.ts";
-import { stackSeconds } from "../../utils/length/stackSeconds.ts";
-import { startOnDraft } from "../../utils/week/startOnDraft.ts";
-import { toMin } from "../../utils/clock/toMin.ts";
+import { addItemReady } from "@utils/length/addItemReady.ts";
+import { addSeconds } from "@utils/length/addSeconds.ts";
+import { chosenSeconds } from "@utils/length/chosenSeconds.ts";
+import { dayClashes } from "@utils/week/dayClashes.ts";
+import { fixedMinutes } from "@utils/length/fixedMinutes.ts";
+import { measureKey } from "@utils/length/measureKey.ts";
+import { minuteFace } from "@utils/clock/minuteFace.ts";
+import { nextItemMinute } from "@utils/playlist/nextItemMinute.ts";
+import { saveBlocked } from "@utils/length/saveBlocked.ts";
+import { stackSeconds } from "@utils/length/stackSeconds.ts";
+import { pathChosen } from "@utils/source/pathChosen.ts";
+import { summaryEnd, summaryLength, summaryMinutes } from "@utils/week/summarySpan.ts";
 import { PlaylistNameField } from "../inputs/PlaylistNameField.tsx";
 import { FieldNote } from "../parts/FieldNote.tsx";
 import { StepTabs } from "../parts/StepTabs.tsx";
@@ -119,43 +117,20 @@ export function SlotForm({
   const matched = measured?.key === measureKey(draft) ? measured : null;
   const length = matched?.length ?? null;
   const lengthMins = length ? Math.ceil(length.durationSec / 60) : 0;
-  const pathChosen =
-    draft.mode === "playlist"
-      ? draft.addSource === "youtube"
-        ? draft.addMode === "specific-file"
-          ? Boolean(parseYoutubeUrl(draft.addFile))
-          : Boolean(canonicalPlaylistUrl(draft.addFolder))
-        : draft.addMode === "specific-file"
-          ? Boolean(draft.addFile.trim())
-          : Boolean(draft.addFolder.trim())
-      : draft.source === "youtube"
-        ? draft.mode === "specific-file"
-          ? Boolean(parseYoutubeUrl(draft.file))
-          : Boolean(canonicalPlaylistUrl(draft.folder))
-        : draft.mode === "specific-file"
-          ? Boolean(draft.file.trim())
-          : Boolean(draft.folder.trim());
+  const pathReady = pathChosen(draft);
   const stackSec = draft.mode === "playlist" ? stackSeconds(draft.items) : null;
-  const addSec = draft.mode === "playlist" && pathChosen ? addSeconds(draft, matched) : null;
+  const addSec = draft.mode === "playlist" && pathReady ? addSeconds(draft, matched) : null;
   const addStartMin = draft.mode === "playlist" && addSec != null ? nextItemMinute(draft.start, draft.items) : null;
   const addPreviewStart = addStartMin != null ? minuteFace(addStartMin) : undefined;
   const addEndMin = addStartMin != null && addSec != null ? addStartMin + Math.max(1, Math.ceil(addSec / 60)) : null;
   const addPreviewEnd = addEndMin != null ? minuteFace(addEndMin) : undefined;
   const addPreviewSpill = addEndMin != null && addEndMin > DAY_MINUTES;
-  const stackBusy = draft.mode === "playlist" && draft.items.some(stackItemNeedsProbe);
   const activeSec = chosenSeconds(draft, matched) ?? 0;
   const fixedMin = draft.lengthChoice !== "longest" ? fixedMinutes(draft) : null;
   const clashes = activeSec ? dayClashes(draft, schedule.blocks, activeSec, titles, board) : [];
   const lengthLabels = [...PRESETS.map((mins) => t.minutes(mins)), t.customLength];
   const lengthCh = Math.max(...lengthLabels.map((label) => label.length));
-  const addDisabled =
-    draft.mode === "playlist"
-      ? !draft.name.trim() || draft.items.length === 0 || Boolean(stackBusy) || draft.items.some((item) => Boolean(item.error))
-      : sourceMissing
-        ? true
-        : draft.lengthChoice === "longest"
-          ? measuring || !pathChosen || !length || Boolean(matched?.error)
-          : !pathChosen || fixedMin === null;
+  const addDisabled = saveBlocked(draft, measured, measuring, sourceMissing);
   const formStep = draft.formStep;
   const addPhase = draft.addPhase;
   const editingPart = Boolean(draft.returnTo);
@@ -166,36 +141,11 @@ export function SlotForm({
   const showAddSource = formStep === "what" && addPhase === "source";
   const showSummary = formStep === "summary";
   const showBack = addPhase !== "list" || formStep === "when" || formStep === "what" || (editingPart && !showSummary);
-  const addItemReady =
-    draft.mode === "playlist" && addPhase === "source"
-      ? draft.addMode === "random-file" && draft.addLengthChoice !== "longest"
-        ? (draft.addSource === "youtube"
-            ? Boolean(canonicalPlaylistUrl(draft.addFolder))
-            : Boolean(draft.addFolder.trim())) && addFixedMinutes(draft) != null
-        : Boolean(measured?.length && measured.key === measureKey(draft) && !measured.error)
-      : false;
   const savedBlock = draft.id ? schedule.blocks.find((block) => block.id === draft.id) : undefined;
   const painted = savedBlock ? placedOn(savedBlock, draft.origin, board) : null;
-  const summaryEnd =
-    draft.mode === "playlist"
-      ? stackSec != null
-        ? endFace(draft.start, stackSec)
-        : draft.end || (painted && startOnDraft(draft, draft.origin) === painted.start ? painted.end : "") || "/"
-      : activeSec
-        ? endFace(draft.start, activeSec)
-        : draft.end;
-  const summaryMin =
-    draft.mode === "playlist" && stackSec != null
-      ? Math.max(1, Math.ceil(stackSec / 60))
-      : activeSec
-        ? Math.max(1, Math.ceil(activeSec / 60))
-        : fixedMin;
-  const summaryLen =
-    summaryMin != null && summaryMin > 0
-      ? t.slotDurationOf(summaryMin)
-      : summaryEnd && summaryEnd !== "/"
-        ? t.slotDurationOf(Math.max(1, toMin(summaryEnd) - toMin(draft.start)))
-        : "";
+  const endLabel = summaryEnd(draft, stackSec, activeSec, painted);
+  const summaryMin = summaryMinutes(draft, stackSec, activeSec, fixedMin);
+  const summaryLen = summaryLength(draft, summaryMin, endLabel, (mins) => t.slotDurationOf(mins));
 
   return (
     <form
@@ -220,7 +170,7 @@ export function SlotForm({
           <SlotSummary
             draft={draft}
             titles={titles}
-            end={summaryEnd}
+            end={endLabel}
             lengthLabel={summaryLen}
             onEditTitle={() => onEditPart(draft.mode === "playlist" ? "name" : "what")}
             onEditWhen={() => onEditPart("when")}
@@ -248,7 +198,7 @@ export function SlotForm({
             folderError={fieldError.folder}
             picking={picking === "draft"}
             measuring={measuring}
-            pathChosen={pathChosen}
+            pathChosen={pathReady}
             length={length}
             lengthMins={lengthMins}
             addPreviewStart={addPreviewStart}
@@ -256,7 +206,7 @@ export function SlotForm({
             addPreviewSpill={addPreviewSpill}
             addSec={addSec}
             matchedError={matched?.error ?? null}
-            noVideo={Boolean(pathChosen && !measuring && matched && !length && !matched.error)}
+            noVideo={Boolean(pathReady && !measuring && matched && !length && !matched.error)}
             lengthCh={lengthCh}
             stackSec={stackSec}
             titles={titles}
@@ -277,7 +227,7 @@ export function SlotForm({
             folderError={fieldError.folder}
             sourceMissing={sourceMissing}
             picking={picking === "draft"}
-            pathChosen={pathChosen}
+            pathChosen={pathReady}
             measuring={measuring}
             length={length}
             lengthMins={lengthMins}
@@ -310,7 +260,7 @@ export function SlotForm({
             draft.mode !== "playlist" &&
             draft.lengthChoice === "longest" &&
             !measuring &&
-            pathChosen &&
+            pathReady &&
             Boolean(matched) &&
             !length &&
             !matched?.error
@@ -324,7 +274,7 @@ export function SlotForm({
         showCancel={addPhase === "list"}
         showBack={showBack}
         showAdd={showAddSource}
-        addDisabled={!addItemReady || slotOp !== null}
+        addDisabled={!addItemReady(draft, measured) || slotOp !== null}
         showNext={showWhen && !editingPart}
         nextDisabled={clashes.length > 0 || slotOp !== null}
         showSave={showSummary || (showWhat && !editingPart)}

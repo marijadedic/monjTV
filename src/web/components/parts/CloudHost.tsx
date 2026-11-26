@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { hideCloud, placeCloud } from "../../utils/tip/cloud.ts";
+import { hideCloud, placeCloud } from "@utils/tip/cloud.ts";
 
 export function CloudHost({ children }: { children: ComponentChildren }) {
   return (

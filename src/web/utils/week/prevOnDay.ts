@@ -1,4 +1,4 @@
-import { toMin } from "../clock/toMin.ts";
+import { toMin } from "@utils/clock/toMin.ts";
 import { windowOn } from "../../../shared/window.ts";
 import type { Day, ScheduleBlock } from "../../../shared/types.ts";
 

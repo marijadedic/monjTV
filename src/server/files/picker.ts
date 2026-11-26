@@ -66,7 +66,9 @@ export function takeRandom(
   const newest = liveRecent.find((file) => reusable.includes(file));
   const withoutNewest = newest ? reusable.filter((file) => file !== newest) : reusable;
   const spread = withoutNewest.filter((file) => !avoided.has(file));
-  const pool = spread.length > 0 ? spread : withoutNewest.length > 0 ? withoutNewest : reusable;
+  let pool = reusable;
+  if (spread.length > 0) pool = spread;
+  else if (withoutNewest.length > 0) pool = withoutNewest;
   return picked(pool);
 }
 

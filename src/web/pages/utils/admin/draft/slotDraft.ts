@@ -3,10 +3,20 @@ import type { Day, ScheduleBlock, TvBoard } from "../../../../../shared/types.ts
 import { DAY_MINUTES } from "../../../../../shared/window.ts";
 import { canonicalPlaylistUrl, parseYoutubeUrl } from "../../../../../shared/youtube.ts";
 import type { Draft } from "../../../../types/Draft.ts";
-import { choiceFromLength } from "../../../../utils/length/choiceFromLength.ts";
-import { fixedChoice } from "../../../../utils/length/fixedChoice.ts";
-import { fromPlaylist } from "../../../../utils/playlist/fromPlaylist.ts";
-import { toMin } from "../../../../utils/clock/toMin.ts";
+import type { LengthChoice } from "../../../../types/LengthChoice.ts";
+import type { PlaySource } from "../../../../types/PlaySource.ts";
+import { choiceFromLength } from "@utils/length/choiceFromLength.ts";
+import { fixedChoice } from "@utils/length/fixedChoice.ts";
+import { fromPlaylist } from "@utils/playlist/fromPlaylist.ts";
+import { toMin } from "@utils/clock/toMin.ts";
+
+function sourceOf(block: ScheduleBlock): PlaySource {
+  if (block.mode === "specific-file" && parseYoutubeUrl(block.file ?? "")) return "youtube";
+  if ((block.mode === "next-episode" || block.mode === "random-file") && canonicalPlaylistUrl(block.folder)) {
+    return "youtube";
+  }
+  return "path";
+}
 
 export function slotDraft(
   block: ScheduleBlock,
@@ -37,12 +47,7 @@ export function slotDraft(
     starts,
     folder: block.folder,
     file: block.file ?? "",
-    source: block.mode === "specific-file" && parseYoutubeUrl(block.file ?? "")
-      ? "youtube"
-      : (block.mode === "next-episode" || block.mode === "random-file") &&
-          canonicalPlaylistUrl(block.folder)
-        ? "youtube"
-        : "path",
+    source: sourceOf(block),
     mode: block.mode,
     name: block.name ?? "",
     items: block.mode === "playlist" ? fromPlaylist(block, day, board) : [],
@@ -52,15 +57,19 @@ export function slotDraft(
     addFile: "",
     addLengthChoice: 60,
     addCustomMin: "",
-    ...(block.mode === "playlist" || (block.mode === "specific-file" && parseYoutubeUrl(block.file ?? ""))
-      ? { lengthChoice: "longest" as const, customMin: "" }
-      : block.mode === "next-episode"
-        ? fixedChoice(block.lengthMin)
-        : choiceFromLength(block.lengthMin)),
+    ...lengthChoiceOf(block),
     freeEnd,
     gapStart: toMin(placed.start),
     formStep: "summary",
     addPhase: "list",
     returnTo: null,
   };
+}
+
+function lengthChoiceOf(block: ScheduleBlock): { lengthChoice: LengthChoice; customMin: string } {
+  if (block.mode === "playlist" || (block.mode === "specific-file" && parseYoutubeUrl(block.file ?? ""))) {
+    return { lengthChoice: "longest", customMin: "" };
+  }
+  if (block.mode === "next-episode") return fixedChoice(block.lengthMin);
+  return choiceFromLength(block.lengthMin);
 }

@@ -8,6 +8,46 @@ import { probeYoutube, youtubePlaylistTimed } from "../youtube/youtube.ts";
 import { itemFits, maxPlayableSec, nextFrom, tightestSlotSec } from "./item.ts";
 import { lengthOf, nameOf, seriesFiles, tryLength } from "./media.ts";
 
+// Longest and shortest from lengths already known, with no extra probe.
+function scanTimedPool(
+  timed: readonly { url: string; title: string; durationSec: number }[],
+  maxMin?: number,
+): SlotLength | null {
+  const remaining = maxMin && maxMin > 0 ? maxMin * 60 : null;
+  if (timed.length === 0) return null;
+  let longest: { url: string; title: string; durationSec: number } | null = null;
+  let shortest: { url: string; title: string; durationSec: number } | null = null;
+  for (const video of timed) {
+    if (remaining != null && !itemFits(video.durationSec, remaining)) continue;
+    if (!longest || video.durationSec > longest.durationSec) longest = video;
+    if (!shortest || video.durationSec < shortest.durationSec) shortest = video;
+  }
+  if (!longest || !shortest) return null;
+  return {
+    title: longest.title,
+    path: longest.url,
+    durationSec: longest.durationSec,
+    kind: "random",
+    fileCount: timed.length,
+    shortest: {
+      title: shortest.title,
+      path: shortest.url,
+      durationSec: shortest.durationSec,
+    },
+  };
+}
+
+// Longest video in this pool, or the longest that still fits a cap.
+async function scanRandomPool(files: string[], maxMin?: number): Promise<SlotLength | null> {
+  const timed: { url: string; title: string; durationSec: number }[] = [];
+  for (const file of files) {
+    const durationSec = await tryLength(file);
+    if (durationSec == null) continue;
+    timed.push({ url: file, title: nameOf(file), durationSec });
+  }
+  return scanTimedPool(timed, maxMin);
+}
+
 // Length of the file a new slot will play. A random folder uses its longest video.
 export async function slotLength(opts: {
   mode: ItemMode;
@@ -75,46 +115,6 @@ export async function slotLength(opts: {
   return scanRandomPool(files, opts.maxMin);
 }
 
-// Longest video in this pool, or the longest that still fits a cap.
-async function scanRandomPool(files: string[], maxMin?: number): Promise<SlotLength | null> {
-  const timed: { url: string; title: string; durationSec: number }[] = [];
-  for (const file of files) {
-    const durationSec = await tryLength(file);
-    if (durationSec == null) continue;
-    timed.push({ url: file, title: nameOf(file), durationSec });
-  }
-  return scanTimedPool(timed, maxMin);
-}
-
-// Longest and shortest from lengths already known, with no extra probe.
-function scanTimedPool(
-  timed: readonly { url: string; title: string; durationSec: number }[],
-  maxMin?: number,
-): SlotLength | null {
-  const remaining = maxMin && maxMin > 0 ? maxMin * 60 : null;
-  if (timed.length === 0) return null;
-  let longest: { url: string; title: string; durationSec: number } | null = null;
-  let shortest: { url: string; title: string; durationSec: number } | null = null;
-  for (const video of timed) {
-    if (remaining != null && !itemFits(video.durationSec, remaining)) continue;
-    if (!longest || video.durationSec > longest.durationSec) longest = video;
-    if (!shortest || video.durationSec < shortest.durationSec) shortest = video;
-  }
-  if (!longest || !shortest) return null;
-  return {
-    title: longest.title,
-    path: longest.url,
-    durationSec: longest.durationSec,
-    kind: "random",
-    fileCount: timed.length,
-    shortest: {
-      title: shortest.title,
-      path: shortest.url,
-      durationSec: shortest.durationSec,
-    },
-  };
-}
-
 // How many videos a folder holds, without timing them.
 export async function videoCount(folder: string): Promise<number> {
   const trimmed = folder.trim();
@@ -129,15 +129,37 @@ export async function videoCount(folder: string): Promise<number> {
   return (await videosIn(trimmed)).length;
 }
 
-// Why a saved block cannot start a file, for blocks that were just added or edited.
-export async function missesForBlocks(blocks: ScheduleBlock[]): Promise<SlotMiss[]> {
-  const progress = await loadProgress();
-  const misses: SlotMiss[] = [];
-  for (const block of blocks) {
-    const miss = await missForBlock(block, progress);
-    if (miss) misses.push(miss);
+// True when every file in a random folder is too long for this window.
+async function missForRandomFolder(blockId: string, folder: string, slotSec: number): Promise<SlotMiss | null> {
+  const playlist = canonicalPlaylistUrl(folder);
+  const timed: { url: string; title: string; durationSec: number }[] = playlist
+    ? await youtubePlaylistTimed(playlist)
+    : [];
+  if (!playlist) {
+    for (const file of await seriesFiles(folder)) {
+      const durationSec = await tryLength(file);
+      if (durationSec == null) continue;
+      timed.push({ url: file, title: nameOf(file), durationSec });
+    }
   }
-  return misses;
+  if (timed.length === 0) return null;
+
+  const limitSec = maxPlayableSec(slotSec);
+  let shortest: { title: string; durationSec: number } | null = null;
+  for (const video of timed) {
+    if (itemFits(video.durationSec, slotSec)) return null;
+    if (!shortest || video.durationSec < shortest.durationSec) {
+      shortest = { title: video.title, durationSec: video.durationSec };
+    }
+  }
+  if (!shortest) return null;
+  return {
+    blockId,
+    kind: "folder",
+    title: shortest.title,
+    durationSec: shortest.durationSec,
+    limitSec,
+  };
 }
 
 // The file this block would start, when that file is too long for the slot.
@@ -195,35 +217,13 @@ async function missForBlock(block: ScheduleBlock, progress: Progress): Promise<S
   return missForRandomFolder(block.id, series, slotSec);
 }
 
-// True when every file in a random folder is too long for this window.
-async function missForRandomFolder(blockId: string, folder: string, slotSec: number): Promise<SlotMiss | null> {
-  const playlist = canonicalPlaylistUrl(folder);
-  const timed: { url: string; title: string; durationSec: number }[] = playlist
-    ? await youtubePlaylistTimed(playlist)
-    : [];
-  if (!playlist) {
-    for (const file of await seriesFiles(folder)) {
-      const durationSec = await tryLength(file);
-      if (durationSec == null) continue;
-      timed.push({ url: file, title: nameOf(file), durationSec });
-    }
+// Why a saved block cannot start a file, for blocks that were just added or edited.
+export async function missesForBlocks(blocks: ScheduleBlock[]): Promise<SlotMiss[]> {
+  const progress = await loadProgress();
+  const misses: SlotMiss[] = [];
+  for (const block of blocks) {
+    const miss = await missForBlock(block, progress);
+    if (miss) misses.push(miss);
   }
-  if (timed.length === 0) return null;
-
-  const limitSec = maxPlayableSec(slotSec);
-  let shortest: { title: string; durationSec: number } | null = null;
-  for (const video of timed) {
-    if (itemFits(video.durationSec, slotSec)) return null;
-    if (!shortest || video.durationSec < shortest.durationSec) {
-      shortest = { title: video.title, durationSec: video.durationSec };
-    }
-  }
-  if (!shortest) return null;
-  return {
-    blockId,
-    kind: "folder",
-    title: shortest.title,
-    durationSec: shortest.durationSec,
-    limitSec,
-  };
+  return misses;
 }

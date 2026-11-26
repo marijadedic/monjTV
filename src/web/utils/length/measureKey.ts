@@ -1,4 +1,4 @@
-import { addMeasureCap } from "./addMeasureCap.ts";
+import { addMeasureCap } from "@utils/length/addMeasureCap.ts";
 import { canonicalPlaylistUrl } from "../../../shared/youtube.ts";
 import type { Draft } from "../../types/Draft.ts";
 

@@ -1,4 +1,4 @@
-import { minutesOfChoice } from "./minutesOfChoice.ts";
+import { minutesOfChoice } from "@utils/length/minutesOfChoice.ts";
 import type { Draft } from "../../types/Draft.ts";
 
 export function addFixedMinutes(draft: Draft): number | null {

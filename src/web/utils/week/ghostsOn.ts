@@ -2,9 +2,9 @@ import { playlistMinutesOn } from "../../../shared/placed.ts";
 import type { Day, ScheduleBlock, TvBoard } from "../../../shared/types.ts";
 import { DAY_MINUTES, lengthMinutes, nextDay, windowOn } from "../../../shared/window.ts";
 import type { Draft } from "../../types/Draft.ts";
-import { draftSpanMin } from "../length/draftSpanMin.ts";
-import { startOnDraft } from "./startOnDraft.ts";
-import { toMin } from "../clock/toMin.ts";
+import { draftSpanMin } from "@utils/length/draftSpanMin.ts";
+import { startOnDraft } from "@utils/week/startOnDraft.ts";
+import { toMin } from "@utils/clock/toMin.ts";
 
 export function ghostsOn(
   draft: Draft,

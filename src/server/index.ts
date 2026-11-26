@@ -45,6 +45,75 @@ app.get("/api/schedule", async (c) => {
   return c.json(await loadSchedule());
 });
 
+// Rebuild today, then join whatever is on at that moment.
+async function rebuildSavedWeek(ids: string[]): Promise<void> {
+  try {
+    await rebuildTodayPreservingPlayback(ids);
+    await joinRundown();
+  } catch (err) {
+    console.error("rundown rebuild failed", err);
+  }
+}
+
+// Record which new slots cannot fit a file. The save response does not wait for this.
+async function noteSlotMisses(changed: ScheduleBlock[]): Promise<void> {
+  try {
+    noteSaveMisses(await missesForBlocks(changed));
+  } catch (err) {
+    console.error("slot fit check failed", err);
+    noteSaveMisses([]);
+  }
+}
+
+// A saved intermission starts on the next gap. A failure leaves the week as stored.
+async function keepIntermission(): Promise<void> {
+  try {
+    await syncIntermission();
+  } catch {
+    // The week is already saved. Playback picks up the intermission on the next gap.
+  }
+}
+
+// A local path must exist. A YouTube video or playlist must be readable.
+async function assertPlaySource(mode: ScheduleBlock["mode"], folder: string, file?: string): Promise<void> {
+  if (mode === "playlist") return;
+  if (mode === "specific-file") {
+    const youtube = parseYoutubeUrl(file ?? "");
+    if (youtube) {
+      await assertYoutubeVideo(youtube);
+      return;
+    }
+    if (isYoutubeLink(file ?? "")) throw new Error("Not a YouTube video URL");
+    await assertVideo(file ?? "");
+    return;
+  }
+  if ((mode === "next-episode" || mode === "random-file") && canonicalPlaylistUrl(folder)) {
+    await assertYoutubePlaylist(folder);
+    return;
+  }
+  if (isYoutubeLink(folder)) {
+    throw new Error(
+      mode === "next-episode" || mode === "random-file"
+        ? "Not a YouTube playlist URL"
+        : "That is a YouTube link. Choose YouTube, then add it.",
+    );
+  }
+  await assertFolder(folder);
+}
+
+async function assertEntrySource(item: PlaylistEntry): Promise<void> {
+  await assertPlaySource(item.mode, item.folder, item.file);
+}
+
+// A new or edited slot still points at a real folder, video, YouTube video, or playlist.
+async function assertBlockSource(block: ScheduleBlock): Promise<void> {
+  if (block.mode === "playlist") {
+    for (const item of block.items ?? []) await assertEntrySource(item);
+    return;
+  }
+  await assertPlaySource(block.mode, block.folder, block.file);
+}
+
 // Save the week and answer once it is stored. The rundown rebuild follows that response.
 app.put("/api/schedule", async (c) => {
   const body = (await c.req.json()) as Parameters<typeof saveSchedule>[0];
@@ -185,7 +254,9 @@ app.post("/api/tv/:date/items/:id/skipped", async (c) => {
 // Move a next-episode item to the previous or next file in its folder.
 app.post("/api/tv/:date/items/:id/episode", async (c) => {
   const body = await c.req.json().catch(() => null);
-  const direction = body?.direction === "prev" ? -1 : body?.direction === "next" ? 1 : 0;
+  let direction: -1 | 0 | 1 = 0;
+  if (body?.direction === "prev") direction = -1;
+  else if (body?.direction === "next") direction = 1;
   if (!direction) return c.json({ error: "direction must be prev or next" }, 400);
   try {
     const date = c.req.param("date");
@@ -263,6 +334,16 @@ app.get("/api/player/status", async (c) => {
   return c.json(await getStatus());
 });
 
+// Stop playback, then leave the port free. The tab is already closed.
+async function finishShutdown(): Promise<void> {
+  try {
+    await shutdownPlayer();
+  } finally {
+    httpServer?.close();
+    process.exit(0);
+  }
+}
+
 // Quit mpv, close the browser tab, and exit the process.
 app.post("/api/shutdown", async (c) => {
   if (!stopping) {
@@ -300,75 +381,6 @@ if (existsSync(clientIndex)) {
   });
 }
 
-// A new or edited slot still points at a real folder, video, YouTube video, or playlist.
-async function assertBlockSource(block: ScheduleBlock): Promise<void> {
-  if (block.mode === "playlist") {
-    for (const item of block.items ?? []) await assertEntrySource(item);
-    return;
-  }
-  await assertPlaySource(block.mode, block.folder, block.file);
-}
-
-async function assertEntrySource(item: PlaylistEntry): Promise<void> {
-  await assertPlaySource(item.mode, item.folder, item.file);
-}
-
-// A local path must exist. A YouTube video or playlist must be readable.
-async function assertPlaySource(mode: ScheduleBlock["mode"], folder: string, file?: string): Promise<void> {
-  if (mode === "playlist") return;
-  if (mode === "specific-file") {
-    const youtube = parseYoutubeUrl(file ?? "");
-    if (youtube) {
-      await assertYoutubeVideo(youtube);
-      return;
-    }
-    if (isYoutubeLink(file ?? "")) throw new Error("Not a YouTube video URL");
-    await assertVideo(file ?? "");
-    return;
-  }
-  if ((mode === "next-episode" || mode === "random-file") && canonicalPlaylistUrl(folder)) {
-    await assertYoutubePlaylist(folder);
-    return;
-  }
-  if (isYoutubeLink(folder)) {
-    throw new Error(
-      mode === "next-episode" || mode === "random-file"
-        ? "Not a YouTube playlist URL"
-        : "That is a YouTube link. Choose YouTube, then add it.",
-    );
-  }
-  await assertFolder(folder);
-}
-
-// A saved intermission starts on the next gap. A failure leaves the week as stored.
-async function keepIntermission(): Promise<void> {
-  try {
-    await syncIntermission();
-  } catch {
-    // The week is already saved. Playback picks up the intermission on the next gap.
-  }
-}
-
-// Record which new slots cannot fit a file. The save response does not wait for this.
-async function noteSlotMisses(changed: ScheduleBlock[]): Promise<void> {
-  try {
-    noteSaveMisses(await missesForBlocks(changed));
-  } catch (err) {
-    console.error("slot fit check failed", err);
-    noteSaveMisses([]);
-  }
-}
-
-// Rebuild today, then join whatever is on at that moment.
-async function rebuildSavedWeek(ids: string[]): Promise<void> {
-  try {
-    await rebuildTodayPreservingPlayback(ids);
-    await joinRundown();
-  } catch (err) {
-    console.error("rundown rebuild failed", err);
-  }
-}
-
 // Open today after the port is listening. A failure leaves the last saved day.
 async function openToday(): Promise<void> {
   try {
@@ -390,16 +402,6 @@ async function main(): Promise<void> {
     }
     void openToday();
   });
-}
-
-// Stop playback, then leave the port free. The tab is already closed.
-async function finishShutdown(): Promise<void> {
-  try {
-    await shutdownPlayer();
-  } finally {
-    httpServer?.close();
-    process.exit(0);
-  }
 }
 
 void main();

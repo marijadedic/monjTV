@@ -29,10 +29,23 @@ export function sourceFolder(item: RundownItem, block: ScheduleBlock): string {
   return block.folder;
 }
 
-// Saved rows for this slot on this day, not the leftover from yesterday.
-export function keptForBlock(existing: DayRundown | undefined, blockId: string): RundownItem[] {
-  if (!existing) return [];
-  return sortRundown(existing.items).filter((item) => item.blockId === blockId && !item.overnight);
+// Seconds after midnight this block still occupies, from its files or its window.
+export function blockLeftoverSec(block: ScheduleBlock, day: Day, items: RundownItem[]): number {
+  const placed = windowOn(block, day);
+  if (block.mode !== "playlist") return leftoverMin(placed) * 60;
+  let leftover = 0;
+  for (const item of items) {
+    if (item.blockId !== block.id || item.overnight) continue;
+    leftover = Math.max(leftover, parseHm(item.start) + item.durationSec - DAY_SECONDS);
+  }
+  return Math.max(0, leftover);
+}
+
+// True when this leftover is on now, or still starts later tonight.
+export function leftoverStillActive(item: RundownItem, now: number, leftoverEndSec: number): boolean {
+  if (itemCoversNow(item, now)) return true;
+  const start = parseHm(item.start);
+  return start < leftoverEndSec && start > now;
 }
 
 // Rows from yesterday that are still on after midnight.
@@ -57,35 +70,6 @@ export function leftoverCarry(
   return out;
 }
 
-// Seconds after midnight this block still occupies, from its files or its window.
-export function blockLeftoverSec(block: ScheduleBlock, day: Day, items: RundownItem[]): number {
-  const placed = windowOn(block, day);
-  if (block.mode !== "playlist") return leftoverMin(placed) * 60;
-  let leftover = 0;
-  for (const item of items) {
-    if (item.blockId !== block.id || item.overnight) continue;
-    leftover = Math.max(leftover, parseHm(item.start) + item.durationSec - DAY_SECONDS);
-  }
-  return Math.max(0, leftover);
-}
-
-// Put yesterday's leftover ahead of today's own rows for those slots.
-export function mergeOvernight(built: RundownItem[], carry: RundownItem[]): RundownItem[] {
-  if (carry.length === 0) return built;
-  const carriedBlocks = new Set(carry.map((item) => item.blockId));
-  return sortRundown([
-    ...carry,
-    ...built.filter((item) => !item.overnight || !carriedBlocks.has(item.blockId)),
-  ]);
-}
-
-// True when this leftover is on now, or still starts later tonight.
-export function leftoverStillActive(item: RundownItem, now: number, leftoverEndSec: number): boolean {
-  if (itemCoversNow(item, now)) return true;
-  const start = parseHm(item.start);
-  return start < leftoverEndSec && start > now;
-}
-
 // Overnight leftovers first, then the day's own rows by start time.
 export function sortRundown(items: RundownItem[]): RundownItem[] {
   return items.slice().sort((a, b) => {
@@ -99,6 +83,22 @@ export function sortRundown(items: RundownItem[]): RundownItem[] {
     }
     return parseHm(a.start) - parseHm(b.start);
   });
+}
+
+// Saved rows for this slot on this day, not the leftover from yesterday.
+export function keptForBlock(existing: DayRundown | undefined, blockId: string): RundownItem[] {
+  if (!existing) return [];
+  return sortRundown(existing.items).filter((item) => item.blockId === blockId && !item.overnight);
+}
+
+// Put yesterday's leftover ahead of today's own rows for those slots.
+export function mergeOvernight(built: RundownItem[], carry: RundownItem[]): RundownItem[] {
+  if (carry.length === 0) return built;
+  const carriedBlocks = new Set(carry.map((item) => item.blockId));
+  return sortRundown([
+    ...carry,
+    ...built.filter((item) => !item.overnight || !carriedBlocks.has(item.blockId)),
+  ]);
 }
 
 // Next file after the last completed one, wrapping to the start.

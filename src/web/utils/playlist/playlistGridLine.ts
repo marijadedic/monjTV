@@ -1,9 +1,9 @@
 import { canonicalPlaylistUrl } from "../../../shared/youtube.ts";
 import type { useI18n } from "../../i18n.tsx";
 import type { DraftItem } from "../../types/DraftItem.ts";
-import { clipLabel } from "../label/clipLabel.ts";
-import { modeLabel } from "../label/modeLabel.ts";
-import { playlistGridName } from "./playlistGridName.ts";
+import { clipLabel } from "@utils/label/clipLabel.ts";
+import { modeLabel } from "@utils/label/modeLabel.ts";
+import { playlistGridName } from "@utils/playlist/playlistGridName.ts";
 
 export function playlistGridLine(
   item: DraftItem,

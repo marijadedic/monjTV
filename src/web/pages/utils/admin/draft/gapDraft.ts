@@ -1,8 +1,8 @@
 import type { Day } from "../../../../../shared/types.ts";
 import type { Draft } from "../../../../types/Draft.ts";
-import { emptyStack } from "../../../../utils/playlist/emptyStack.ts";
-import { endFromDuration } from "../../../../utils/clock/endFromDuration.ts";
-import { inputTime } from "../../../../utils/clock/inputTime.ts";
+import { emptyStack } from "@utils/playlist/emptyStack.ts";
+import { endFromDuration } from "@utils/clock/endFromDuration.ts";
+import { inputTime } from "@utils/clock/inputTime.ts";
 
 export function gapDraft(day: Day, startMin: number, endMin: number, at: number): Draft {
   let start = startMin + Math.round((at - startMin) / 30) * 30;

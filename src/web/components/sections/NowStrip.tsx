@@ -1,11 +1,11 @@
 import "./styles/NowStrip.css";
 import type { RundownItem } from "../../../shared/types.ts";
 import { useI18n } from "../../i18n.tsx";
-import { gapStillSrc } from "../../utils/rundown/gapStillSrc.ts";
-import { scheduleMode } from "../../utils/rundown/scheduleMode.ts";
-import { scheduleSource } from "../../utils/rundown/scheduleSource.ts";
-import { showsFrame } from "../../utils/rundown/showsFrame.ts";
-import { stillSrc } from "../../utils/rundown/stillSrc.ts";
+import { gapStillSrc } from "@utils/rundown/gapStillSrc.ts";
+import { scheduleMode } from "@utils/rundown/scheduleMode.ts";
+import { scheduleSource } from "@utils/rundown/scheduleSource.ts";
+import { showsFrame } from "@utils/rundown/showsFrame.ts";
+import { stillSrc } from "@utils/rundown/stillSrc.ts";
 import { ItemActions } from "./ItemActions.tsx";
 import { Pill } from "../parts/Pill.tsx";
 import { StillFrame } from "../parts/StillFrame.tsx";

@@ -1,4 +1,4 @@
-import { modeHint } from "./modeHint.ts";
+import { modeHint } from "@utils/label/modeHint.ts";
 import type { BlockMode } from "../../../shared/types.ts";
 import type { useI18n } from "../../i18n.tsx";
 

@@ -1,4 +1,4 @@
-import { gapOf } from "./gapOf.ts";
+import { gapOf } from "@utils/playlist/gapOf.ts";
 
 export function gapFields(item: { gapAfterMin?: number }): { gapAfterMin?: number } {
   const mins = gapOf(item);

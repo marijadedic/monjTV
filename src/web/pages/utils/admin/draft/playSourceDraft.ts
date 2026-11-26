@@ -1,4 +1,4 @@
-import { endFromDuration } from "../../../../utils/clock/endFromDuration.ts";
+import { endFromDuration } from "@utils/clock/endFromDuration.ts";
 import type { Draft } from "../../../../types/Draft.ts";
 import type { PlaySource } from "../../../../types/PlaySource.ts";
 

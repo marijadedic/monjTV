@@ -1,4 +1,4 @@
-import { gapFields } from "./gapFields.ts";
+import { gapFields } from "@utils/playlist/gapFields.ts";
 import type { DraftItem } from "../../types/DraftItem.ts";
 import type { PlaylistEntry } from "../../../shared/types.ts";
 

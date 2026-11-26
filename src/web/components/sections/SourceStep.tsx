@@ -6,9 +6,10 @@ import { MANY_FILES } from "../../constants/manyFiles.ts";
 import type { Draft } from "../../types/Draft.ts";
 import type { FieldError } from "../../types/FieldError.ts";
 import type { PlaySource } from "../../types/PlaySource.ts";
-import { elapsedClock } from "../../utils/clock/elapsedClock.ts";
-import { endFromDuration } from "../../utils/clock/endFromDuration.ts";
-import { parentDir } from "../../utils/source/parentDir.ts";
+import { elapsedClock } from "@utils/clock/elapsedClock.ts";
+import { endFromDuration } from "@utils/clock/endFromDuration.ts";
+import { sourcePrompt } from "@utils/label/sourcePrompt.ts";
+import { parentDir } from "@utils/source/parentDir.ts";
 import { InfoButton } from "../buttons/InfoButton.tsx";
 import { DurationPick } from "../inputs/DurationPick.tsx";
 import { FolderPath } from "../inputs/FolderPath.tsx";
@@ -97,13 +98,7 @@ export function SourceStep({
         <SourcePick mode={draft.mode} source={draft.source} onPick={onPickSource} />
       )}
       <span class="k">
-        {draft.source === "youtube" && draft.mode === "specific-file"
-          ? t.chooseYoutube
-          : draft.source === "youtube"
-            ? t.choosePlaylist
-            : draft.mode === "specific-file"
-              ? t.chooseVideo
-              : t.chooseFolder}
+        {sourcePrompt(draft.mode, draft.source, t)}
       </span>
       {draft.source === "youtube" ? (
         <YoutubeField

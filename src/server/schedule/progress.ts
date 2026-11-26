@@ -70,17 +70,6 @@ export function rememberRandom(recent: string[], file: string, files: readonly s
   return [file, ...kept];
 }
 
-// Record a random play through the whole folder before anything in it repeats.
-export async function markRandomPlayed(folder: string, filePath: string): Promise<void> {
-  const progress = await loadProgress();
-  const files = await filesForProgress(folder);
-  const prev = progress.recentRandom[folder] ?? [];
-  progress.recentRandom[folder] = files.includes(filePath)
-    ? rememberRandom(prev, filePath, files)
-    : noteRandom(prev, filePath);
-  await saveProgress(progress);
-}
-
 // Videos in this folder, or in this YouTube playlist. An unread playlist is empty.
 async function filesForProgress(folder: string): Promise<string[]> {
   if (canonicalPlaylistUrl(folder)) {
@@ -94,37 +83,21 @@ async function filesForProgress(folder: string): Promise<string[]> {
   return listVideos(folder);
 }
 
-// Recently played random files, grouped by folder. Newest file is first.
-export async function recentPlays(): Promise<RecentPlays> {
-  return presentRecent(await loadProgress());
+// Record a random play through the whole folder before anything in it repeats.
+export async function markRandomPlayed(folder: string, filePath: string): Promise<void> {
+  const progress = await loadProgress();
+  const files = await filesForProgress(folder);
+  const prev = progress.recentRandom[folder] ?? [];
+  progress.recentRandom[folder] = files.includes(filePath)
+    ? rememberRandom(prev, filePath, files)
+    : noteRandom(prev, filePath);
+  await saveProgress(progress);
 }
 
-// Drop this file from every recently played list.
-export async function forgetRandomPath(filePath: string): Promise<RecentPlays> {
-  const progress = await loadProgress();
-  let changed = false;
-  for (const [folder, files] of Object.entries(progress.recentRandom)) {
-    if (!files.includes(filePath)) continue;
-    const next = files.filter((entry) => entry !== filePath);
-    if (next.length === 0) delete progress.recentRandom[folder];
-    else progress.recentRandom[folder] = next;
-    changed = true;
-  }
-  if (changed) await saveProgress(progress);
-  return presentRecent(progress);
-}
-
-// Drop one file from a folder's recent list so a random slot can pick it again.
-export async function forgetRandomPlayed(folder: string, filePath: string): Promise<RecentPlays> {
-  const progress = await loadProgress();
-  const prev = progress.recentRandom[folder];
-  if (prev?.includes(filePath)) {
-    const next = prev.filter((entry) => entry !== filePath);
-    if (next.length === 0) delete progress.recentRandom[folder];
-    else progress.recentRandom[folder] = next;
-    await saveProgress(progress);
-  }
-  return presentRecent(progress);
+// Playlist title, or the last part of a local folder path.
+function recentFolderName(folder: string): string {
+  if (canonicalPlaylistUrl(folder)) return cachedYoutubeTitle(folder) ?? youtubeLabel(folder);
+  return path.basename(folder) || folder;
 }
 
 // Shape the saved skip lists for the options window.
@@ -159,8 +132,35 @@ function presentRecent(progress: Progress): RecentPlays {
   return { folders };
 }
 
-// Playlist title, or the last part of a local folder path.
-function recentFolderName(folder: string): string {
-  if (canonicalPlaylistUrl(folder)) return cachedYoutubeTitle(folder) ?? youtubeLabel(folder);
-  return path.basename(folder) || folder;
+// Recently played random files, grouped by folder. Newest file is first.
+export async function recentPlays(): Promise<RecentPlays> {
+  return presentRecent(await loadProgress());
+}
+
+// Drop this file from every recently played list.
+export async function forgetRandomPath(filePath: string): Promise<RecentPlays> {
+  const progress = await loadProgress();
+  let changed = false;
+  for (const [folder, files] of Object.entries(progress.recentRandom)) {
+    if (!files.includes(filePath)) continue;
+    const next = files.filter((entry) => entry !== filePath);
+    if (next.length === 0) delete progress.recentRandom[folder];
+    else progress.recentRandom[folder] = next;
+    changed = true;
+  }
+  if (changed) await saveProgress(progress);
+  return presentRecent(progress);
+}
+
+// Drop one file from a folder's recent list so a random slot can pick it again.
+export async function forgetRandomPlayed(folder: string, filePath: string): Promise<RecentPlays> {
+  const progress = await loadProgress();
+  const prev = progress.recentRandom[folder];
+  if (prev?.includes(filePath)) {
+    const next = prev.filter((entry) => entry !== filePath);
+    if (next.length === 0) delete progress.recentRandom[folder];
+    else progress.recentRandom[folder] = next;
+    await saveProgress(progress);
+  }
+  return presentRecent(progress);
 }

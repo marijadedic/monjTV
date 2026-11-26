@@ -1,7 +1,7 @@
 import type { BlockMode } from "../../../shared/types.ts";
 import { canonicalPlaylistUrl, parseYoutubeUrl, youtubeLabel } from "../../../shared/youtube.ts";
-import { fileTitle } from "./fileTitle.ts";
-import { folderLabel } from "./folderLabel.ts";
+import { fileTitle } from "@utils/label/fileTitle.ts";
+import { folderLabel } from "@utils/label/folderLabel.ts";
 
 export function slotLabel(
   block: { folder: string; file?: string; mode: BlockMode; name?: string },

@@ -12,6 +12,14 @@ function missingFile(err: unknown): boolean {
   );
 }
 
+// Write JSON atomically via a temporary file.
+export async function writeJson(file: string, value: unknown): Promise<void> {
+  await mkdir(path.dirname(file), { recursive: true });
+  const tmp = `${file}.${process.pid}.tmp`;
+  await writeFile(tmp, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+  await rename(tmp, file);
+}
+
 // Parse a JSON file. A missing or empty file is created from the fallback.
 // Invalid JSON returns the fallback and is left on disk.
 export async function readJson<T>(file: string, fallback: T): Promise<T> {
@@ -26,12 +34,4 @@ export async function readJson<T>(file: string, fallback: T): Promise<T> {
     if (missingFile(err)) await writeJson(file, fallback);
     return fallback;
   }
-}
-
-// Write JSON atomically via a temporary file.
-export async function writeJson(file: string, value: unknown): Promise<void> {
-  await mkdir(path.dirname(file), { recursive: true });
-  const tmp = `${file}.${process.pid}.tmp`;
-  await writeFile(tmp, `${JSON.stringify(value, null, 2)}\n`, "utf8");
-  await rename(tmp, file);
 }

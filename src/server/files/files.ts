@@ -17,14 +17,6 @@ export function titleFromPath(filePath: string): string {
   return path.basename(filePath, path.extname(filePath));
 }
 
-// Video files under a folder, sorted by path.
-export async function listVideos(folder: string): Promise<string[]> {
-  const out: string[] = [];
-  await walk(folder, 0, out);
-  out.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
-  return out;
-}
-
 // Collect videos, stopping at the depth and count limits.
 async function walk(dir: string, depth: number, out: string[]): Promise<void> {
   if (depth > MAX_DEPTH || out.length >= MAX_VIDEOS) return;
@@ -45,6 +37,14 @@ async function walk(dir: string, depth: number, out: string[]): Promise<void> {
       if (out.length >= MAX_VIDEOS) return;
     }
   }
+}
+
+// Video files under a folder, sorted by path.
+export async function listVideos(folder: string): Promise<string[]> {
+  const out: string[] = [];
+  await walk(folder, 0, out);
+  out.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+  return out;
 }
 
 // Folders and videos in one directory, for the folder picker.
@@ -86,13 +86,31 @@ const SUGGEST_LIMIT = 12;
 
 type PathHit = { name: string; path: string };
 
-// Folders, or folders and videos, that continue a path being typed.
-export async function suggestPaths(
-  raw: string,
-  kind: "folder" | "video",
-): Promise<{ dirs: PathHit[]; videos: PathHit[] }> {
-  if (kind === "folder") return { dirs: await suggestFolders(raw), videos: [] };
-  return suggestVideos(raw);
+// Directory to list, and the incomplete last segment.
+function splitTypedPath(typed: string): { dir: string; prefix: string } {
+  const slash = Math.max(typed.lastIndexOf("/"), typed.lastIndexOf("\\"));
+  if (slash < 0) return { dir: os.homedir(), prefix: typed };
+  const prefix = typed.slice(slash + 1);
+  if (!prefix) return { dir: typed, prefix: "" };
+  const dir = typed.slice(0, slash) || typed.slice(0, slash + 1);
+  return { dir, prefix };
+}
+
+// Directories in one folder, skipping hidden names.
+async function childDirs(dir: string): Promise<PathHit[]> {
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const dirs: { name: string; path: string }[] = [];
+  for (const entry of entries) {
+    if (entry.name.startsWith(".") || !entry.isDirectory()) continue;
+    dirs.push({ name: entry.name, path: path.join(dir, entry.name) });
+  }
+  dirs.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  return dirs;
 }
 
 // Child folders that continue a path being typed.
@@ -111,6 +129,30 @@ export async function suggestFolders(raw: string): Promise<PathHit[]> {
   }
   const current = typed.replace(/[\\/]+$/, "");
   return matches.filter((dir) => dir.path !== current).slice(0, SUGGEST_LIMIT);
+}
+
+// Video files in one folder, skipping hidden names.
+async function childVideos(dir: string): Promise<PathHit[]> {
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const videos: PathHit[] = [];
+  for (const entry of entries) {
+    if (entry.name.startsWith(".") || entry.isDirectory()) continue;
+    if (!VIDEO_EXT.has(path.extname(entry.name).toLowerCase())) continue;
+    videos.push({ name: entry.name, path: path.join(dir, entry.name) });
+  }
+  videos.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  return videos;
+}
+
+// Names that start with the typed prefix. An empty prefix keeps the full list.
+function filterPrefix(hits: PathHit[], needle: string): PathHit[] {
+  if (!needle) return hits;
+  return hits.filter((hit) => hit.name.toLowerCase().startsWith(needle));
 }
 
 // Videos and folders that continue a path being typed.
@@ -141,85 +183,89 @@ async function suggestVideos(raw: string): Promise<{ dirs: PathHit[]; videos: Pa
   };
 }
 
-// Names that start with the typed prefix. An empty prefix keeps the full list.
-function filterPrefix(hits: PathHit[], needle: string): PathHit[] {
-  if (!needle) return hits;
-  return hits.filter((hit) => hit.name.toLowerCase().startsWith(needle));
+// Folders, or folders and videos, that continue a path being typed.
+export async function suggestPaths(
+  raw: string,
+  kind: "folder" | "video",
+): Promise<{ dirs: PathHit[]; videos: PathHit[] }> {
+  if (kind === "folder") return { dirs: await suggestFolders(raw), videos: [] };
+  return suggestVideos(raw);
 }
 
-// Directory to list, and the incomplete last segment.
-function splitTypedPath(typed: string): { dir: string; prefix: string } {
-  const slash = Math.max(typed.lastIndexOf("/"), typed.lastIndexOf("\\"));
-  if (slash < 0) return { dir: os.homedir(), prefix: typed };
-  const prefix = typed.slice(slash + 1);
-  if (!prefix) return { dir: typed, prefix: "" };
-  const dir = typed.slice(0, slash) || typed.slice(0, slash + 1);
-  return { dir, prefix };
-}
-
-// Directories in one folder, skipping hidden names.
-async function childDirs(dir: string): Promise<PathHit[]> {
-  let entries;
+// True when the path is a file with a video extension.
+export async function isVideoFile(p: string): Promise<boolean> {
+  if (!VIDEO_EXT.has(path.extname(p).toLowerCase())) return false;
   try {
-    entries = await readdir(dir, { withFileTypes: true });
+    return (await stat(p)).isFile();
   } catch {
-    return [];
+    return false;
   }
-  const dirs: { name: string; path: string }[] = [];
-  for (const entry of entries) {
-    if (entry.name.startsWith(".") || !entry.isDirectory()) continue;
-    dirs.push({ name: entry.name, path: path.join(dir, entry.name) });
-  }
-  dirs.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-  return dirs;
 }
 
-// Video files in one folder, skipping hidden names.
-async function childVideos(dir: string): Promise<PathHit[]> {
-  let entries;
+// True when the path is a directory.
+export async function isDir(p: string): Promise<boolean> {
   try {
-    entries = await readdir(dir, { withFileTypes: true });
+    return (await stat(p)).isDirectory();
   } catch {
-    return [];
+    return false;
   }
-  const videos: PathHit[] = [];
-  for (const entry of entries) {
-    if (entry.name.startsWith(".") || entry.isDirectory()) continue;
-    if (!VIDEO_EXT.has(path.extname(entry.name).toLowerCase())) continue;
-    videos.push({ name: entry.name, path: path.join(dir, entry.name) });
-  }
-  videos.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-  return videos;
 }
 
-// Open the system folder picker and return the chosen path. Null when canceled.
-export async function pickFolder(): Promise<string | null> {
-  if (process.platform === "darwin") {
-    return runPicker(
-      "osascript",
-      ["-e", 'POSIX path of (choose folder with prompt "Choose a folder for this block")'],
-      "dir",
-    );
-  }
-  if (process.platform === "linux") return pickOnLinux("dir");
-  throw new Error("The folder picker is only available on macOS and Linux.");
+// Cancel, a missing binary, or a real failure.
+function classifyPickerError(err: unknown): PickerFailure {
+  const record =
+    err && typeof err === "object" ? (err as { code?: unknown; stderr?: unknown }) : {};
+  if (record.code === "ENOENT") return "missing";
+  const stderr = typeof record.stderr === "string" ? record.stderr : "";
+  const message = err instanceof Error ? err.message : String(err);
+  const text = `${message}\n${stderr}`;
+  if (/user canceled|user cancelled|-128/i.test(text)) return "cancel";
+  if (/cannot open display|no display/i.test(text)) return "error";
+  if (record.code === 1 || record.code === 252) return "cancel";
+  return "error";
 }
 
-// Open the system file picker and return the chosen video. Null when canceled.
-export async function pickFile(): Promise<string | null> {
-  if (process.platform === "darwin") {
-    // Extensions are not AppleScript types. public.movie covers the videos we play.
-    return runPicker(
-      "osascript",
-      [
-        "-e",
-        'POSIX path of (choose file with prompt "Choose a video for this block" of type {"public.movie"})',
-      ],
-      "video",
-    );
+// A local directory path from picker stdout.
+function cleanPicked(stdout: string): string {
+  let picked = stdout.trim();
+  if (picked.startsWith("file://")) {
+    try {
+      picked = decodeURIComponent(picked.slice("file://".length));
+    } catch {
+      picked = picked.slice("file://".length);
+    }
   }
-  if (process.platform === "linux") return pickOnLinux("video");
-  throw new Error("The file picker is only available on macOS and Linux.");
+  if (picked.length > 1) picked = picked.replace(/\/+$/, "");
+  return picked;
+}
+
+// Run one picker. Null when the user cancels or the result is the wrong kind.
+async function runPicker(bin: string, args: string[], kind: "dir" | "video"): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync(bin, args);
+    const picked = cleanPicked(stdout);
+    if (!picked) return null;
+    if (kind === "dir") return (await isDir(picked)) ? picked : null;
+    if (await isVideoFile(picked)) return picked;
+    throw new Error(`Not a video file: ${picked}`);
+  } catch (err) {
+    if (classifyPickerError(err) === "cancel") return null;
+    throw err instanceof Error ? err : new Error(String(err));
+  }
+}
+
+// True when bin is an executable somewhere on PATH.
+async function onPath(bin: string): Promise<boolean> {
+  const dirs = (process.env.PATH ?? "").split(path.delimiter).filter(Boolean);
+  for (const dir of dirs) {
+    try {
+      await access(path.join(dir, bin), constants.X_OK);
+      return true;
+    } catch {
+      continue;
+    }
+  }
+  return false;
 }
 
 // Folder or video dialogs. First match on PATH wins.
@@ -269,80 +315,34 @@ async function pickOnLinux(kind: "dir" | "video"): Promise<string | null> {
   );
 }
 
-// Run one picker. Null when the user cancels or the result is the wrong kind.
-async function runPicker(bin: string, args: string[], kind: "dir" | "video"): Promise<string | null> {
-  try {
-    const { stdout } = await execFileAsync(bin, args);
-    const picked = cleanPicked(stdout);
-    if (!picked) return null;
-    if (kind === "dir") return (await isDir(picked)) ? picked : null;
-    if (await isVideoFile(picked)) return picked;
-    throw new Error(`Not a video file: ${picked}`);
-  } catch (err) {
-    if (classifyPickerError(err) === "cancel") return null;
-    throw err instanceof Error ? err : new Error(String(err));
+// Open the system folder picker and return the chosen path. Null when canceled.
+export async function pickFolder(): Promise<string | null> {
+  if (process.platform === "darwin") {
+    return runPicker(
+      "osascript",
+      ["-e", 'POSIX path of (choose folder with prompt "Choose a folder for this block")'],
+      "dir",
+    );
   }
+  if (process.platform === "linux") return pickOnLinux("dir");
+  throw new Error("The folder picker is only available on macOS and Linux.");
 }
 
-// True when bin is an executable somewhere on PATH.
-async function onPath(bin: string): Promise<boolean> {
-  const dirs = (process.env.PATH ?? "").split(path.delimiter).filter(Boolean);
-  for (const dir of dirs) {
-    try {
-      await access(path.join(dir, bin), constants.X_OK);
-      return true;
-    } catch {
-      continue;
-    }
+// Open the system file picker and return the chosen video. Null when canceled.
+export async function pickFile(): Promise<string | null> {
+  if (process.platform === "darwin") {
+    // Extensions are not AppleScript types. public.movie covers the videos we play.
+    return runPicker(
+      "osascript",
+      [
+        "-e",
+        'POSIX path of (choose file with prompt "Choose a video for this block" of type {"public.movie"})',
+      ],
+      "video",
+    );
   }
-  return false;
-}
-
-// A local directory path from picker stdout.
-function cleanPicked(stdout: string): string {
-  let picked = stdout.trim();
-  if (picked.startsWith("file://")) {
-    try {
-      picked = decodeURIComponent(picked.slice("file://".length));
-    } catch {
-      picked = picked.slice("file://".length);
-    }
-  }
-  if (picked.length > 1) picked = picked.replace(/\/+$/, "");
-  return picked;
-}
-
-// Cancel, a missing binary, or a real failure.
-function classifyPickerError(err: unknown): PickerFailure {
-  const record =
-    err && typeof err === "object" ? (err as { code?: unknown; stderr?: unknown }) : {};
-  if (record.code === "ENOENT") return "missing";
-  const stderr = typeof record.stderr === "string" ? record.stderr : "";
-  const message = err instanceof Error ? err.message : String(err);
-  const text = `${message}\n${stderr}`;
-  if (/user canceled|user cancelled|-128/i.test(text)) return "cancel";
-  if (/cannot open display|no display/i.test(text)) return "error";
-  if (record.code === 1 || record.code === 252) return "cancel";
-  return "error";
-}
-
-// True when the path is a directory.
-export async function isDir(p: string): Promise<boolean> {
-  try {
-    return (await stat(p)).isDirectory();
-  } catch {
-    return false;
-  }
-}
-
-// True when the path is a file with a video extension.
-export async function isVideoFile(p: string): Promise<boolean> {
-  if (!VIDEO_EXT.has(path.extname(p).toLowerCase())) return false;
-  try {
-    return (await stat(p)).isFile();
-  } catch {
-    return false;
-  }
+  if (process.platform === "linux") return pickOnLinux("video");
+  throw new Error("The file picker is only available on macOS and Linux.");
 }
 
 // Throw unless the path is an existing video file.

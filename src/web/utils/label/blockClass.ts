@@ -1,4 +1,4 @@
-import { modeClass } from "./modeClass.ts";
+import { modeClass } from "@utils/label/modeClass.ts";
 import type { BlockMode } from "../../../shared/types.ts";
 
 export function blockClass(mode: BlockMode): string {

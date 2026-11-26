@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { blurCloud, showCloud } from "../../utils/tip/cloud.ts";
+import { blurCloud, showCloud } from "@utils/tip/cloud.ts";
 import { CloudHost } from "../parts/CloudHost.tsx";
 import { InfoMark } from "../parts/InfoMark.tsx";
 

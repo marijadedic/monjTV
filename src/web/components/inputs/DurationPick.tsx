@@ -3,7 +3,7 @@ import { useI18n } from "../../i18n.tsx";
 import type { LengthChoice } from "../../types/LengthChoice.ts";
 import type { PresetMin } from "../../types/PresetMin.ts";
 import type { TipKey } from "../../types/TipKey.ts";
-import { isPreset } from "../../utils/length/isPreset.ts";
+import { isPreset } from "@utils/length/isPreset.ts";
 import { InfoButton } from "../buttons/InfoButton.tsx";
 
 export function DurationPick({

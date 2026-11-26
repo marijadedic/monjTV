@@ -3,8 +3,8 @@ import { canonicalPlaylistUrl, isYoutubeLink, parseYoutubeUrl } from "../../../.
 import type { SlotLength } from "../../../../../shared/types.ts";
 import type { Draft } from "../../../../types/Draft.ts";
 import type { FieldError } from "../../../../types/FieldError.ts";
-import { chosenSeconds } from "../../../../utils/length/chosenSeconds.ts";
-import { stackItemNeedsProbe } from "../../../../utils/length/stackItemNeedsProbe.ts";
+import { chosenSeconds } from "@utils/length/chosenSeconds.ts";
+import { stackItemNeedsProbe } from "@utils/length/stackItemNeedsProbe.ts";
 
 export function commitErrors(
   draft: Draft,

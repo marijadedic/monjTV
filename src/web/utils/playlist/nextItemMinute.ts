@@ -1,6 +1,6 @@
-import { gapOf } from "./gapOf.ts";
-import { itemSeconds } from "../length/itemSeconds.ts";
-import { toMin } from "../clock/toMin.ts";
+import { gapOf } from "@utils/playlist/gapOf.ts";
+import { itemSeconds } from "@utils/length/itemSeconds.ts";
+import { toMin } from "@utils/clock/toMin.ts";
 import type { DraftItem } from "../../types/DraftItem.ts";
 
 export function nextItemMinute(start: string, items: DraftItem[]): number | null {

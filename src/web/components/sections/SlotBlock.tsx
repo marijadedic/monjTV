@@ -4,17 +4,17 @@ import { placedOn } from "../../../shared/placed.ts";
 import { DAY_MINUTES, clockOf, nextDay } from "../../../shared/window.ts";
 import { useI18n } from "../../i18n.tsx";
 import type { Draft } from "../../types/Draft.ts";
-import { clockFace } from "../../utils/clock/clockFace.ts";
-import { fromPlaylist } from "../../utils/playlist/fromPlaylist.ts";
-import { gapOf } from "../../utils/playlist/gapOf.ts";
-import { playlistGridLine } from "../../utils/playlist/playlistGridLine.ts";
-import { playlistSliceLines } from "../../utils/playlist/playlistSliceLines.ts";
-import { rowStyle } from "../../utils/week/rowStyle.ts";
-import { slotHover } from "../../utils/label/slotHover.ts";
-import { slotIsBuilding } from "../../utils/week/slotIsBuilding.ts";
-import { slotKind } from "../../utils/label/slotKind.ts";
-import { slotLabel } from "../../utils/label/slotLabel.ts";
-import { startOnDraft } from "../../utils/week/startOnDraft.ts";
+import { clockFace } from "@utils/clock/clockFace.ts";
+import { fromPlaylist } from "@utils/playlist/fromPlaylist.ts";
+import { gapOf } from "@utils/playlist/gapOf.ts";
+import { playlistGridLine } from "@utils/playlist/playlistGridLine.ts";
+import { playlistSliceLines } from "@utils/playlist/playlistSliceLines.ts";
+import { rowStyle } from "@utils/week/rowStyle.ts";
+import { slotHover } from "@utils/label/slotHover.ts";
+import { slotIsBuilding } from "@utils/week/slotIsBuilding.ts";
+import { slotKind } from "@utils/label/slotKind.ts";
+import { slotLabel } from "@utils/label/slotLabel.ts";
+import { startOnDraft } from "@utils/week/startOnDraft.ts";
 import { Spinner } from "../parts/Spinner.tsx";
 
 export function SlotBlock({

@@ -2,7 +2,15 @@ import { canonicalPlaylistUrl, isYoutubeUrl, parseYoutubeUrl } from "../../../..
 import type { BlockMode } from "../../../../../shared/types.ts";
 import type { Draft } from "../../../../types/Draft.ts";
 import type { DraftItem } from "../../../../types/DraftItem.ts";
-import { parentDir } from "../../../../utils/source/parentDir.ts";
+import { parentDir } from "@utils/source/parentDir.ts";
+
+function folderAfterSpecific(cleared: Draft): string {
+  if (cleared.mode === "specific-file" && cleared.file && !isYoutubeUrl(cleared.file)) {
+    return parentDir(cleared.file) || cleared.folder;
+  }
+  if (canonicalPlaylistUrl(cleared.folder) || isYoutubeUrl(cleared.file)) return "";
+  return cleared.folder;
+}
 
 export function modeDraft(current: Draft | null, mode: BlockMode): Draft | null {
   if (!current) return current;
@@ -50,12 +58,7 @@ export function modeDraft(current: Draft | null, mode: BlockMode): Draft | null 
     const next = { ...cleared, mode, source: "youtube" as const, folder: playlist, file: "" };
     return withStep(next.lengthChoice === "longest" ? { ...next, lengthChoice: 60 } : next);
   }
-  const folder =
-    cleared.mode === "specific-file" && cleared.file && !isYoutubeUrl(cleared.file)
-      ? parentDir(cleared.file) || cleared.folder
-      : canonicalPlaylistUrl(cleared.folder) || isYoutubeUrl(cleared.file)
-        ? ""
-        : cleared.folder;
+  const folder = folderAfterSpecific(cleared);
   const next = { ...cleared, mode, source: "path" as const, folder, file: "" };
   return withStep(
     mode === "next-episode" && next.lengthChoice === "longest" ? { ...next, lengthChoice: 60 } : next,

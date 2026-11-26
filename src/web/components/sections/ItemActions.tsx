@@ -1,8 +1,13 @@
 import "./styles/ItemActions.css";
-import type { RundownItem } from "../../../shared/types.ts";
+import type { ItemMode, RundownItem } from "../../../shared/types.ts";
 import { useI18n } from "../../i18n.tsx";
-import { canStepEpisode } from "../../utils/rundown/canStepEpisode.ts";
-import { rowWatched } from "../../utils/rundown/rowWatched.ts";
+
+function markDoneTip(mode: ItemMode, upcoming: boolean, t: ReturnType<typeof useI18n>["t"]): string {
+  if (mode === "next-episode") return upcoming ? t.markDoneEpisode : t.markDoneEpisodeAired;
+  return upcoming ? t.markDoneMovie : t.markDoneMovieAired;
+}
+import { canStepEpisode } from "@utils/rundown/canStepEpisode.ts";
+import { rowWatched } from "@utils/rundown/rowWatched.ts";
 import { StepIcon } from "../parts/StepIcon.tsx";
 
 export function ItemActions({
@@ -56,14 +61,7 @@ export function ItemActions({
     busy === `${item.id}:prev` ||
     busy === `${item.id}:next`;
   const upcoming = !passed && item.status !== "done" && item.status !== "skipped";
-  const doneTip =
-    item.mode === "next-episode"
-      ? upcoming
-        ? t.markDoneEpisode
-        : t.markDoneEpisodeAired
-      : upcoming
-        ? t.markDoneMovie
-        : t.markDoneMovieAired;
+  const doneTip = markDoneTip(item.mode, upcoming, t);
   const skipTip = item.mode === "next-episode" ? t.markSkippedEpisode : t.markSkippedMovie;
   function choose(action: () => void) {
     onMenu(null);

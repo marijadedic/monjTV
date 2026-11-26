@@ -142,13 +142,6 @@ function unique(words: string[]): string[] {
   return out;
 }
 
-// One yt-dlp search at a time so a day of cards cannot flood the Pi.
-function exclusiveSearch<T>(task: () => Promise<T>): Promise<T> {
-  const run = afterSearch(task);
-  searchTail = quietSearch(run);
-  return run;
-}
-
 // Search after the previous search, even when that search failed.
 async function afterSearch<T>(task: () => Promise<T>): Promise<T> {
   try {
@@ -166,6 +159,13 @@ async function quietSearch(run: Promise<unknown>): Promise<void> {
   } catch {
     // The caller of exclusiveSearch still sees this failure.
   }
+}
+
+// One yt-dlp search at a time so a day of cards cannot flood the Pi.
+function exclusiveSearch<T>(task: () => Promise<T>): Promise<T> {
+  const run = afterSearch(task);
+  searchTail = quietSearch(run);
+  return run;
 }
 
 function jpegSize(bytes: Buffer): { width: number; height: number } | null {
@@ -321,7 +321,9 @@ export function posterQuery(file: string): PosterQuery {
   const showTokens = borrowed
     ? unique([...nameTokens(folder), ...nameTokens(rest)])
     : unique([...own, ...nameTokens(after)]);
-  let phrase = borrowed ? [folder, rest, episode].filter(Boolean).join(" ") : episode ? `${before.trim()} ${episode}` : cleaned;
+  let phrase = cleaned;
+  if (borrowed) phrase = [folder, rest, episode].filter(Boolean).join(" ");
+  else if (episode) phrase = `${before.trim()} ${episode}`;
   if (episode && !fold(phrase).includes(fold(episode)) && !/s\d{2}e\d{2}/i.test(phrase)) phrase = `${phrase} ${episode}`;
   if (year && !phrase.includes(year)) phrase = `${phrase} ${year}`;
   phrase = phrase.replace(/\s+/g, " ").trim();
@@ -607,15 +609,6 @@ export async function refreshFrame(file: string): Promise<string | null> {
   return dest;
 }
 
-// One cached still: a YouTube poster, or a local frame, or null.
-export function frameOf(file: string): Promise<string | null> {
-  const running = pending.get(file);
-  if (running) return running;
-  const job = loadFrame(file);
-  pending.set(file, job);
-  return job;
-}
-
 // Use the cached still when it is there. Otherwise make one, and try once more if that fails.
 async function loadFrame(file: string): Promise<string | null> {
   const dest = cachePath(file);
@@ -631,4 +624,13 @@ async function loadFrame(file: string): Promise<string | null> {
   } finally {
     pending.delete(file);
   }
+}
+
+// One cached still: a YouTube poster, or a local frame, or null.
+export function frameOf(file: string): Promise<string | null> {
+  const running = pending.get(file);
+  if (running) return running;
+  const job = loadFrame(file);
+  pending.set(file, job);
+  return job;
 }

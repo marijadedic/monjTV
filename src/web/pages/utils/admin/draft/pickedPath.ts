@@ -1,5 +1,5 @@
 import type { Draft } from "../../../../types/Draft.ts";
-import { parentDir } from "../../../../utils/source/parentDir.ts";
+import { parentDir } from "@utils/source/parentDir.ts";
 
 export function pickedPath(current: Draft, chosen: string): Draft {
   if (current.mode === "playlist") {

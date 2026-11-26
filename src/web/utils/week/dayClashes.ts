@@ -2,8 +2,8 @@ import { segmentsPlaced } from "../../../shared/placed.ts";
 import type { Day, ScheduleBlock, TvBoard } from "../../../shared/types.ts";
 import { clockOf, segmentsOf } from "../../../shared/window.ts";
 import type { Draft } from "../../types/Draft.ts";
-import { draftAsBlock } from "./draftAsBlock.ts";
-import { slotLabel } from "../label/slotLabel.ts";
+import { draftAsBlock } from "@utils/week/draftAsBlock.ts";
+import { slotLabel } from "@utils/label/slotLabel.ts";
 
 export function dayClashes(
   draft: Draft,

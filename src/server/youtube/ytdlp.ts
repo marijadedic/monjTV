@@ -25,10 +25,17 @@ export function ytdlpRuntimeArgs(): string[] {
   return ["--js-runtimes", `node:${process.execPath}`];
 }
 
-export async function ensureYtdlp(): Promise<string> {
-  if (existsSync(ytdlpBin)) return ytdlpBin;
-  if (!ensuring) ensuring = downloadOnce();
-  return ensuring;
+async function downloadYtdlp(): Promise<string> {
+  await mkdir(toolsDir, { recursive: true });
+  const res = await fetch(`${RELEASE}/${assetName()}`, { redirect: "follow" });
+  if (!res.ok) {
+    throw new Error(`Could not download yt-dlp (${res.status})`);
+  }
+  const tmp = `${ytdlpBin}.tmp`;
+  await writeFile(tmp, Buffer.from(await res.arrayBuffer()));
+  await chmod(tmp, 0o755);
+  await rename(tmp, ytdlpBin);
+  return ytdlpBin;
 }
 
 // One download shared by the callers that arrive while it is running.
@@ -42,15 +49,8 @@ async function downloadOnce(): Promise<string> {
   }
 }
 
-async function downloadYtdlp(): Promise<string> {
-  await mkdir(toolsDir, { recursive: true });
-  const res = await fetch(`${RELEASE}/${assetName()}`, { redirect: "follow" });
-  if (!res.ok) {
-    throw new Error(`Could not download yt-dlp (${res.status})`);
-  }
-  const tmp = `${ytdlpBin}.tmp`;
-  await writeFile(tmp, Buffer.from(await res.arrayBuffer()));
-  await chmod(tmp, 0o755);
-  await rename(tmp, ytdlpBin);
-  return ytdlpBin;
+export async function ensureYtdlp(): Promise<string> {
+  if (existsSync(ytdlpBin)) return ytdlpBin;
+  if (!ensuring) ensuring = downloadOnce();
+  return ensuring;
 }

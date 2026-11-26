@@ -1,5 +1,5 @@
 import type { BlockMode } from "../../../shared/types.ts";
-import { folderLabel } from "./folderLabel.ts";
+import { folderLabel } from "@utils/label/folderLabel.ts";
 
 export function slotKind(block: { folder: string; mode: BlockMode }): string {
   if (block.mode === "playlist") return " stack";

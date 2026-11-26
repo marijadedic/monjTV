@@ -1,5 +1,5 @@
-import { modeLabel } from "../label/modeLabel.ts";
-import { stackItemNeedsProbe } from "../length/stackItemNeedsProbe.ts";
+import { modeLabel } from "@utils/label/modeLabel.ts";
+import { stackItemNeedsProbe } from "@utils/length/stackItemNeedsProbe.ts";
 import type { DraftItem } from "../../types/DraftItem.ts";
 import type { useI18n } from "../../i18n.tsx";
 

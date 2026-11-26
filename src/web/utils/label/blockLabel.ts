@@ -1,4 +1,4 @@
-import { modeLabel } from "./modeLabel.ts";
+import { modeLabel } from "@utils/label/modeLabel.ts";
 import type { BlockMode } from "../../../shared/types.ts";
 import type { useI18n } from "../../i18n.tsx";
 

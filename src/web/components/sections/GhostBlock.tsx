@@ -1,8 +1,8 @@
 import type { Day } from "../../../shared/types.ts";
 import { nextDay } from "../../../shared/window.ts";
 import { useI18n } from "../../i18n.tsx";
-import { clockFace } from "../../utils/clock/clockFace.ts";
-import { rowStyle } from "../../utils/week/rowStyle.ts";
+import { clockFace } from "@utils/clock/clockFace.ts";
+import { rowStyle } from "@utils/week/rowStyle.ts";
 
 export function GhostBlock({
   start,

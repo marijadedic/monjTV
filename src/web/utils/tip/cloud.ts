@@ -13,21 +13,6 @@ function tipNode(): HTMLSpanElement {
   return tipEl;
 }
 
-export function dismissTip() {
-  tipWatch?.disconnect();
-  tipWatch = null;
-  tipHost = null;
-  tipFrame?.removeEventListener("scroll", onTipScroll);
-  tipFrame = null;
-  if (!tipEl) return;
-  tipEl.style.display = "none";
-  tipEl.classList.remove("below");
-}
-
-function onTipScroll() {
-  if (tipHost) placeCloud({ currentTarget: tipHost });
-}
-
 export function placeCloud(event: { currentTarget: EventTarget | null }) {
   const host = event.currentTarget as HTMLElement | null;
   const source = host?.querySelector(":scope > .cloud") as HTMLElement | null;
@@ -65,6 +50,21 @@ export function placeCloud(event: { currentTarget: EventTarget | null }) {
   const tail = hostRect.left + hostRect.width / 2 - left;
   tip.style.setProperty("--tail", `${Math.min(Math.max(tail, 14), Math.max(14, width - 14))}px`);
   tip.style.visibility = "";
+}
+
+function onTipScroll() {
+  if (tipHost) placeCloud({ currentTarget: tipHost });
+}
+
+export function dismissTip() {
+  tipWatch?.disconnect();
+  tipWatch = null;
+  tipHost = null;
+  tipFrame?.removeEventListener("scroll", onTipScroll);
+  tipFrame = null;
+  if (!tipEl) return;
+  tipEl.style.display = "none";
+  tipEl.classList.remove("below");
 }
 
 export function showCloud(event: { currentTarget: EventTarget | null }) {

@@ -1,8 +1,14 @@
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import preact from "@preact/preset-vite";
 
 export default defineConfig({
   plugins: [preact()],
+  resolve: {
+    alias: {
+      "@utils": fileURLToPath(new URL("./src/web/utils", import.meta.url)),
+    },
+  },
   root: "src/web",
   build: {
     outDir: "../../dist/client",

@@ -1,6 +1,6 @@
 import { DAY_MINUTES } from "../../../shared/window.ts";
-import { fixedMinutes } from "./fixedMinutes.ts";
-import { toMin } from "../clock/toMin.ts";
+import { fixedMinutes } from "@utils/length/fixedMinutes.ts";
+import { toMin } from "@utils/clock/toMin.ts";
 import type { Draft } from "../../types/Draft.ts";
 
 export function draftSpanMin(draft: Draft): number {

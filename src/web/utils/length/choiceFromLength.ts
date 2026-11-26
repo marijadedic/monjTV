@@ -1,5 +1,5 @@
 import type { LengthChoice } from "../../types/LengthChoice.ts";
-import { isPreset } from "./isPreset.ts";
+import { isPreset } from "@utils/length/isPreset.ts";
 
 export function choiceFromLength(lengthMin?: number): { lengthChoice: LengthChoice; customMin: string } {
   if (lengthMin && isPreset(lengthMin)) return { lengthChoice: lengthMin, customMin: "" };

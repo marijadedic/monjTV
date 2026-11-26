@@ -1,5 +1,5 @@
-import { folderLabel } from "./folderLabel.ts";
-import { parentDir } from "../source/parentDir.ts";
+import { folderLabel } from "@utils/label/folderLabel.ts";
+import { parentDir } from "@utils/source/parentDir.ts";
 
 export function folderName(filePath: string): string {
   const parent = parentDir(filePath);

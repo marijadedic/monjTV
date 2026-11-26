@@ -1,8 +1,8 @@
 import type { SlotLength } from "../../../shared/types.ts";
 import type { Draft } from "../../types/Draft.ts";
-import { fixedMinutes } from "./fixedMinutes.ts";
-import { measureKey } from "./measureKey.ts";
-import { stackSeconds } from "./stackSeconds.ts";
+import { fixedMinutes } from "@utils/length/fixedMinutes.ts";
+import { measureKey } from "@utils/length/measureKey.ts";
+import { stackSeconds } from "@utils/length/stackSeconds.ts";
 
 export function chosenSeconds(
   draft: Draft,

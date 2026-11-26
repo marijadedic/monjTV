@@ -2,7 +2,7 @@ import "./styles/IntermissionPanel.css";
 import type { Ref } from "preact";
 import type { IntermissionItem, IntermissionKind, Schedule } from "../../../shared/types.ts";
 import { useI18n } from "../../i18n.tsx";
-import { intermissionLabel } from "../../utils/source/intermissionLabel.ts";
+import { intermissionLabel } from "@utils/source/intermissionLabel.ts";
 import { CloseButton } from "../buttons/CloseButton.tsx";
 import { FieldNote } from "../parts/FieldNote.tsx";
 import { FolderPath } from "../inputs/FolderPath.tsx";

@@ -4,19 +4,20 @@ import { useEffect, useState } from "preact/hooks";
 import { dateOffset, weekdayOfKey } from "../../shared/dates.ts";
 import type { PlayerStatus, RundownItem, TvBoard } from "../../shared/types.ts";
 import { itemProgress, prevDay } from "../../shared/window.ts";
-import { canonicalYoutubeIntermission, parseYoutubeUrl } from "../../shared/youtube.ts";
+import { canonicalYoutubeIntermission } from "../../shared/youtube.ts";
 import { api } from "../api.ts";
 import { useI18n } from "../i18n.tsx";
 import { DayTabs, EmptyDay } from "../components/sections/DayTabs.tsx";
 import { NowStrip } from "../components/sections/NowStrip.tsx";
 import { ErrorNote } from "../components/parts/ErrorNote.tsx";
 import { Rail, RailCard } from "../components/sections/Rail.tsx";
-import { carryGroups } from "../utils/rundown/carryGroups.ts";
-import { heldItem } from "../utils/rundown/heldItem.ts";
-import { nextPlanned } from "../utils/rundown/nextPlanned.ts";
-import { nowSec } from "../utils/clock/nowSec.ts";
-import { onNowPlanned } from "../utils/rundown/onNowPlanned.ts";
-import { playedPaths } from "../utils/rundown/playedPaths.ts";
+import { carryGroups } from "@utils/rundown/carryGroups.ts";
+import { heldItem } from "@utils/rundown/heldItem.ts";
+import { nextPlanned } from "@utils/rundown/nextPlanned.ts";
+import { nowSec } from "@utils/clock/nowSec.ts";
+import { onNowPlanned } from "@utils/rundown/onNowPlanned.ts";
+import { gapStillFile } from "@utils/rundown/gapStillFile.ts";
+import { playedPaths } from "@utils/rundown/playedPaths.ts";
 
 export function TvSchedule() {
   const { t } = useI18n();
@@ -185,14 +186,7 @@ export function TvSchedule() {
   const namedLive = liveFiller && !liveFiller.startsWith("YouTube · ") ? liveFiller : null;
   const fillerName = live ? watchTitle || status?.intermissionTitle || null : null;
   const gapTitle = namedLive || (!current && !due ? fillerName : null) || liveFiller;
-  const gapFile =
-    gapTitle && status?.fallbackPath
-      ? status.fallbackPath
-      : gapTitle && status?.intermissionKind === "video"
-        ? status.intermissionSource
-        : gapTitle && status?.intermissionKind === "youtube"
-          ? parseYoutubeUrl(status.intermissionSource ?? "")
-          : null;
+  const gapFile = gapStillFile(gapTitle, status);
   const air = current ?? due;
 
   function hideStill(filePath: string) {
@@ -215,7 +209,9 @@ export function TvSchedule() {
   }
 
   const showColumn = Boolean(day && (items.length > 0 || gapTitle));
-  const episodeItem = current?.mode === "next-episode" ? current : due?.mode === "next-episode" ? due : null;
+  let episodeItem: RundownItem | null = null;
+  if (current?.mode === "next-episode") episodeItem = current;
+  else if (due?.mode === "next-episode") episodeItem = due;
 
   const fromDay = day ? t.dayName[prevDay(weekdayOfKey(day.date))] : "";
   const carried = past ? [] : carryGroups(items);

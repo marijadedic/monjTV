@@ -1,6 +1,6 @@
 import { canonicalPlaylistUrl } from "../../../shared/youtube.ts";
-import { folderLabel } from "../label/folderLabel.ts";
-import { itemLabel } from "../label/itemLabel.ts";
+import { folderLabel } from "@utils/label/folderLabel.ts";
+import { itemLabel } from "@utils/label/itemLabel.ts";
 import type { DraftItem } from "../../types/DraftItem.ts";
 
 export function playlistGridName(

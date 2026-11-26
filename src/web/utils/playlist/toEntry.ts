@@ -1,6 +1,6 @@
 import { canonicalPlaylistUrl, parseYoutubeUrl } from "../../../shared/youtube.ts";
-import { gapFields } from "./gapFields.ts";
-import { parentDir } from "../source/parentDir.ts";
+import { gapFields } from "@utils/playlist/gapFields.ts";
+import { parentDir } from "@utils/source/parentDir.ts";
 import type { DraftItem } from "../../types/DraftItem.ts";
 import type { PlaylistEntry } from "../../../shared/types.ts";
 

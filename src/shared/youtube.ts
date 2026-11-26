@@ -69,25 +69,6 @@ export function isYoutubeUrl(raw: string): boolean {
   return parseYoutubeUrl(raw) !== null;
 }
 
-// Playlist link: list=, or watch_videos with video_ids. A generated TLG list is not stored.
-export function parseYoutubePlaylist(raw: string): YoutubePlaylistRef | null {
-  const url = parseHttpUrl(raw);
-  if (!url || !isYoutubeHost(url)) return null;
-  const queued = watchVideoIds(url);
-  if (queued) return videoIdsPlaylist(queued);
-  const id = url.searchParams.get("list");
-  if (!id || !PLAYLIST_ID.test(id)) return null;
-  const indexRaw = url.searchParams.get("index");
-  const indexNum = indexRaw == null || indexRaw === "" ? NaN : Number(indexRaw);
-  const startIndex = Number.isInteger(indexNum) && indexNum > 1 ? indexNum - 1 : 0;
-  return {
-    id,
-    url: `https://www.youtube.com/playlist?list=${id}`,
-    startVideoId: videoIdOf(url),
-    startIndex,
-  };
-}
-
 // Ordered unique ids from /watch_videos?video_ids=, or null when none are valid.
 function watchVideoIds(url: URL): string[] | null {
   const path = url.pathname.replace(/\/+$/, "") || "/";
@@ -115,11 +96,23 @@ function videoIdsPlaylist(ids: string[]): YoutubePlaylistRef {
   };
 }
 
-// Saved intermission URL. A list plays the playlist. A bare video plays that video.
-export function canonicalYoutubeIntermission(raw: string): string | null {
-  const playlist = parseYoutubePlaylist(raw);
-  if (playlist) return formatPlaylistSource(playlist);
-  return parseYoutubeUrl(raw);
+// Playlist link: list=, or watch_videos with video_ids. A generated TLG list is not stored.
+export function parseYoutubePlaylist(raw: string): YoutubePlaylistRef | null {
+  const url = parseHttpUrl(raw);
+  if (!url || !isYoutubeHost(url)) return null;
+  const queued = watchVideoIds(url);
+  if (queued) return videoIdsPlaylist(queued);
+  const id = url.searchParams.get("list");
+  if (!id || !PLAYLIST_ID.test(id)) return null;
+  const indexRaw = url.searchParams.get("index");
+  const indexNum = indexRaw == null || indexRaw === "" ? NaN : Number(indexRaw);
+  const startIndex = Number.isInteger(indexNum) && indexNum > 1 ? indexNum - 1 : 0;
+  return {
+    id,
+    url: `https://www.youtube.com/playlist?list=${id}`,
+    startVideoId: videoIdOf(url),
+    startIndex,
+  };
 }
 
 // Playlist page used as the series key. A start video on the pasted link is ignored.
@@ -137,6 +130,13 @@ export function formatPlaylistSource(playlist: YoutubePlaylistRef): string {
     return `https://www.youtube.com/playlist?list=${playlist.id}&index=${playlist.startIndex + 1}`;
   }
   return playlist.url;
+}
+
+// Saved intermission URL. A list plays the playlist. A bare video plays that video.
+export function canonicalYoutubeIntermission(raw: string): string | null {
+  const playlist = parseYoutubePlaylist(raw);
+  if (playlist) return formatPlaylistSource(playlist);
+  return parseYoutubeUrl(raw);
 }
 
 export function isYoutubeLink(raw: string): boolean {

@@ -6,13 +6,6 @@ let buildingIds: Set<string> | null = null;
 let saveMissToken = 0;
 let saveMisses: SlotMiss[] = [];
 
-// One board write at a time, so a playback save cannot drop another day.
-export function exclusive<T>(task: () => Promise<T>): Promise<T> {
-  const run = afterTail(task);
-  tail = quiet(run);
-  return run;
-}
-
 // Run this write after the previous one, even when that write failed.
 async function afterTail<T>(task: () => Promise<T>): Promise<T> {
   try {
@@ -30,6 +23,13 @@ async function quiet(run: Promise<unknown>): Promise<void> {
   } catch {
     // The caller of exclusive still sees this failure.
   }
+}
+
+// One board write at a time, so a playback save cannot drop another day.
+export function exclusive<T>(task: () => Promise<T>): Promise<T> {
+  const run = afterTail(task);
+  tail = quiet(run);
+  return run;
 }
 
 // Remember whether the latest save found a video that does not fit.

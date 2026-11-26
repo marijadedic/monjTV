@@ -1,6 +1,6 @@
 import { canonicalPlaylistUrl, parseYoutubeUrl, youtubeLabel } from "../../../shared/youtube.ts";
-import { fileTitle } from "./fileTitle.ts";
-import { folderLabel } from "./folderLabel.ts";
+import { fileTitle } from "@utils/label/fileTitle.ts";
+import { folderLabel } from "@utils/label/folderLabel.ts";
 import type { DraftItem } from "../../types/DraftItem.ts";
 
 export function itemLabel(item: DraftItem, titles: Readonly<Record<string, string>>): string {

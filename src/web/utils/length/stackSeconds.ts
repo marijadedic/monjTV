@@ -1,5 +1,5 @@
-import { itemSeconds } from "./itemSeconds.ts";
-import { stackGapSeconds } from "./stackGapSeconds.ts";
+import { itemSeconds } from "@utils/length/itemSeconds.ts";
+import { stackGapSeconds } from "@utils/length/stackGapSeconds.ts";
 import type { DraftItem } from "../../types/DraftItem.ts";
 
 export function stackSeconds(items: DraftItem[]): number | null {

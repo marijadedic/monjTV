@@ -78,6 +78,33 @@ export function cachedYoutubeTitle(raw: string): string | undefined {
   return playlists.get(playlist.id)?.title || extraTitles.get(playlist.url) || undefined;
 }
 
+type YoutubePrint = {
+  title?: string;
+  duration?: number | null;
+  is_live?: boolean;
+  live_status?: string;
+};
+
+function parseYoutubePrint(stdout: string): YoutubePrint | null {
+  const text = stdout.trim();
+  if (!text || text.startsWith("ERROR")) return null;
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start < 0 || end <= start) return null;
+  try {
+    return JSON.parse(text.slice(start, end + 1)) as YoutubePrint;
+  } catch {
+    return null;
+  }
+}
+
+function youtubeReadError(detail: string): Error {
+  if (/ENOENT|not found/i.test(detail)) {
+    return new Error("yt-dlp is not installed or not on PATH");
+  }
+  return new Error("Could not read this YouTube video");
+}
+
 // Title, length, and live flag from yt-dlp. Live is rejected unless allowLive.
 export async function probeYoutube(
   raw: string,
@@ -196,6 +223,90 @@ export async function youtubeStreamUrls(raw: string): Promise<YoutubeStream> {
   return { videoUrl: lines[0], audioUrl: lines[1] ?? null };
 }
 
+function playlistReadError(detail: string): Error {
+  if (/ENOENT|not found/i.test(detail)) {
+    return new Error("yt-dlp is not installed or not on PATH");
+  }
+  if (/no videos|empty playlist|this playlist does not exist/i.test(detail)) {
+    return new Error("This YouTube playlist has no videos");
+  }
+  return new Error("Could not read this YouTube playlist");
+}
+
+async function runYtdlp(
+  args: string[],
+  timeout: number,
+  maxBuffer = 2_000_000,
+): Promise<{ stdout: string; stderr: string }> {
+  let stdout = "";
+  let stderr = "";
+  try {
+    const ytdlp = await ensureYtdlp();
+    const result = await execFileAsync(
+      ytdlp,
+      [
+        "--ignore-config",
+        "--skip-download",
+        "--no-warnings",
+        "--socket-timeout",
+        "30",
+        "--extractor-retries",
+        "3",
+        ...ytdlpRuntimeArgs(),
+        ...args,
+      ],
+      { timeout, maxBuffer },
+    );
+    stdout = result.stdout;
+    stderr = result.stderr;
+  } catch (err) {
+    const record = err as { message?: string; stderr?: string; stdout?: string };
+    stdout = record.stdout ?? "";
+    stderr = `${record.stderr ?? ""}\n${record.message ?? ""}`;
+    if (!stdout.trim()) throw playlistReadError(stderr);
+  }
+  return { stdout, stderr };
+}
+
+async function readPlaylistTitle(ref: YoutubePlaylistRef): Promise<string> {
+  const { stdout, stderr } = await runYtdlp(
+    [
+      "--flat-playlist",
+      "--yes-playlist",
+      "--playlist-items",
+      "1",
+      "--print",
+      "%(playlist_title)s",
+      ref.url,
+    ],
+    45_000,
+  );
+  const title = stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => line && line !== "NA");
+  if (title) return title;
+  if (stderr.trim()) throw playlistReadError(stderr);
+  return youtubeLabel(ref.url);
+}
+
+function rememberTitle(url: string, title: string): void {
+  const clean = title.trim();
+  if (!clean || clean === "NA") return;
+  extraTitles.set(url, clean);
+}
+
+// Playlist title for the intermission chip. Does not list every video.
+export async function youtubePlaylistTitle(raw: string): Promise<string> {
+  const ref = parseYoutubePlaylist(raw);
+  if (!ref) throw new Error("Not a YouTube playlist URL");
+  const known = playlists.get(ref.id)?.title || extraTitles.get(ref.url);
+  if (known) return known;
+  const title = await readPlaylistTitle(ref);
+  rememberTitle(ref.url, title);
+  return title;
+}
+
 // Titles for timetable labels. A failed lookup is omitted so the id can stay.
 export async function youtubeTitles(raws: string[]): Promise<Record<string, string>> {
   const urls = [...new Set(raws.map((raw) => raw.trim()).filter(Boolean))];
@@ -220,15 +331,143 @@ export async function youtubeTitles(raws: string[]): Promise<Record<string, stri
   return titles;
 }
 
-// Playlist title for the intermission chip. Does not list every video.
-export async function youtubePlaylistTitle(raw: string): Promise<string> {
-  const ref = parseYoutubePlaylist(raw);
-  if (!ref) throw new Error("Not a YouTube playlist URL");
-  const known = playlists.get(ref.id)?.title || extraTitles.get(ref.url);
-  if (known) return known;
-  const title = await readPlaylistTitle(ref);
-  rememberTitle(ref.url, title);
-  return title;
+function videoIdFromEntry(entry: { id?: string; url?: string }): string | null {
+  if (entry.id && /^[\w-]{11}$/.test(entry.id)) return entry.id;
+  if (!entry.url) return null;
+  return youtubeId(entry.url) ?? (/^[\w-]{11}$/.test(entry.url) ? entry.url : null);
+}
+
+// Seconds from a playlist dump entry. Missing or live lengths stay 0.
+function listedDurationSec(row: {
+  duration?: number | string | null;
+  duration_string?: string;
+}): number {
+  const fromSec = Math.round(Number(row.duration));
+  if (Number.isFinite(fromSec) && fromSec > 0) return fromSec;
+  const raw = row.duration_string?.trim() ?? "";
+  if (!raw || raw === "NA") return 0;
+  const parts = raw.split(":").map((part) => Number(part));
+  if (parts.length < 2 || parts.length > 3 || parts.some((part) => !Number.isFinite(part))) return 0;
+  const [first, second, third] = parts;
+  if (third != null) return Math.round(first! * 3600 + second! * 60 + third);
+  return Math.round(first! * 60 + second!);
+}
+
+function playlistVideos(entries: unknown): YoutubePlaylistVideo[] {
+  if (!Array.isArray(entries)) return [];
+  const videos: YoutubePlaylistVideo[] = [];
+  const seen = new Set<string>();
+  for (const entry of entries) {
+    if (!entry || typeof entry !== "object") continue;
+    const row = entry as {
+      id?: string;
+      url?: string;
+      title?: string;
+      duration?: number | string | null;
+      duration_string?: string;
+      is_live?: boolean;
+      live_status?: string;
+    };
+    const id = videoIdFromEntry(row);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const title = row.title?.trim() ?? "";
+    const durationSec = listedDurationSec(row);
+    const isLive =
+      row.is_live === true || row.live_status === "is_live" || row.live_status === "is_upcoming";
+    videos.push({
+      id,
+      url: `https://www.youtube.com/watch?v=${id}`,
+      title: title && title !== "NA" ? title : `YouTube · ${id}`,
+      durationSec,
+      isLive,
+    });
+    if (videos.length >= PLAYLIST_LIMIT) break;
+  }
+  return videos;
+}
+
+// Keep the listed length so later timing does not probe each video.
+function rememberListedVideo(video: YoutubePlaylistVideo): void {
+  rememberTitle(video.url, video.title);
+  if (cache.has(video.url)) return;
+  if (!video.isLive && video.durationSec < 1) return;
+  cache.set(video.url, {
+    url: video.url,
+    title: video.title,
+    durationSec: video.isLive ? 0 : video.durationSec,
+    isLive: video.isLive,
+  });
+}
+
+// Remember this list for the life of the process.
+function storePlaylist(
+  ref: YoutubePlaylistRef,
+  videos: YoutubePlaylistVideo[],
+  title: string,
+): YoutubePlaylist {
+  const playlist: YoutubePlaylist = {
+    id: ref.id,
+    url: ref.url,
+    title: title && title !== "NA" ? title : youtubeLabel(ref.url),
+    videos,
+  };
+  rememberTitle(ref.url, playlist.title);
+  for (const video of videos) rememberListedVideo(video);
+  playlists.set(ref.id, playlist);
+  return playlist;
+}
+
+// Listed videos for a watch_videos URL when yt-dlp did not return entries.
+function videosFromIdList(ref: YoutubePlaylistRef): YoutubePlaylistVideo[] {
+  if (!ref.id.startsWith("video_ids:")) return [];
+  const videos: YoutubePlaylistVideo[] = [];
+  const seen = new Set<string>();
+  for (const id of ref.id.slice("video_ids:".length).split(",")) {
+    if (!/^[\w-]{11}$/.test(id) || seen.has(id)) continue;
+    seen.add(id);
+    videos.push({
+      id,
+      url: `https://www.youtube.com/watch?v=${id}`,
+      title: `YouTube · ${id}`,
+      durationSec: 0,
+      isLive: false,
+    });
+  }
+  return videos;
+}
+
+async function readPlaylist(ref: YoutubePlaylistRef): Promise<YoutubePlaylist> {
+  const fallback = videosFromIdList(ref);
+  let stdout = "";
+  let stderr = "";
+  try {
+    const result = await runYtdlp(
+      [
+        "--flat-playlist",
+        "--yes-playlist",
+        "--playlist-end",
+        String(PLAYLIST_LIMIT),
+        "--dump-single-json",
+        ref.url,
+      ],
+      90_000,
+      8_000_000,
+    );
+    stdout = result.stdout;
+    stderr = result.stderr;
+  } catch (err) {
+    if (fallback.length) return storePlaylist(ref, fallback, "");
+    throw err;
+  }
+  const dump = parseYoutubePrint(stdout) as { title?: string; entries?: unknown } | null;
+  const videos = playlistVideos(dump?.entries);
+  const queued = videos.length > 0 ? videos : fallback;
+  if (!queued.length) {
+    if (stderr.trim() || stdout.trim().startsWith("ERROR")) throw playlistReadError(stderr || stdout);
+    throw new Error("This YouTube playlist has no videos");
+  }
+  return storePlaylist(ref, queued, (dump?.title ?? "").trim());
 }
 
 // Videos in playlist order. The same list is shared for the life of the process.
@@ -278,241 +517,3 @@ export function assertYoutubeUrl(raw: string): string {
   return url;
 }
 
-type YoutubePrint = {
-  title?: string;
-  duration?: number | null;
-  is_live?: boolean;
-  live_status?: string;
-};
-
-function parseYoutubePrint(stdout: string): YoutubePrint | null {
-  const text = stdout.trim();
-  if (!text || text.startsWith("ERROR")) return null;
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start < 0 || end <= start) return null;
-  try {
-    return JSON.parse(text.slice(start, end + 1)) as YoutubePrint;
-  } catch {
-    return null;
-  }
-}
-
-function youtubeReadError(detail: string): Error {
-  if (/ENOENT|not found/i.test(detail)) {
-    return new Error("yt-dlp is not installed or not on PATH");
-  }
-  return new Error("Could not read this YouTube video");
-}
-
-function rememberTitle(url: string, title: string): void {
-  const clean = title.trim();
-  if (!clean || clean === "NA") return;
-  extraTitles.set(url, clean);
-}
-
-async function readPlaylistTitle(ref: YoutubePlaylistRef): Promise<string> {
-  const { stdout, stderr } = await runYtdlp(
-    [
-      "--flat-playlist",
-      "--yes-playlist",
-      "--playlist-items",
-      "1",
-      "--print",
-      "%(playlist_title)s",
-      ref.url,
-    ],
-    45_000,
-  );
-  const title = stdout
-    .split("\n")
-    .map((line) => line.trim())
-    .find((line) => line && line !== "NA");
-  if (title) return title;
-  if (stderr.trim()) throw playlistReadError(stderr);
-  return youtubeLabel(ref.url);
-}
-
-async function readPlaylist(ref: YoutubePlaylistRef): Promise<YoutubePlaylist> {
-  const fallback = videosFromIdList(ref);
-  let stdout = "";
-  let stderr = "";
-  try {
-    const result = await runYtdlp(
-      [
-        "--flat-playlist",
-        "--yes-playlist",
-        "--playlist-end",
-        String(PLAYLIST_LIMIT),
-        "--dump-single-json",
-        ref.url,
-      ],
-      90_000,
-      8_000_000,
-    );
-    stdout = result.stdout;
-    stderr = result.stderr;
-  } catch (err) {
-    if (fallback.length) return storePlaylist(ref, fallback, "");
-    throw err;
-  }
-  const dump = parseYoutubePrint(stdout) as { title?: string; entries?: unknown } | null;
-  const videos = playlistVideos(dump?.entries);
-  const queued = videos.length > 0 ? videos : fallback;
-  if (!queued.length) {
-    if (stderr.trim() || stdout.trim().startsWith("ERROR")) throw playlistReadError(stderr || stdout);
-    throw new Error("This YouTube playlist has no videos");
-  }
-  return storePlaylist(ref, queued, (dump?.title ?? "").trim());
-}
-
-// Listed videos for a watch_videos URL when yt-dlp did not return entries.
-function videosFromIdList(ref: YoutubePlaylistRef): YoutubePlaylistVideo[] {
-  if (!ref.id.startsWith("video_ids:")) return [];
-  const videos: YoutubePlaylistVideo[] = [];
-  const seen = new Set<string>();
-  for (const id of ref.id.slice("video_ids:".length).split(",")) {
-    if (!/^[\w-]{11}$/.test(id) || seen.has(id)) continue;
-    seen.add(id);
-    videos.push({
-      id,
-      url: `https://www.youtube.com/watch?v=${id}`,
-      title: `YouTube · ${id}`,
-      durationSec: 0,
-      isLive: false,
-    });
-  }
-  return videos;
-}
-
-// Remember this list for the life of the process.
-function storePlaylist(
-  ref: YoutubePlaylistRef,
-  videos: YoutubePlaylistVideo[],
-  title: string,
-): YoutubePlaylist {
-  const playlist: YoutubePlaylist = {
-    id: ref.id,
-    url: ref.url,
-    title: title && title !== "NA" ? title : youtubeLabel(ref.url),
-    videos,
-  };
-  rememberTitle(ref.url, playlist.title);
-  for (const video of videos) rememberListedVideo(video);
-  playlists.set(ref.id, playlist);
-  return playlist;
-}
-
-function playlistVideos(entries: unknown): YoutubePlaylistVideo[] {
-  if (!Array.isArray(entries)) return [];
-  const videos: YoutubePlaylistVideo[] = [];
-  const seen = new Set<string>();
-  for (const entry of entries) {
-    if (!entry || typeof entry !== "object") continue;
-    const row = entry as {
-      id?: string;
-      url?: string;
-      title?: string;
-      duration?: number | string | null;
-      duration_string?: string;
-      is_live?: boolean;
-      live_status?: string;
-    };
-    const id = videoIdFromEntry(row);
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
-    const title = row.title?.trim() ?? "";
-    const durationSec = listedDurationSec(row);
-    const isLive =
-      row.is_live === true || row.live_status === "is_live" || row.live_status === "is_upcoming";
-    videos.push({
-      id,
-      url: `https://www.youtube.com/watch?v=${id}`,
-      title: title && title !== "NA" ? title : `YouTube · ${id}`,
-      durationSec,
-      isLive,
-    });
-    if (videos.length >= PLAYLIST_LIMIT) break;
-  }
-  return videos;
-}
-
-// Seconds from a playlist dump entry. Missing or live lengths stay 0.
-function listedDurationSec(row: {
-  duration?: number | string | null;
-  duration_string?: string;
-}): number {
-  const fromSec = Math.round(Number(row.duration));
-  if (Number.isFinite(fromSec) && fromSec > 0) return fromSec;
-  const raw = row.duration_string?.trim() ?? "";
-  if (!raw || raw === "NA") return 0;
-  const parts = raw.split(":").map((part) => Number(part));
-  if (parts.length < 2 || parts.length > 3 || parts.some((part) => !Number.isFinite(part))) return 0;
-  const [first, second, third] = parts;
-  if (third != null) return Math.round(first! * 3600 + second! * 60 + third);
-  return Math.round(first! * 60 + second!);
-}
-
-// Keep the listed length so later timing does not probe each video.
-function rememberListedVideo(video: YoutubePlaylistVideo): void {
-  rememberTitle(video.url, video.title);
-  if (cache.has(video.url)) return;
-  if (!video.isLive && video.durationSec < 1) return;
-  cache.set(video.url, {
-    url: video.url,
-    title: video.title,
-    durationSec: video.isLive ? 0 : video.durationSec,
-    isLive: video.isLive,
-  });
-}
-
-function videoIdFromEntry(entry: { id?: string; url?: string }): string | null {
-  if (entry.id && /^[\w-]{11}$/.test(entry.id)) return entry.id;
-  if (!entry.url) return null;
-  return youtubeId(entry.url) ?? (/^[\w-]{11}$/.test(entry.url) ? entry.url : null);
-}
-
-async function runYtdlp(
-  args: string[],
-  timeout: number,
-  maxBuffer = 2_000_000,
-): Promise<{ stdout: string; stderr: string }> {
-  let stdout = "";
-  let stderr = "";
-  try {
-    const ytdlp = await ensureYtdlp();
-    const result = await execFileAsync(
-      ytdlp,
-      [
-        "--ignore-config",
-        "--skip-download",
-        "--no-warnings",
-        "--socket-timeout",
-        "30",
-        "--extractor-retries",
-        "3",
-        ...ytdlpRuntimeArgs(),
-        ...args,
-      ],
-      { timeout, maxBuffer },
-    );
-    stdout = result.stdout;
-    stderr = result.stderr;
-  } catch (err) {
-    const record = err as { message?: string; stderr?: string; stdout?: string };
-    stdout = record.stdout ?? "";
-    stderr = `${record.stderr ?? ""}\n${record.message ?? ""}`;
-    if (!stdout.trim()) throw playlistReadError(stderr);
-  }
-  return { stdout, stderr };
-}
-
-function playlistReadError(detail: string): Error {
-  if (/ENOENT|not found/i.test(detail)) {
-    return new Error("yt-dlp is not installed or not on PATH");
-  }
-  if (/no videos|empty playlist|this playlist does not exist/i.test(detail)) {
-    return new Error("This YouTube playlist has no videos");
-  }
-  return new Error("Could not read this YouTube playlist");
-}

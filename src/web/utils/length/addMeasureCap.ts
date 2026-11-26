@@ -1,4 +1,4 @@
-import { addFixedMinutes } from "./addFixedMinutes.ts";
+import { addFixedMinutes } from "@utils/length/addFixedMinutes.ts";
 import type { Draft } from "../../types/Draft.ts";
 
 export function addMeasureCap(draft: Draft): number | undefined {

@@ -45,23 +45,6 @@ type StoredSchedule = {
   intermissionRandomStart?: unknown;
 };
 
-// Read the weekly schedule from disk.
-export async function loadSchedule(): Promise<Schedule> {
-  const data = await readJson<StoredSchedule>(schedulePath, empty);
-  const schedule = scheduleFrom(data);
-  if (!Array.isArray(data.intermissions)) await writeJson(schedulePath, schedule);
-  return schedule;
-}
-
-// Validate the schedule and write it to disk.
-export async function saveSchedule(schedule: StoredSchedule): Promise<Schedule> {
-  const previous = await loadSchedule();
-  const normalized = validateSchedule(schedule, await peekTvBoard(), previous.blocks);
-  await assertIntermissions(normalized.intermissions);
-  await writeJson(schedulePath, normalized);
-  return normalized;
-}
-
 // Saved TV days, for playlist height. Missing or invalid JSON is ignored.
 async function peekTvBoard(): Promise<TvBoard | null> {
   try {
@@ -90,6 +73,24 @@ export function playingIntermission(schedule: Schedule): IntermissionItem | null
   return schedule.intermissions.find((item) => item.id === schedule.activeIntermission) ?? null;
 }
 
+// True when both stacks name the same videos in the same order.
+function sameEntries(a: PlaylistEntry[] | undefined, b: PlaylistEntry[] | undefined): boolean {
+  const left = a ?? [];
+  const right = b ?? [];
+  if (left.length !== right.length) return false;
+  return left.every((item, index) => {
+    const other = right[index]!;
+    return (
+      item.id === other.id &&
+      item.mode === other.mode &&
+      item.folder === other.folder &&
+      (item.file ?? "") === (other.file ?? "") &&
+      (item.lengthMin ?? 0) === (other.lengthMin ?? 0) &&
+      (item.gapAfterMin ?? 0) === (other.gapAfterMin ?? 0)
+    );
+  });
+}
+
 // True when this block is new, or its folder, file, or mode changed.
 // A slot whose show was deleted can stay until it is removed, and can be removed
 // without the missing folder blocking the save.
@@ -104,9 +105,21 @@ export function sourceChanged(before: ScheduleBlock[], block: ScheduleBlock): bo
   );
 }
 
-// True when the weekly grid is the same, even if Intermission changed.
-export function sameBlocks(before: ScheduleBlock[], after: ScheduleBlock[]): boolean {
-  return before.length === after.length && changedBlocks(before, after).length === 0;
+// True when both maps name the same per-day starts.
+function sameStarts(
+  a: ScheduleBlock["starts"],
+  b: ScheduleBlock["starts"],
+): boolean {
+  const days = new Set<string>([...Object.keys(a ?? {}), ...Object.keys(b ?? {})]);
+  for (const day of days) {
+    if ((a?.[day as Day] ?? "") !== (b?.[day as Day] ?? "")) return false;
+  }
+  return true;
+}
+
+// True when both lists name the same days.
+function sameDays(a: Day[], b: Day[]): boolean {
+  return [...a].sort().join() === [...b].sort().join();
 }
 
 // Blocks that were added or whose window, folder, file, or mode changed.
@@ -127,6 +140,11 @@ export function changedBlocks(before: ScheduleBlock[], after: ScheduleBlock[]): 
       !sameEntries(old.items, block.items)
     );
   });
+}
+
+// True when the weekly grid is the same, even if Intermission changed.
+export function sameBlocks(before: ScheduleBlock[], after: ScheduleBlock[]): boolean {
+  return before.length === after.length && changedBlocks(before, after).length === 0;
 }
 
 // Blocks that air on a day, ordered by start time.
@@ -165,6 +183,89 @@ function migrateStoredBlock(block: ScheduleBlock): ScheduleBlock {
       return { ...item, mode: "specific-file", folder: "", ...(file ? { file } : {}) };
     }),
   };
+}
+
+// Blocks plus the intermission list, without rejecting a saved block.
+function scheduleFrom(data: StoredSchedule): Schedule {
+  return {
+    blocks: Array.isArray(data.blocks) ? data.blocks.map(migrateStoredBlock) : [],
+    ...intermissionsFrom(data, false),
+    intermissionRandomStart: data.intermissionRandomStart === true,
+  };
+}
+
+// Read the weekly schedule from disk.
+export async function loadSchedule(): Promise<Schedule> {
+  const data = await readJson<StoredSchedule>(schedulePath, empty);
+  const schedule = scheduleFrom(data);
+  if (!Array.isArray(data.intermissions)) await writeJson(schedulePath, schedule);
+  return schedule;
+}
+
+// A folder path, a canonical YouTube video or playlist URL, or empty.
+function fallbackFolderOf(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  return canonicalYoutubeIntermission(trimmed) ?? trimmed;
+}
+
+function freshId(id: unknown, seen: Set<string>): string {
+  let next = typeof id === "string" && id.trim() ? id.trim() : randomUUID();
+  if (seen.has(next)) next = randomUUID();
+  seen.add(next);
+  return next;
+}
+
+// Why a folder or video intermission was rejected.
+function intermissionProblem(kind: string, source: string): string {
+  if (isYoutubeLink(source)) return "That is a YouTube link. Choose YouTube, then add it.";
+  if (kind === "video") return "Type the video path.";
+  return "Type the folder path.";
+}
+
+// Keep a usable list entry. Saving rejects a bad one; loading skips it.
+function normalizeIntermission(raw: unknown, seen: Set<string>, strict: boolean): IntermissionItem | null {
+  const fail = (message: string): null => {
+    if (strict) throw new Error(message);
+    return null;
+  };
+  if (!raw || typeof raw !== "object") return fail("Invalid intermission");
+  const item = raw as { id?: unknown; kind?: unknown; source?: unknown };
+  const source = typeof item.source === "string" ? item.source.trim() : "";
+  const kind = typeof item.kind === "string" && isIntermissionKind(item.kind) ? item.kind : "";
+  if (!kind) return fail("Invalid intermission");
+  if (kind === "youtube") {
+    const url = canonicalYoutubeIntermission(source);
+    if (!url) return fail("Not a YouTube video or playlist URL");
+    return { id: freshId(item.id, seen), kind, source: url };
+  }
+  if (!source || isYoutubeLink(source)) return fail(intermissionProblem(kind, source));
+  return { id: freshId(item.id, seen), kind, source };
+}
+
+// The saved list, or one item made from an older fallbackFolder.
+function intermissionsFrom(
+  data: StoredSchedule,
+  strict: boolean,
+): { intermissions: IntermissionItem[]; activeIntermission: string } {
+  if (Array.isArray(data.intermissions)) {
+    const seen = new Set<string>();
+    const intermissions = data.intermissions.flatMap((raw) => {
+      const item = normalizeIntermission(raw, seen, strict);
+      return item ? [item] : [];
+    });
+    const wanted = typeof data.activeIntermission === "string" ? data.activeIntermission : "";
+    const activeIntermission = intermissions.some((item) => item.id === wanted) ? wanted : "";
+    return { intermissions, activeIntermission };
+  }
+  const source = fallbackFolderOf(data.fallbackFolder);
+  if (!source) return { intermissions: [], activeIntermission: "" };
+  const item: IntermissionItem = {
+    id: randomUUID(),
+    kind: isYoutubeLink(source) ? "youtube" : "folder",
+    source,
+  };
+  return { intermissions: [item], activeIntermission: item.id };
 }
 
 // Normalize blocks and reject a new overlap, including leftovers that run past midnight.
@@ -213,80 +314,64 @@ export function validateSchedule(
   };
 }
 
-// Blocks plus the intermission list, without rejecting a saved block.
-function scheduleFrom(data: StoredSchedule): Schedule {
-  return {
-    blocks: Array.isArray(data.blocks) ? data.blocks.map(migrateStoredBlock) : [],
-    ...intermissionsFrom(data, false),
-    intermissionRandomStart: data.intermissionRandomStart === true,
-  };
-}
-
-// A folder path, a canonical YouTube video or playlist URL, or empty.
-function fallbackFolderOf(value: unknown): string {
-  if (typeof value !== "string") return "";
-  const trimmed = value.trim();
-  return canonicalYoutubeIntermission(trimmed) ?? trimmed;
-}
-
-// The saved list, or one item made from an older fallbackFolder.
-function intermissionsFrom(
-  data: StoredSchedule,
-  strict: boolean,
-): { intermissions: IntermissionItem[]; activeIntermission: string } {
-  if (Array.isArray(data.intermissions)) {
-    const seen = new Set<string>();
-    const intermissions = data.intermissions.flatMap((raw) => {
-      const item = normalizeIntermission(raw, seen, strict);
-      return item ? [item] : [];
-    });
-    const wanted = typeof data.activeIntermission === "string" ? data.activeIntermission : "";
-    const activeIntermission = intermissions.some((item) => item.id === wanted) ? wanted : "";
-    return { intermissions, activeIntermission };
+// Throw if the path is not a directory.
+export async function assertFolder(folder: string): Promise<void> {
+  if (!(await isDir(folder))) {
+    throw new Error(`Folder does not exist: ${folder}`);
   }
-  const source = fallbackFolderOf(data.fallbackFolder);
-  if (!source) return { intermissions: [], activeIntermission: "" };
-  const item: IntermissionItem = {
-    id: randomUUID(),
-    kind: isYoutubeLink(source) ? "youtube" : "folder",
-    source,
-  };
-  return { intermissions: [item], activeIntermission: item.id };
 }
 
-// Keep a usable list entry. Saving rejects a bad one; loading skips it.
-function normalizeIntermission(raw: unknown, seen: Set<string>, strict: boolean): IntermissionItem | null {
-  const fail = (message: string): null => {
-    if (strict) throw new Error(message);
-    return null;
-  };
-  if (!raw || typeof raw !== "object") return fail("Invalid intermission");
-  const item = raw as { id?: unknown; kind?: unknown; source?: unknown };
-  const source = typeof item.source === "string" ? item.source.trim() : "";
-  const kind = typeof item.kind === "string" && isIntermissionKind(item.kind) ? item.kind : "";
-  if (!kind) return fail("Invalid intermission");
-  if (kind === "youtube") {
-    const url = canonicalYoutubeIntermission(source);
-    if (!url) return fail("Not a YouTube video or playlist URL");
-    return { id: freshId(item.id, seen), kind, source: url };
+// Each list entry is a folder, a video file, or a YouTube video or playlist. Live streams are allowed.
+export async function assertIntermissions(items: IntermissionItem[]): Promise<void> {
+  for (const item of items) {
+    if (item.kind === "youtube") continue;
+    if (item.kind === "video") await assertVideo(item.source);
+    else await assertFolder(item.source);
   }
-  if (!source || isYoutubeLink(source)) {
-    return fail(
-      isYoutubeLink(source)
-        ? "That is a YouTube link. Choose YouTube, then add it."
-        : kind === "video"
-          ? "Type the video path."
-          : "Type the folder path.",
-    );
-  }
-  return { id: freshId(item.id, seen), kind, source };
 }
 
-function freshId(id: unknown, seen: Set<string>): string {
-  let next = typeof id === "string" && id.trim() ? id.trim() : randomUUID();
-  if (seen.has(next)) next = randomUUID();
-  seen.add(next);
-  return next;
+// Validate the schedule and write it to disk.
+export async function saveSchedule(schedule: StoredSchedule): Promise<Schedule> {
+  const previous = await loadSchedule();
+  const normalized = validateSchedule(schedule, await peekTvBoard(), previous.blocks);
+  await assertIntermissions(normalized.intermissions);
+  await writeJson(schedulePath, normalized);
+  return normalized;
+}
+
+// Folders a block uses for episode or random progress.
+export function foldersOf(block: ScheduleBlock): string[] {
+  if (block.mode === "playlist") {
+    return [...new Set((block.items ?? []).map((item) => item.folder.trim()).filter(Boolean))];
+  }
+  const folder = (block.folder ?? "").trim();
+  return folder ? [folder] : [];
+}
+
+// Keep starts that name a selected day.
+function cleanStarts(
+  days: Day[],
+  raw: ScheduleBlock["starts"],
+): Partial<Record<Day, string>> | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const starts: Partial<Record<Day, string>> = {};
+  for (const day of days) {
+    const value = raw[day];
+    if (value == null || value === "") continue;
+    if (typeof value !== "string" || !isHm(value)) throw new Error("start and end must be HH:mm");
+    starts[day] = value;
+  }
+  return Object.keys(starts).length ? starts : undefined;
+}
+
+// Whole minutes, when the block stores its length.
+function cleanLength(raw: { lengthMin?: number }): number | undefined {
+  if (raw.lengthMin == null) return undefined;
+  if (typeof raw.lengthMin !== "number" || !Number.isInteger(raw.lengthMin) || raw.lengthMin < 1) {
+    throw new Error("start and end must be HH:mm");
+  }
+  if (raw.lengthMin >= DAY_MINUTES) throw new Error("Block must be shorter than 24 hours");
+  return raw.lengthMin;
 }
 
 // Fill defaults and reject an invalid block.
@@ -392,6 +477,16 @@ function normalizeBlock(raw: ScheduleBlock): ScheduleBlock {
   };
 }
 
+// Whole minutes of intermission after a stacked video.
+function cleanGap(raw: { gapAfterMin?: number }): number | undefined {
+  if (raw.gapAfterMin == null) return undefined;
+  if (typeof raw.gapAfterMin !== "number" || !Number.isInteger(raw.gapAfterMin) || raw.gapAfterMin < 1) {
+    throw new Error("Intermission between videos must be a whole number of minutes");
+  }
+  if (raw.gapAfterMin >= DAY_MINUTES) throw new Error("Block must be shorter than 24 hours");
+  return raw.gapAfterMin;
+}
+
 // One stacked video. The three play modes match a normal slot.
 function normalizeEntry(raw: PlaylistEntry): PlaylistEntry {
   if (!raw || typeof raw !== "object") throw new Error("Invalid playlist item");
@@ -431,98 +526,3 @@ function normalizeEntry(raw: PlaylistEntry): PlaylistEntry {
   return { id, mode, folder, ...(lengthMin ? { lengthMin } : {}), ...gap };
 }
 
-// True when both stacks name the same videos in the same order.
-function sameEntries(a: PlaylistEntry[] | undefined, b: PlaylistEntry[] | undefined): boolean {
-  const left = a ?? [];
-  const right = b ?? [];
-  if (left.length !== right.length) return false;
-  return left.every((item, index) => {
-    const other = right[index]!;
-    return (
-      item.id === other.id &&
-      item.mode === other.mode &&
-      item.folder === other.folder &&
-      (item.file ?? "") === (other.file ?? "") &&
-      (item.lengthMin ?? 0) === (other.lengthMin ?? 0) &&
-      (item.gapAfterMin ?? 0) === (other.gapAfterMin ?? 0)
-    );
-  });
-}
-
-// Folders a block uses for episode or random progress.
-export function foldersOf(block: ScheduleBlock): string[] {
-  if (block.mode === "playlist") {
-    return [...new Set((block.items ?? []).map((item) => item.folder.trim()).filter(Boolean))];
-  }
-  const folder = (block.folder ?? "").trim();
-  return folder ? [folder] : [];
-}
-
-// Keep starts that name a selected day.
-function cleanStarts(
-  days: Day[],
-  raw: ScheduleBlock["starts"],
-): Partial<Record<Day, string>> | undefined {
-  if (!raw || typeof raw !== "object") return undefined;
-  const starts: Partial<Record<Day, string>> = {};
-  for (const day of days) {
-    const value = raw[day];
-    if (value == null || value === "") continue;
-    if (typeof value !== "string" || !isHm(value)) throw new Error("start and end must be HH:mm");
-    starts[day] = value;
-  }
-  return Object.keys(starts).length ? starts : undefined;
-}
-
-// Whole minutes of intermission after a stacked video.
-function cleanGap(raw: { gapAfterMin?: number }): number | undefined {
-  if (raw.gapAfterMin == null) return undefined;
-  if (typeof raw.gapAfterMin !== "number" || !Number.isInteger(raw.gapAfterMin) || raw.gapAfterMin < 1) {
-    throw new Error("Intermission between videos must be a whole number of minutes");
-  }
-  if (raw.gapAfterMin >= DAY_MINUTES) throw new Error("Block must be shorter than 24 hours");
-  return raw.gapAfterMin;
-}
-
-// Whole minutes, when the block stores its length.
-function cleanLength(raw: { lengthMin?: number }): number | undefined {
-  if (raw.lengthMin == null) return undefined;
-  if (typeof raw.lengthMin !== "number" || !Number.isInteger(raw.lengthMin) || raw.lengthMin < 1) {
-    throw new Error("start and end must be HH:mm");
-  }
-  if (raw.lengthMin >= DAY_MINUTES) throw new Error("Block must be shorter than 24 hours");
-  return raw.lengthMin;
-}
-
-// True when both lists name the same days.
-function sameDays(a: Day[], b: Day[]): boolean {
-  return [...a].sort().join() === [...b].sort().join();
-}
-
-// True when both maps name the same per-day starts.
-function sameStarts(
-  a: ScheduleBlock["starts"],
-  b: ScheduleBlock["starts"],
-): boolean {
-  const days = new Set<string>([...Object.keys(a ?? {}), ...Object.keys(b ?? {})]);
-  for (const day of days) {
-    if ((a?.[day as Day] ?? "") !== (b?.[day as Day] ?? "")) return false;
-  }
-  return true;
-}
-
-// Throw if the path is not a directory.
-export async function assertFolder(folder: string): Promise<void> {
-  if (!(await isDir(folder))) {
-    throw new Error(`Folder does not exist: ${folder}`);
-  }
-}
-
-// Each list entry is a folder, a video file, or a YouTube video or playlist. Live streams are allowed.
-export async function assertIntermissions(items: IntermissionItem[]): Promise<void> {
-  for (const item of items) {
-    if (item.kind === "youtube") continue;
-    if (item.kind === "video") await assertVideo(item.source);
-    else await assertFolder(item.source);
-  }
-}

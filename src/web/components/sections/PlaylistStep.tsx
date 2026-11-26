@@ -8,13 +8,14 @@ import type { Draft } from "../../types/Draft.ts";
 import type { DraftItem } from "../../types/DraftItem.ts";
 import type { FieldError } from "../../types/FieldError.ts";
 import type { PlaySource } from "../../types/PlaySource.ts";
-import { addFixedMinutes } from "../../utils/length/addFixedMinutes.ts";
-import { dismissTip } from "../../utils/tip/cloud.ts";
-import { gapOf } from "../../utils/playlist/gapOf.ts";
-import { parentDir } from "../../utils/source/parentDir.ts";
-import { modeClass } from "../../utils/label/modeClass.ts";
-import { modeHint } from "../../utils/label/modeHint.ts";
-import { modeLabel } from "../../utils/label/modeLabel.ts";
+import { addFixedMinutes } from "@utils/length/addFixedMinutes.ts";
+import { dismissTip } from "@utils/tip/cloud.ts";
+import { gapOf } from "@utils/playlist/gapOf.ts";
+import { parentDir } from "@utils/source/parentDir.ts";
+import { modeClass } from "@utils/label/modeClass.ts";
+import { modeHint } from "@utils/label/modeHint.ts";
+import { modeLabel } from "@utils/label/modeLabel.ts";
+import { youtubeAddNote } from "@utils/label/youtubeAddNote.ts";
 import { InfoButton } from "../buttons/InfoButton.tsx";
 import { DurationPick } from "../inputs/DurationPick.tsx";
 import { FolderPath } from "../inputs/FolderPath.tsx";
@@ -254,11 +255,7 @@ export function PlaylistStep({
               <SourcePick mode={draft.addMode} source={draft.addSource} onPick={onPickSource} />
               {draft.addSource === "youtube" && (
                 <p class="mode-note">
-                  {draft.addMode === "next-episode"
-                    ? t.youtubePlaylistNote
-                    : draft.addMode === "random-file"
-                      ? t.youtubeRandomNote
-                      : t.youtubeCaveat}
+                  {youtubeAddNote(draft.addMode, t)}
                 </p>
               )}
               {draft.addSource === "youtube" ? (

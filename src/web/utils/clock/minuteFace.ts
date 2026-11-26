@@ -1,4 +1,4 @@
-import { clockFace } from "./clockFace.ts";
+import { clockFace } from "@utils/clock/clockFace.ts";
 import { DAY_MINUTES, clockOf } from "../../../shared/window.ts";
 
 export function minuteFace(mins: number): string {

@@ -1,8 +1,8 @@
 import type { DraftItem } from "../../types/DraftItem.ts";
-import { gapOf } from "./gapOf.ts";
-import { itemSeconds } from "../length/itemSeconds.ts";
-import { minuteFace } from "../clock/minuteFace.ts";
-import { toMin } from "../clock/toMin.ts";
+import { gapOf } from "@utils/playlist/gapOf.ts";
+import { itemSeconds } from "@utils/length/itemSeconds.ts";
+import { minuteFace } from "@utils/clock/minuteFace.ts";
+import { toMin } from "@utils/clock/toMin.ts";
 
 export function stackClocks(start: string, items: DraftItem[]): { start: string; end: string }[] {
   let cursor: number | null = toMin(start);

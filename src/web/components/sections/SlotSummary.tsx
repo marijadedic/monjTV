@@ -1,13 +1,13 @@
 import "./styles/SlotSummary.css";
 import "./styles/SlotSummary.layout.css";
 import type { Draft } from "../../types/Draft.ts";
-import { canonicalPlaylistUrl, parseYoutubeUrl } from "../../../shared/youtube.ts";
 import { useI18n } from "../../i18n.tsx";
-import { blockLabel } from "../../utils/label/blockLabel.ts";
-import { itemLabel } from "../../utils/label/itemLabel.ts";
-import { stackClocks } from "../../utils/playlist/stackClocks.ts";
-import { stackItemLine } from "../../utils/playlist/stackItemLine.ts";
-import { startOnDraft } from "../../utils/week/startOnDraft.ts";
+import { blockLabel } from "@utils/label/blockLabel.ts";
+import { summaryTitle } from "@utils/label/summaryTitle.ts";
+import { itemLabel } from "@utils/label/itemLabel.ts";
+import { stackClocks } from "@utils/playlist/stackClocks.ts";
+import { stackItemLine } from "@utils/playlist/stackItemLine.ts";
+import { startOnDraft } from "@utils/week/startOnDraft.ts";
 import { ChangeButton } from "../buttons/ChangeButton.tsx";
 import { PlaylistWhen } from "../parts/PlaylistWhen.tsx";
 
@@ -29,16 +29,7 @@ export function SlotSummary({
   onEditVideos: () => void;
 }) {
   const { t } = useI18n();
-  const title =
-    draft.mode === "playlist"
-      ? draft.name || t.playlistName
-      : draft.mode === "specific-file" && draft.source === "youtube"
-        ? titles[parseYoutubeUrl(draft.file) ?? ""] || draft.file
-        : draft.source === "youtube"
-          ? titles[canonicalPlaylistUrl(draft.folder) ?? ""] || draft.folder
-          : draft.mode === "specific-file"
-            ? draft.file.split(/[\\/]/).pop() || draft.file
-            : draft.folder;
+  const title = summaryTitle(draft, titles, t.playlistName);
   const clocks = stackClocks(draft.start, draft.items);
   return (
     <div class="summary">

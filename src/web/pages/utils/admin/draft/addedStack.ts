@@ -2,10 +2,16 @@ import type { SlotLength } from "../../../../../shared/types.ts";
 import { canonicalPlaylistUrl, parseYoutubeUrl } from "../../../../../shared/youtube.ts";
 import type { Draft } from "../../../../types/Draft.ts";
 import type { DraftItem } from "../../../../types/DraftItem.ts";
-import { addFixedMinutes } from "../../../../utils/length/addFixedMinutes.ts";
-import { measureKey } from "../../../../utils/length/measureKey.ts";
-import { newItemId } from "../../../../utils/playlist/newItemId.ts";
-import { parentDir } from "../../../../utils/source/parentDir.ts";
+import { addFixedMinutes } from "@utils/length/addFixedMinutes.ts";
+import { measureKey } from "@utils/length/measureKey.ts";
+import { newItemId } from "@utils/playlist/newItemId.ts";
+import { parentDir } from "@utils/source/parentDir.ts";
+
+function addedFolder(draft: Draft, file: string): string {
+  if (draft.addMode !== "specific-file") return canonicalPlaylistUrl(draft.addFolder) ?? draft.addFolder.trim();
+  if (parseYoutubeUrl(file)) return "";
+  return parentDir(file);
+}
 
 export function addedStack(
   draft: Draft,
@@ -21,12 +27,7 @@ export function addedStack(
   }
   const file =
     draft.addMode === "specific-file" ? (parseYoutubeUrl(draft.addFile) ?? draft.addFile.trim()) : "";
-  const folder =
-    draft.addMode === "specific-file"
-      ? parseYoutubeUrl(file)
-        ? ""
-        : parentDir(file)
-      : (canonicalPlaylistUrl(draft.addFolder) ?? draft.addFolder.trim());
+  const folder = addedFolder(draft, file);
   const measuredSec =
     measured?.key === measureKey(draft) && measured.length ? measured.length.durationSec : null;
   const item: DraftItem = {
