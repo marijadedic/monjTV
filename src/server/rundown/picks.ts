@@ -14,8 +14,8 @@ export function cloneProgress(progress: Progress): Progress {
 }
 
 // Treat this day's planned picks as already chosen, so the next day continues the series.
-// Overnight rows are the previous day's leftover, unless this is the live day and that leftover
-// has not been written into progress yet.
+// A skipped row does not use its episode or movie up. Overnight rows are the previous day's
+// leftover, unless this is the live day and that leftover has not been written into progress yet.
 export function notePicks(
   progress: Progress,
   items: RundownItem[],
@@ -25,6 +25,7 @@ export function notePicks(
   const next = cloneProgress(progress);
   for (const item of sortRundown(items)) {
     if (item.overnight && !includeOvernight) continue;
+    if (item.status === "skipped") continue;
     const block = schedule.blocks.find((entry) => entry.id === item.blockId);
     if (!block) continue;
     const folder = sourceFolder(item, block);

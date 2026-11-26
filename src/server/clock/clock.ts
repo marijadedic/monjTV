@@ -60,7 +60,9 @@ export function msUntil(secFromMidnight: number, d = new Date()): number {
   return ms;
 }
 
-// True when the string is HH:mm.
+// True when the string is a time of day, HH:mm.
 export function isHm(value: string): boolean {
-  return /^\d{2}:\d{2}$/.test(value);
+  if (!/^\d{2}:\d{2}$/.test(value)) return false;
+  const [h, m] = value.split(":").map(Number);
+  return h! <= 23 && m! <= 59;
 }

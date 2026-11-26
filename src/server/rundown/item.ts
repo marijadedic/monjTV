@@ -175,7 +175,7 @@ export function plannedSpill(previous: DayRundown, schedule: Schedule): RundownI
   const day = weekdayOfKey(previous.date);
   const out: RundownItem[] = [];
   for (const item of previous.items) {
-    if (item.overnight) continue;
+    if (item.overnight || item.status === "done" || item.status === "skipped") continue;
     const block = schedule.blocks.find((entry) => entry.id === item.blockId);
     if (!block?.days.includes(day)) continue;
     if (blockLeftoverSec(block, day, previous.items) <= 0) continue;

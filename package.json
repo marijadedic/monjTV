@@ -9,6 +9,7 @@
     "start:server": "tsx src/server/index.ts",
     "start": "npm run build && npm run start:server",
     "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "desktop": "node scripts/install-desktop.mjs"
   },
   "devDependencies": {
