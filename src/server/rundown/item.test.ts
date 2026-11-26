@@ -459,6 +459,17 @@ describe("a slot keeps its own rows", () => {
       row({ blockId: "pl", path: "/films/b.mkv", start: "23:00", durationSec: 90 * 60, end: "00:30" }),
     ];
     assert.equal(blockLeftoverSec(playlist, "mon", files), 30 * 60);
+    const carriedOnly = [
+      row({
+        blockId: "pl",
+        path: "/films/b.mkv",
+        start: "23:00",
+        durationSec: 90 * 60,
+        end: "00:30",
+        overnight: true,
+      }),
+    ];
+    assert.equal(blockLeftoverSec(playlist, "mon", carriedOnly), 0);
   });
 
   it("finds the slot by id", () => {

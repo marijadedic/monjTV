@@ -326,3 +326,100 @@ describe("the day and the gap filler", () => {
     );
   });
 });
+
+describe("a save keeps a usable week", () => {
+  const show = () => block({ id: "show", folder: "/shows/a" });
+
+  it("refuses a week that is not a list of slots", () => {
+    assert.throws(() => validateSchedule({ intermissions: [] }));
+  });
+
+  it("refuses a slot with no day, no clock, or no length", () => {
+    assert.throws(() => validateSchedule(input([block({ id: "show", days: [] })])));
+    assert.throws(() => validateSchedule(input([block({ id: "show", start: "24:00" })])));
+    assert.throws(() => validateSchedule(input([block({ id: "show", start: "18:00", end: "18:00" })])));
+    assert.throws(() => validateSchedule(input([block({ id: "show", lengthMin: 24 * 60 })])));
+  });
+
+  it("refuses a playlist with no name or no videos, and a video slot with no file", () => {
+    assert.throws(() =>
+      validateSchedule(input([block({ id: "pl", mode: "playlist", name: "", folder: "", items: [] })])),
+    );
+    assert.throws(() =>
+      validateSchedule(
+        input([
+          block({
+            id: "pl",
+            mode: "playlist",
+            name: "Evening",
+            folder: "",
+            items: [],
+          }),
+        ]),
+      ),
+    );
+    assert.throws(() =>
+      validateSchedule(input([block({ id: "film", mode: "specific-file", folder: "/films", file: "" })])),
+    );
+  });
+
+  it("stores a YouTube playlist as the playlist page, and a video-ids link as itself", () => {
+    const list = validateSchedule(
+      input([
+        block({
+          id: "show",
+          mode: "next-episode",
+          folder: "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLmonjtvtest",
+        }),
+      ]),
+    );
+    assert.equal(list.blocks[0]?.folder, "https://www.youtube.com/playlist?list=PLmonjtvtest");
+    assert.equal(list.blocks[0]?.mode, "next-episode");
+
+    const queued = "https://www.youtube.com/watch_videos?video_ids=dQw4w9WgXcQ,abcdefghijk";
+    const queue = validateSchedule(input([block({ id: "show", mode: "random-file", folder: queued })]));
+    assert.equal(queue.blocks[0]?.folder, queued);
+  });
+
+  it("keeps a YouTube intermission and rejects a YouTube link typed as a folder", () => {
+    const saved = validateSchedule({
+      blocks: [show()],
+      intermissions: [{ id: "gap", kind: "youtube", source: "https://youtu.be/dQw4w9WgXcQ" }],
+      activeIntermission: "gap",
+      intermissionRandomStart: true,
+    });
+    assert.equal(saved.intermissions[0]?.source, "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+    assert.equal(saved.activeIntermission, "gap");
+    assert.equal(saved.intermissionRandomStart, true);
+    assert.throws(() =>
+      validateSchedule({
+        blocks: [show()],
+        intermissions: [{ id: "gap", kind: "folder", source: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" }],
+      }),
+    );
+  });
+
+  it("turns an older fallback folder into the selected intermission", () => {
+    const saved = validateSchedule({ blocks: [show()], fallbackFolder: "/intermission" });
+    assert.equal(saved.intermissions[0]?.kind, "folder");
+    assert.equal(saved.intermissions[0]?.source, "/intermission");
+    assert.equal(saved.activeIntermission, saved.intermissions[0]?.id);
+  });
+
+  it("selects nothing when the chosen intermission is no longer in the list", () => {
+    const saved = validateSchedule({
+      blocks: [show()],
+      intermissions: [{ id: "gap", kind: "folder", source: "/intermission" }],
+      activeIntermission: "missing",
+    });
+    assert.equal(saved.activeIntermission, "");
+  });
+
+  it("treats a new start as a change of the slot, not of its videos", () => {
+    const before = block({ id: "show", days: ["mon", "wed"], start: "20:00", starts: { wed: "09:00" } });
+    const after = block({ id: "show", days: ["mon", "wed"], start: "20:00", starts: { wed: "10:00" } });
+    assert.equal(sameBlocks([before], [after]), false);
+    assert.equal(changedBlocks([before], [after]).map((item) => item.id).includes("show"), true);
+    assert.equal(sourceChanged([before], after), false);
+  });
+});

@@ -1,8 +1,11 @@
 // Episode order and a random pass. One eligible file makes the pick determined.
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { after, before, describe, it } from "node:test";
 import { noteRandom } from "../schedule/progress.ts";
-import { nextEpisode, otherFolderPlays, takeRandom } from "./picker.ts";
+import { episodePaths, nextEpisode, otherFolderPlays, pick, takeRandom, videosIn } from "./picker.ts";
 
 const episode = (name: string) => `/shows/serial/${name}.mkv`;
 const movie = (name: string) => `/films/${name}.mkv`;
@@ -87,5 +90,37 @@ describe("a random folder plays each file once", () => {
       "/films",
     );
     assert.deepEqual(new Set(held), new Set([episode("01"), movie("b")]));
+  });
+});
+
+describe("a chosen local file", () => {
+  let dir = "";
+  before(async () => {
+    dir = await mkdtemp(path.join(os.tmpdir(), "monjtv-"));
+  });
+  after(() => rm(dir, { recursive: true, force: true }));
+
+  it("walks the video files in episode order", async () => {
+    const show = path.join(dir, "serial");
+    await mkdir(show, { recursive: true });
+    await writeFile(path.join(show, "10.mkv"), "");
+    await writeFile(path.join(show, "2.mkv"), "");
+    const listed = await videosIn(show);
+    assert.deepEqual(
+      listed.map((file) => path.basename(file)),
+      ["2.mkv", "10.mkv"],
+    );
+    assert.deepEqual(await episodePaths(show), listed);
+  });
+
+  it("plays that file, or one YouTube video", async () => {
+    const file = path.join(dir, "Night.mkv");
+    await writeFile(file, "");
+    assert.equal(await pick({ folder: dir, mode: "specific-file", file }), file);
+    assert.equal(await pick({ folder: dir, mode: "specific-file", file: path.join(dir, "missing.mkv") }), null);
+    assert.equal(
+      await pick({ folder: "", mode: "specific-file", file: "https://youtu.be/dQw4w9WgXcQ" }),
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    );
   });
 });
