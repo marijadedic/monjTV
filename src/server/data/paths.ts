@@ -1,9 +1,10 @@
+// Paths for this checkout and its saved JSON.
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const rootDir = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
-  "../..",
+  "../../..",
 );
 export const dataDir = path.join(rootDir, "data");
 export const clientDir = path.join(rootDir, "dist/client");

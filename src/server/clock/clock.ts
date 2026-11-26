@@ -1,4 +1,5 @@
-import type { Day } from "../shared/types.ts";
+// The wall clock: today, the weekday, and times.
+import type { Day } from "../../shared/types.ts";
 
 const JS_DAY_TO_DAY: Day[] = [
   "sun",

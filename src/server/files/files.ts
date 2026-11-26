@@ -1,11 +1,12 @@
+// Browse and pick folders and videos on this machine.
 import { execFile } from "node:child_process";
 import { constants } from "node:fs";
 import { access, readdir, stat } from "node:fs/promises";
 import { promisify } from "node:util";
 import os from "node:os";
 import path from "node:path";
-import { VIDEO_EXT } from "../shared/constants.ts";
-import type { BrowseResult } from "../shared/types.ts";
+import { VIDEO_EXT } from "../../shared/constants.ts";
+import type { BrowseResult } from "../../shared/types.ts";
 
 const MAX_DEPTH = 5;
 const MAX_VIDEOS = 2000;

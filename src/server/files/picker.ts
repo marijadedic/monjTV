@@ -1,9 +1,10 @@
+// The next episode, or a random file that has not played.
 import { randomInt } from "node:crypto";
-import type { ItemMode } from "../shared/types.ts";
-import { canonicalPlaylistUrl, parseYoutubePlaylist, parseYoutubeUrl } from "../shared/youtube.ts";
+import type { ItemMode } from "../../shared/types.ts";
+import { canonicalPlaylistUrl, parseYoutubePlaylist, parseYoutubeUrl } from "../../shared/youtube.ts";
 import { isVideoFile, listVideos } from "./files.ts";
-import { loadProgress, rememberRandom } from "./progress.ts";
-import { loadYoutubePlaylist } from "./youtube.ts";
+import { loadProgress, rememberRandom } from "../schedule/progress.ts";
+import { loadYoutubePlaylist } from "../youtube/youtube.ts";
 
 // Sorted video paths in a folder.
 export async function videosIn(folder: string): Promise<string[]> {

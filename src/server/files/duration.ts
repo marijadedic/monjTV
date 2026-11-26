@@ -1,3 +1,4 @@
+// Probe how long a local file is.
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -9,12 +10,28 @@ let probeTail: Promise<void> = Promise.resolve();
 
 // One ffprobe at a time so a playlist open cannot flood the machine.
 function enqueueProbe<T>(task: () => Promise<T>): Promise<T> {
-  const run = probeTail.then(task, task);
-  probeTail = run.then(
-    () => undefined,
-    () => undefined,
-  );
+  const run = afterProbe(task);
+  probeTail = quietProbe(run);
   return run;
+}
+
+// Probe this file after the previous probe, even when that probe failed.
+async function afterProbe<T>(task: () => Promise<T>): Promise<T> {
+  try {
+    await probeTail;
+  } catch {
+    // The previous probe failed. This one still runs.
+  }
+  return task();
+}
+
+// Keep the probe queue from rejecting, so the next file is not skipped.
+async function quietProbe(run: Promise<unknown>): Promise<void> {
+  try {
+    await run;
+  } catch {
+    // The caller of enqueueProbe still sees this failure.
+  }
 }
 
 async function probeFile(file: string): Promise<number | null> {

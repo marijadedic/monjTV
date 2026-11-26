@@ -1,11 +1,12 @@
+// Episodes finished and movies recently played.
 import path from "node:path";
-import type { Progress, RecentPlays, ScheduleBlock } from "../shared/types.ts";
-import { canonicalPlaylistUrl, isYoutubeUrl, youtubeLabel } from "../shared/youtube.ts";
+import type { Progress, RecentPlays, ScheduleBlock } from "../../shared/types.ts";
+import { canonicalPlaylistUrl, isYoutubeUrl, youtubeLabel } from "../../shared/youtube.ts";
 import { foldersOf } from "./schedule.ts";
-import { titleFromPath, listVideos } from "./files.ts";
-import { progressPath } from "./paths.ts";
-import { readJson, writeJson } from "./store.ts";
-import { cachedYoutubeTitle, loadYoutubePlaylist } from "./youtube.ts";
+import { titleFromPath, listVideos } from "../files/files.ts";
+import { progressPath } from "../data/paths.ts";
+import { readJson, writeJson } from "../data/store.ts";
+import { cachedYoutubeTitle, loadYoutubePlaylist } from "../youtube/youtube.ts";
 
 const empty: Progress = { lastCompleted: {}, recentRandom: {} };
 

@@ -1,5 +1,6 @@
+// Close the monjTV browser tab on this machine.
 import { execFile, execFileSync } from "node:child_process";
-import { PORT } from "../shared/constants.ts";
+import { PORT } from "../../shared/constants.ts";
 
 const MAC_BROWSERS = [
   "Safari",
@@ -88,10 +89,9 @@ function focusedMonjTab(app: string, title: string): boolean {
 }
 
 // Close windows whose title is the monjTV page. Linux has no shared tab API.
-function closeLinuxTabs(): Promise<void> {
-  return run("wmctrl", ["-c", "monjTV"], 3000).then(() =>
-    run("xdotool", ["search", "--name", "monjTV", "windowclose"], 3000),
-  );
+async function closeLinuxTabs(): Promise<void> {
+  await run("wmctrl", ["-c", "monjTV"], 3000);
+  await run("xdotool", ["search", "--name", "monjTV", "windowclose"], 3000);
 }
 
 // Close visible windows titled monjTV.

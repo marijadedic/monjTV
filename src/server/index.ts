@@ -6,10 +6,10 @@ import path from "node:path";
 import { Hono } from "hono";
 import { isItemMode, type PlaylistEntry, type ScheduleBlock } from "../shared/types.ts";
 import { PORT } from "../shared/constants.ts";
-import { assertVideo, browse, isDir, isVideoFile, pickFile, pickFolder, suggestPaths } from "./files.ts";
-import { clientDir } from "./paths.ts";
-import { getStatus, intermissionStillAllowed, joinRundown, replayItem, shutdownPlayer, startPlayer, syncIntermission } from "./player.ts";
-import { forgetRandomPlayed, forgetUnusedFolders, loadProgress, recentPlays } from "./progress.ts";
+import { assertVideo, browse, isDir, isVideoFile, pickFile, pickFolder, suggestPaths } from "./files/files.ts";
+import { clientDir } from "./data/paths.ts";
+import { getStatus, intermissionStillAllowed, joinRundown, replayItem, shutdownPlayer, startPlayer, syncIntermission } from "./play/player.ts";
+import { forgetRandomPlayed, forgetUnusedFolders, loadProgress, recentPlays } from "./schedule/progress.ts";
 import {
   ensureBoard,
   findRundownItem,
@@ -25,12 +25,12 @@ import {
   slotLength,
   stepEpisode,
   videoCount,
-} from "./rundown.ts";
-import { assertFolder, changedBlocks, loadSchedule, sameBlocks, saveSchedule, sourceChanged } from "./schedule.ts";
+} from "./rundown/index.ts";
+import { assertFolder, changedBlocks, loadSchedule, sameBlocks, saveSchedule, sourceChanged } from "./schedule/schedule.ts";
 import { canonicalPlaylistUrl, isYoutubeLink, parseYoutubeUrl } from "../shared/youtube.ts";
-import { frameOf } from "./still.ts";
-import { assertYoutubePlaylist, assertYoutubeVideo, youtubeTitles } from "./youtube.ts";
-import { closeAppTabs, portsFrom } from "./tabs.ts";
+import { frameOf } from "./files/still.ts";
+import { assertYoutubePlaylist, assertYoutubeVideo, youtubeTitles } from "./youtube/youtube.ts";
+import { closeAppTabs, portsFrom } from "./tabs/tabs.ts";
 
 const app = new Hono();
 let httpServer: { close: () => void } | undefined;
@@ -56,21 +56,14 @@ app.put("/api/schedule", async (c) => {
     }
     const saved = await saveSchedule(body);
     if (sameBlocks(previous.blocks, saved.blocks)) {
-      void syncIntermission().catch(() => undefined);
+      void keepIntermission();
       return c.json({ schedule: saved, today: await savedToday(), misses: [] });
     }
     await forgetUnusedFolders(previous.blocks, saved.blocks);
     const changed = changedBlocks(previous.blocks, saved.blocks);
     if (changed.length) markBuilding(changed.map((block) => block.id));
-    void missesForBlocks(changed)
-      .then((misses) => noteSaveMisses(misses))
-      .catch((err) => {
-        console.error("slot fit check failed", err);
-        noteSaveMisses([]);
-      });
-    void rebuildTodayPreservingPlayback(changed.map((block) => block.id))
-      .then(() => joinRundown())
-      .catch((err) => console.error("rundown rebuild failed", err));
+    void noteSlotMisses(changed);
+    void rebuildSavedWeek(changed.map((block) => block.id));
     return c.json({ schedule: saved, today: await savedToday(), misses: [] });
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
@@ -344,6 +337,44 @@ async function assertPlaySource(mode: ScheduleBlock["mode"], folder: string, fil
   await assertFolder(folder);
 }
 
+// A saved intermission starts on the next gap. A failure leaves the week as stored.
+async function keepIntermission(): Promise<void> {
+  try {
+    await syncIntermission();
+  } catch {
+    // The week is already saved. Playback picks up the intermission on the next gap.
+  }
+}
+
+// Record which new slots cannot fit a file. The save response does not wait for this.
+async function noteSlotMisses(changed: ScheduleBlock[]): Promise<void> {
+  try {
+    noteSaveMisses(await missesForBlocks(changed));
+  } catch (err) {
+    console.error("slot fit check failed", err);
+    noteSaveMisses([]);
+  }
+}
+
+// Rebuild today, then join whatever is on at that moment.
+async function rebuildSavedWeek(ids: string[]): Promise<void> {
+  try {
+    await rebuildTodayPreservingPlayback(ids);
+    await joinRundown();
+  } catch (err) {
+    console.error("rundown rebuild failed", err);
+  }
+}
+
+// Open today after the port is listening. A failure leaves the last saved day.
+async function openToday(): Promise<void> {
+  try {
+    await loadToday();
+  } catch (err) {
+    console.error("rundown rebuild failed", err);
+  }
+}
+
 // Create the local data files, then start the server.
 async function main(): Promise<void> {
   await loadSchedule();
@@ -354,7 +385,7 @@ async function main(): Promise<void> {
     if (!existsSync(clientIndex)) {
       console.log("UI dev server: http://127.0.0.1:5173 (npm run dev)");
     }
-    void loadToday().catch((err) => console.error("rundown rebuild failed", err));
+    void openToday();
   });
 }
 

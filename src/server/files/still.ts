@@ -1,12 +1,13 @@
+// Posters and frames for the TV schedule.
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import { youtubeId } from "../shared/youtube.ts";
+import { youtubeId } from "../../shared/youtube.ts";
 import { probeDuration } from "./duration.ts";
-import { dataDir } from "./paths.ts";
-import { ensureYtdlp, ytdlpRuntimeArgs } from "./ytdlp.ts";
+import { dataDir } from "../data/paths.ts";
+import { ensureYtdlp, ytdlpRuntimeArgs } from "../youtube/ytdlp.ts";
 
 const execFileAsync = promisify(execFile);
 const stillDir = path.join(dataDir, "stills");
@@ -143,13 +144,28 @@ function unique(words: string[]): string[] {
 
 // One yt-dlp search at a time so a day of cards cannot flood the Pi.
 function exclusiveSearch<T>(task: () => Promise<T>): Promise<T> {
-  const run = searchTail.then(task, task);
-  const settled = run.then(
-    () => undefined,
-    () => undefined,
-  );
-  searchTail = settled;
+  const run = afterSearch(task);
+  searchTail = quietSearch(run);
   return run;
+}
+
+// Search after the previous search, even when that search failed.
+async function afterSearch<T>(task: () => Promise<T>): Promise<T> {
+  try {
+    await searchTail;
+  } catch {
+    // The previous search failed. This one still runs.
+  }
+  return task();
+}
+
+// Keep the search queue from rejecting, so the next card is not skipped.
+async function quietSearch(run: Promise<unknown>): Promise<void> {
+  try {
+    await run;
+  } catch {
+    // The caller of exclusiveSearch still sees this failure.
+  }
 }
 
 function jpegSize(bytes: Buffer): { width: number; height: number } | null {
@@ -593,14 +609,26 @@ export async function refreshFrame(file: string): Promise<string | null> {
 
 // One cached still: a YouTube poster, or a local frame, or null.
 export function frameOf(file: string): Promise<string | null> {
-  const dest = cachePath(file);
   const running = pending.get(file);
   if (running) return running;
-  const make = () => (youtubeId(file) ? writeYoutubeThumb(file, dest) : writeLocalStill(file, dest));
-  const job = stat(dest)
-    .then((info) => (info.size > 100 ? dest : make()))
-    .catch(() => make())
-    .finally(() => pending.delete(file));
+  const job = loadFrame(file);
   pending.set(file, job);
   return job;
+}
+
+// Use the cached still when it is there. Otherwise make one, and try once more if that fails.
+async function loadFrame(file: string): Promise<string | null> {
+  const dest = cachePath(file);
+  const make = () => (youtubeId(file) ? writeYoutubeThumb(file, dest) : writeLocalStill(file, dest));
+  try {
+    try {
+      const info = await stat(dest);
+      if (info.size > 100) return dest;
+      return await make();
+    } catch {
+      return await make();
+    }
+  } finally {
+    pending.delete(file);
+  }
 }

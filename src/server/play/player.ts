@@ -1,12 +1,13 @@
-import type { IntermissionItem, PlayerStatus, RundownItem, TodayRundown } from "../shared/types.ts";
-import { formatHm, msUntil, nowSec, parseHm, weekday } from "./clock.ts";
-import { measureDuration } from "./duration.ts";
-import { titleFromPath } from "./files.ts";
+// Playback: join the rundown, seek to the clock, and cut for the next slot.
+import type { IntermissionItem, PlayerStatus, RundownItem, TodayRundown } from "../../shared/types.ts";
+import { formatHm, msUntil, nowSec, parseHm, weekday } from "../clock/clock.ts";
+import { measureDuration } from "../files/duration.ts";
+import { titleFromPath } from "../files/files.ts";
 import { Mpv } from "./mpv.ts";
-import { pick } from "./picker.ts";
-import { markEpisodeDone, markRandomPlayed } from "./progress.ts";
-import { coversNow, ensureToday, joinOffset, loadToday, onAirItem, saveToday } from "./rundown.ts";
-import { DAY_SECONDS, windowOn } from "../shared/window.ts";
+import { pick } from "../files/picker.ts";
+import { markEpisodeDone, markRandomPlayed } from "../schedule/progress.ts";
+import { coversNow, ensureToday, joinOffset, loadToday, onAirItem, saveToday } from "../rundown/index.ts";
+import { DAY_SECONDS, windowOn } from "../../shared/window.ts";
 import {
   isYoutubeUrl,
   parseYoutubePlaylist,
@@ -14,9 +15,9 @@ import {
   playlistStartIndex,
   youtubeLabel,
   type YoutubePlaylistRef,
-} from "../shared/youtube.ts";
-import { blocksForDay, loadSchedule, playingIntermission } from "./schedule.ts";
-import { cachedYoutube, cachedYoutubeTitle, loadYoutubePlaylist } from "./youtube.ts";
+} from "../../shared/youtube.ts";
+import { blocksForDay, loadSchedule, playingIntermission } from "../schedule/schedule.ts";
+import { cachedYoutube, cachedYoutubeTitle, loadYoutubePlaylist } from "../youtube/youtube.ts";
 
 const mpv = new Mpv();
 let waitingUntil: string | null = null;

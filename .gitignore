@@ -148,8 +148,8 @@ vite.config.ts.timestamp-*
 # Turbo Repo
 .turbo
 
-# Data
-data/
+# Saved TV state at the checkout root. Not src/server/data.
+/data/
 
 # Current yt-dlp binary, downloaded on first YouTube use
 tools/yt-dlp

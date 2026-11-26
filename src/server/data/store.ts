@@ -1,3 +1,4 @@
+// Read and write a JSON file.
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 

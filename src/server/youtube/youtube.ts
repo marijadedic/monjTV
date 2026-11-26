@@ -1,3 +1,4 @@
+// Titles, lengths, and streams for a YouTube link.
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import {
@@ -7,7 +8,7 @@ import {
   youtubeId,
   youtubeLabel,
   type YoutubePlaylistRef,
-} from "../shared/youtube.ts";
+} from "../../shared/youtube.ts";
 import { ensureYtdlp, ytdlpRuntimeArgs } from "./ytdlp.ts";
 
 const execFileAsync = promisify(execFile);

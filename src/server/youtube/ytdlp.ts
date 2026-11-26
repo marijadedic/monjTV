@@ -1,7 +1,8 @@
+// The yt-dlp binary this checkout uses.
 import { chmod, mkdir, rename, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { rootDir } from "./paths.ts";
+import { rootDir } from "../data/paths.ts";
 
 export const toolsDir = path.join(rootDir, "tools");
 export const ytdlpBin = path.join(toolsDir, "yt-dlp");
@@ -26,14 +27,19 @@ export function ytdlpRuntimeArgs(): string[] {
 
 export async function ensureYtdlp(): Promise<string> {
   if (existsSync(ytdlpBin)) return ytdlpBin;
-  if (!ensuring) {
-    ensuring = downloadYtdlp()
-      .catch(() => "yt-dlp")
-      .finally(() => {
-        ensuring = null;
-      });
-  }
+  if (!ensuring) ensuring = downloadOnce();
   return ensuring;
+}
+
+// One download shared by the callers that arrive while it is running.
+async function downloadOnce(): Promise<string> {
+  try {
+    return await downloadYtdlp();
+  } catch {
+    return "yt-dlp";
+  } finally {
+    ensuring = null;
+  }
 }
 
 async function downloadYtdlp(): Promise<string> {

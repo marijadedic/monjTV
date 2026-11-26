@@ -1,12 +1,13 @@
+// The long-lived mpv process.
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { unlink } from "node:fs/promises";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import { isYoutubeUrl } from "../shared/youtube.ts";
-import { cachedYoutubeTitle, youtubeStreamUrls } from "./youtube.ts";
-import { ensureYtdlp } from "./ytdlp.ts";
+import { isYoutubeUrl } from "../../shared/youtube.ts";
+import { cachedYoutubeTitle, youtubeStreamUrls } from "../youtube/youtube.ts";
+import { ensureYtdlp } from "../youtube/ytdlp.ts";
 
 type MpvEvent = {
   event?: string;

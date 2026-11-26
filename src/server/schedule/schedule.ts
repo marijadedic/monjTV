@@ -1,7 +1,8 @@
+// The weekly grid in schedule.json.
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { segmentsPlaced } from "../shared/placed.ts";
+import { segmentsPlaced } from "../../shared/placed.ts";
 import {
   DAYS,
   isBlockMode,
@@ -14,8 +15,8 @@ import {
   type Schedule,
   type ScheduleBlock,
   type TvBoard,
-} from "../shared/types.ts";
-import { DAY_MINUTES, clockOf, minutesOf, windowOn } from "../shared/window.ts";
+} from "../../shared/types.ts";
+import { DAY_MINUTES, clockOf, minutesOf, windowOn } from "../../shared/window.ts";
 import {
   canonicalPlaylistUrl,
   canonicalYoutubeIntermission,
@@ -23,11 +24,11 @@ import {
   parseYoutubePlaylist,
   parseYoutubeUrl,
   youtubeLabel,
-} from "../shared/youtube.ts";
-import { dateKey, parseHm, isHm } from "./clock.ts";
-import { assertVideo, isDir } from "./files.ts";
-import { schedulePath, tvPath } from "./paths.ts";
-import { readJson, writeJson } from "./store.ts";
+} from "../../shared/youtube.ts";
+import { dateKey, parseHm, isHm } from "../clock/clock.ts";
+import { assertVideo, isDir } from "../files/files.ts";
+import { schedulePath, tvPath } from "../data/paths.ts";
+import { readJson, writeJson } from "../data/store.ts";
 
 const empty: Schedule = {
   blocks: [],
