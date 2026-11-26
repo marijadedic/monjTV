@@ -1,120 +1,25 @@
 import { Fragment } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { dateOffset, weekdayOfKey } from "../../shared/dates.ts";
-import type { ItemStatus, PlayerStatus, RecentPlays, RundownItem, TvBoard } from "../../shared/types.ts";
-import { itemCoversNow, itemHasPassed, itemProgress, itemStartsLater, prevDay, secondsOf } from "../../shared/window.ts";
+import type { ItemStatus, PlayerStatus, RundownItem, TvBoard } from "../../shared/types.ts";
+import { itemHasPassed, itemProgress, prevDay } from "../../shared/window.ts";
 import { canonicalYoutubeIntermission, isYoutubeUrl, parseYoutubeUrl } from "../../shared/youtube.ts";
 import { api } from "../api.ts";
 import { pageHref } from "../href.ts";
 import { useI18n } from "../i18n.tsx";
-
-function showsFrame(item: RundownItem): boolean {
-  return item.mode === "next-episode" || item.mode === "random-file" || item.mode === "specific-file";
-}
-
-function stillSrc(item: RundownItem): string {
-  return `/api/tv/items/${encodeURIComponent(item.id)}/still?v=2&file=${encodeURIComponent(item.path)}`;
-}
-
-function gapStillSrc(filePath: string): string {
-  return `/api/player/intermission-still?v=2&file=${encodeURIComponent(filePath)}`;
-}
-
-function folderName(filePath: string): string {
-  const parts = filePath.split(/[/\\]/).filter(Boolean);
-  if (parts.length < 2) return filePath;
-  return parts[parts.length - 2]!;
-}
-
-function nowSec(d: Date): number {
-  return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
-}
-
-function onNowPlanned(items: RundownItem[], sec: number): RundownItem | null {
-  let chosen: RundownItem | null = null;
-  for (const item of items) {
-    if (item.status !== "planned" || !itemCoversNow(item, sec)) continue;
-    if (!chosen || secondsOf(item.start) >= secondsOf(chosen.start)) chosen = item;
-  }
-  return chosen;
-}
-
-function nextPlanned(items: RundownItem[], sec: number): RundownItem | null {
-  let chosen: RundownItem | null = null;
-  let chosenStart = Infinity;
-  for (const item of items) {
-    if (!itemStartsLater(item, sec)) continue;
-    const start = secondsOf(item.start);
-    if (start < chosenStart) {
-      chosen = item;
-      chosenStart = start;
-    }
-  }
-  return chosen;
-}
-
-function canStepEpisode(item: RundownItem, passed: boolean): boolean {
-  return item.mode === "next-episode" && !passed;
-}
-
-function playedPaths(recent: RecentPlays): Set<string> {
-  const paths = new Set<string>();
-  for (const folder of recent.folders) {
-    for (const video of folder.videos) paths.add(video.path);
-  }
-  return paths;
-}
-
-function rowWatched(item: RundownItem, played: ReadonlySet<string>): boolean {
-  if (item.mode === "random-file") return played.has(item.path);
-  return item.status === "done";
-}
-
-// A file whose clock starts the previous evening and ends after midnight.
-function beganPreviousDay(item: RundownItem): boolean {
-  return Boolean(item.overnight) && secondsOf(item.start) > secondsOf(item.end);
-}
-
-// Overnight rows of one slot, with the latest real end.
-function carryGroups(items: RundownItem[]): { id: string; until: string; rows: RundownItem[] }[] {
-  const order: string[] = [];
-  const map = new Map<string, RundownItem[]>();
-  for (const item of items) {
-    if (!item.overnight) continue;
-    const rows = map.get(item.blockId);
-    if (rows) rows.push(item);
-    else {
-      map.set(item.blockId, [item]);
-      order.push(item.blockId);
-    }
-  }
-  return order.map((id) => {
-    const rows = map.get(id)!;
-    let until = rows[0]!.end;
-    let untilSec = secondsOf(until);
-    for (const row of rows) {
-      const sec = secondsOf(row.end);
-      if (sec >= untilSec) {
-        until = row.end;
-        untilSec = sec;
-      }
-    }
-    return { id, until, rows };
-  });
-}
-
-function heldItem(items: RundownItem[], sec: number): RundownItem | null {
-  let winner: RundownItem | null = null;
-  for (const item of items) {
-    if (item.status !== "planned" || !itemCoversNow(item, sec)) continue;
-    if (!winner || secondsOf(item.start) >= secondsOf(winner.start)) winner = item;
-  }
-  for (const item of items) {
-    if (item.status !== "planned" || !itemCoversNow(item, sec)) continue;
-    if (winner && item.id !== winner.id) return item;
-  }
-  return null;
-}
+import { beganPreviousDay } from "../utils/beganPreviousDay.ts";
+import { canStepEpisode } from "../utils/canStepEpisode.ts";
+import { carryGroups } from "../utils/carryGroups.ts";
+import { folderName } from "../utils/folderName.ts";
+import { gapStillSrc } from "../utils/gapStillSrc.ts";
+import { heldItem } from "../utils/heldItem.ts";
+import { nextPlanned } from "../utils/nextPlanned.ts";
+import { nowSec } from "../utils/nowSec.ts";
+import { onNowPlanned } from "../utils/onNowPlanned.ts";
+import { playedPaths } from "../utils/playedPaths.ts";
+import { rowWatched } from "../utils/rowWatched.ts";
+import { showsFrame } from "../utils/showsFrame.ts";
+import { stillSrc } from "../utils/stillSrc.ts";
 
 export function TvSchedule() {
   const { t } = useI18n();

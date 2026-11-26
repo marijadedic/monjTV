@@ -7,33 +7,15 @@ import {
   type IntermissionItem,
   type IntermissionKind,
   type ItemMode,
-  type PlaylistEntry,
   type Schedule,
   type ScheduleBlock,
-  type RundownItem,
   type SlotLength,
   type SlotMiss,
   type TvBoard,
 } from "../../shared/types.ts";
-import { placedOn, playlistMinutesOn, playlistRowsOn, segmentsPlaced } from "../../shared/placed.ts";
-import {
-  DAY_MINUTES,
-  clockOf,
-  leftoverMin,
-  lengthMinutes,
-  nextDay,
-  prevDay,
-  segmentsOf,
-  windowOn,
-} from "../../shared/window.ts";
-import {
-  canonicalPlaylistUrl,
-  canonicalYoutubeIntermission,
-  isYoutubeLink,
-  isYoutubeUrl,
-  parseYoutubeUrl,
-  youtubeLabel,
-} from "../../shared/youtube.ts";
+import { placedOn } from "../../shared/placed.ts";
+import { DAY_MINUTES, clockOf, nextDay, windowOn } from "../../shared/window.ts";
+import { canonicalPlaylistUrl, isYoutubeLink, isYoutubeUrl, parseYoutubeUrl } from "../../shared/youtube.ts";
 import { api } from "../api.ts";
 import { useI18n } from "../i18n.tsx";
 import type { Draft } from "../types/Draft.ts";
@@ -41,240 +23,73 @@ import type { DraftItem } from "../types/DraftItem.ts";
 import type { FieldError } from "../types/FieldError.ts";
 import type { FolderHit } from "../types/FolderHit.ts";
 import type { LengthChoice } from "../types/LengthChoice.ts";
-import type { Piece } from "../types/Piece.ts";
 import type { PlaySource } from "../types/PlaySource.ts";
 import { PRESETS, type PresetMin } from "../types/PresetMin.ts";
-import type { SliceLine } from "../types/SliceLine.ts";
-import type { SliceSide } from "../types/SliceSide.ts";
 import type { SlotOp } from "../types/SlotOp.ts";
 import type { TipKey } from "../types/TipKey.ts";
+import { blurCloud, dismissTip, hideCloud, placeCloud, showCloud } from "../utils/cloud.ts";
+import { addFixedMinutes } from "../utils/addFixedMinutes.ts";
+import { addMeasureCap } from "../utils/addMeasureCap.ts";
+import { addSeconds } from "../utils/addSeconds.ts";
+import { blockClass } from "../utils/blockClass.ts";
+import { blockHint } from "../utils/blockHint.ts";
+import { blockLabel } from "../utils/blockLabel.ts";
+import { changedBlockIds } from "../utils/changedBlockIds.ts";
+import { choiceFromLength } from "../utils/choiceFromLength.ts";
+import { chosenSeconds } from "../utils/chosenSeconds.ts";
+import { clockFace } from "../utils/clockFace.ts";
+import { dayClashes } from "../utils/dayClashes.ts";
+import { elapsedClock } from "../utils/elapsedClock.ts";
+import { emptySchedule } from "../utils/emptySchedule.ts";
+import { emptyStack } from "../utils/emptyStack.ts";
+import { endFace } from "../utils/endFace.ts";
+import { endFromDuration } from "../utils/endFromDuration.ts";
+import { fixedChoice } from "../utils/fixedChoice.ts";
+import { fixedMinutes } from "../utils/fixedMinutes.ts";
+import { fromPlaylist } from "../utils/fromPlaylist.ts";
+import { gapOf } from "../utils/gapOf.ts";
+import { ghostsOn } from "../utils/ghostsOn.ts";
+import { inputTime } from "../utils/inputTime.ts";
+import { intermissionLabel } from "../utils/intermissionLabel.ts";
+import { isPreset } from "../utils/isPreset.ts";
+import { itemLabel } from "../utils/itemLabel.ts";
+import { measureKey } from "../utils/measureKey.ts";
+import { minuteFace } from "../utils/minuteFace.ts";
+import { modeClass } from "../utils/modeClass.ts";
+import { modeHint } from "../utils/modeHint.ts";
+import { modeLabel } from "../utils/modeLabel.ts";
+import { newItemId } from "../utils/newItemId.ts";
+import { nextItemMinute } from "../utils/nextItemMinute.ts";
+import { nextOnDay } from "../utils/nextOnDay.ts";
+import { occupancyOf } from "../utils/occupancyOf.ts";
+import { parentDir } from "../utils/parentDir.ts";
+import { pendingSource } from "../utils/pendingSource.ts";
+import { piecesFor } from "../utils/piecesFor.ts";
+import { playlistAddNeedsMeasure } from "../utils/playlistAddNeedsMeasure.ts";
+import { playlistGridLine } from "../utils/playlistGridLine.ts";
+import { playlistSliceLines } from "../utils/playlistSliceLines.ts";
+import { prevOnDay } from "../utils/prevOnDay.ts";
+import { rowStyle } from "../utils/rowStyle.ts";
+import { selectedDays } from "../utils/selectedDays.ts";
+import { slotHover } from "../utils/slotHover.ts";
+import { slotIsBuilding } from "../utils/slotIsBuilding.ts";
+import { slotKind } from "../utils/slotKind.ts";
+import { slotLabel } from "../utils/slotLabel.ts";
+import { spillsPastDay } from "../utils/spillsPastDay.ts";
+import { stackClocks } from "../utils/stackClocks.ts";
+import { stackItemLine } from "../utils/stackItemLine.ts";
+import { stackItemNeedsProbe } from "../utils/stackItemNeedsProbe.ts";
+import { stackSeconds } from "../utils/stackSeconds.ts";
+import { startOnDraft } from "../utils/startOnDraft.ts";
+import { toEntry } from "../utils/toEntry.ts";
+import { toMin } from "../utils/toMin.ts";
+import { youtubeRefsOf } from "../utils/youtubeRefsOf.ts";
+import { youtubeScheduleKey } from "../utils/youtubeScheduleKey.ts";
 
 const MANY_FILES = 20;
 const BUSY_SPIN_MS = 400;
 
 const WEEKDAY: Day[] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
-
-function emptyStack(): Pick<
-  Draft,
-  "name" | "items" | "addMode" | "addSource" | "addFolder" | "addFile" | "addLengthChoice" | "addCustomMin"
-> {
-  return {
-    name: "",
-    items: [],
-    addMode: "specific-file",
-    addSource: "path",
-    addFolder: "",
-    addFile: "",
-    addLengthChoice: 60,
-    addCustomMin: "",
-  };
-}
-
-function newItemId(): string {
-  const cryptoObj = globalThis.crypto;
-  if (cryptoObj && typeof cryptoObj.randomUUID === "function") return cryptoObj.randomUUID();
-  return `item-${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
-}
-
-function gapOf(item: DraftItem | PlaylistEntry): number {
-  const mins = item.gapAfterMin;
-  return mins && mins >= 1 ? mins : 0;
-}
-
-function gapFields(item: { gapAfterMin?: number }): { gapAfterMin?: number } {
-  const mins = gapOf(item);
-  return mins ? { gapAfterMin: mins } : {};
-}
-
-function toEntry(item: DraftItem): PlaylistEntry {
-  const file = item.file.trim();
-  const gap = gapFields(item);
-  if (item.mode === "specific-file") {
-    const youtube = parseYoutubeUrl(file);
-    if (youtube) return { id: item.id, mode: item.mode, folder: "", file: youtube, ...gap };
-    return { id: item.id, mode: item.mode, folder: parentDir(file), file, ...gap };
-  }
-  if (item.mode === "next-episode" || item.mode === "random-file") {
-    const playlist = canonicalPlaylistUrl(item.folder);
-    return {
-      id: item.id,
-      mode: item.mode,
-      folder: playlist ?? item.folder.trim(),
-      ...(item.mode === "random-file" && item.lengthMin ? { lengthMin: item.lengthMin } : {}),
-      ...gap,
-    };
-  }
-  return {
-    id: item.id,
-    mode: item.mode,
-    folder: item.folder.trim(),
-    ...gap,
-  };
-}
-
-function fromEntry(item: PlaylistEntry, durationSec: number | null = null, title = ""): DraftItem {
-  const lengthMin = item.mode === "random-file" ? item.lengthMin : undefined;
-  return {
-    id: item.id,
-    mode: item.mode,
-    folder: item.folder,
-    file: item.file ?? "",
-    title: item.mode === "random-file" ? "" : title,
-    durationSec,
-    ...(lengthMin ? { lengthMin } : {}),
-    ...gapFields(item),
-  };
-}
-
-function itemSeconds(item: DraftItem): number | null {
-  if (item.durationSec != null) return item.durationSec;
-  if (item.mode === "random-file" && item.lengthMin) return item.lengthMin * 60;
-  return null;
-}
-
-function stackGapSeconds(items: DraftItem[]): number {
-  return items.slice(0, -1).reduce((sum, item) => sum + gapOf(item) * 60, 0);
-}
-
-function stackSeconds(items: DraftItem[]): number | null {
-  if (items.length === 0 || items.some((item) => item.error)) return null;
-  if (items.some((item) => itemSeconds(item) == null && item.mode !== "random-file")) return null;
-  const total = items.reduce((sum, item) => sum + (itemSeconds(item) ?? 0), 0) + stackGapSeconds(items);
-  return total > 0 ? total : null;
-}
-
-function stackItemNeedsProbe(item: DraftItem): boolean {
-  if (item.durationSec != null || item.error) return false;
-  return item.mode === "next-episode" || item.mode === "specific-file";
-}
-
-function isPreset(value: number): value is PresetMin {
-  return (PRESETS as readonly number[]).includes(value);
-}
-
-function minutesOfChoice(choice: LengthChoice, customMin: string): number | null {
-  if (choice === "longest") return null;
-  if (choice === "custom") {
-    if (!/^\d+$/.test(customMin.trim())) return null;
-    const mins = Number(customMin);
-    return mins >= 1 ? mins : null;
-  }
-  return choice;
-}
-
-function fixedMinutes(draft: Draft): number | null {
-  return minutesOfChoice(draft.lengthChoice, draft.customMin);
-}
-
-function addFixedMinutes(draft: Draft): number | null {
-  return minutesOfChoice(draft.addLengthChoice, draft.addCustomMin);
-}
-
-function choiceFromLength(lengthMin?: number): { lengthChoice: LengthChoice; customMin: string } {
-  if (lengthMin && isPreset(lengthMin)) return { lengthChoice: lengthMin, customMin: "" };
-  if (lengthMin && lengthMin > 0) return { lengthChoice: "custom", customMin: String(lengthMin) };
-  return { lengthChoice: "longest", customMin: "" };
-}
-
-function fixedChoice(lengthMin?: number): { lengthChoice: LengthChoice; customMin: string } {
-  const choice = choiceFromLength(lengthMin);
-  if (choice.lengthChoice === "longest") return { lengthChoice: 60, customMin: "" };
-  return choice;
-}
-
-function elapsedClock(sec: number): string {
-  const mins = Math.floor(sec / 60);
-  const rest = sec % 60;
-  return `${mins}:${String(rest).padStart(2, "0")}`;
-}
-
-let tipEl: HTMLSpanElement | null = null;
-let tipHost: HTMLElement | null = null;
-let tipWatch: MutationObserver | null = null;
-let tipFrame: HTMLElement | null = null;
-
-function tipNode(): HTMLSpanElement {
-  if (!tipEl) {
-    tipEl = document.createElement("span");
-    tipEl.className = "cloud lifted";
-    tipEl.setAttribute("role", "tooltip");
-    document.body.appendChild(tipEl);
-  }
-  return tipEl;
-}
-
-function dismissTip() {
-  tipWatch?.disconnect();
-  tipWatch = null;
-  tipHost = null;
-  tipFrame?.removeEventListener("scroll", onTipScroll);
-  tipFrame = null;
-  if (!tipEl) return;
-  tipEl.style.display = "none";
-  tipEl.classList.remove("below");
-}
-
-function onTipScroll() {
-  if (tipHost) placeCloud({ currentTarget: tipHost });
-}
-
-function placeCloud(event: { currentTarget: EventTarget | null }) {
-  const host = event.currentTarget as HTMLElement | null;
-  const source = host?.querySelector(":scope > .cloud") as HTMLElement | null;
-  if (!host || !source) return;
-  const tip = tipNode();
-  tipHost = host;
-  tipWatch?.disconnect();
-  const sync = () => {
-    tip.textContent = source.textContent ?? "";
-  };
-  sync();
-  tipWatch = new MutationObserver(sync);
-  tipWatch.observe(source, { subtree: true, characterData: true, childList: true });
-  const frame = host.closest(".add-form") as HTMLElement | null;
-  if (tipFrame !== frame) {
-    tipFrame?.removeEventListener("scroll", onTipScroll);
-    tipFrame = frame;
-    tipFrame?.addEventListener("scroll", onTipScroll, { passive: true });
-  }
-  tip.style.display = "block";
-  tip.style.visibility = "hidden";
-  const hostRect = host.getBoundingClientRect();
-  const width = tip.offsetWidth;
-  const height = tip.offsetHeight;
-  const pad = 12;
-  let left = hostRect.left;
-  if (left + width > window.innerWidth - pad) left = window.innerWidth - pad - width;
-  if (left < pad) left = pad;
-  let top = hostRect.top - height - 12;
-  const below = top < pad;
-  if (below) top = Math.min(hostRect.bottom + 12, window.innerHeight - height - pad);
-  tip.classList.toggle("below", below);
-  tip.style.left = `${left}px`;
-  tip.style.top = `${top}px`;
-  const tail = hostRect.left + hostRect.width / 2 - left;
-  tip.style.setProperty("--tail", `${Math.min(Math.max(tail, 14), Math.max(14, width - 14))}px`);
-  tip.style.visibility = "";
-}
-
-function showCloud(event: { currentTarget: EventTarget | null }) {
-  const node = event.currentTarget as HTMLElement | null;
-  const host = node?.closest(".cloud-host");
-  if (host) placeCloud({ currentTarget: host });
-}
-
-function hideCloud(event: { currentTarget: EventTarget | null }) {
-  const host = event.currentTarget as HTMLElement | null;
-  if (!host || tipHost !== host || host.contains(document.activeElement)) return;
-  dismissTip();
-}
-
-function blurCloud(event: { currentTarget: EventTarget | null }) {
-  const node = event.currentTarget as HTMLElement | null;
-  const host = node?.closest(".cloud-host");
-  if (!host || host.matches(":hover")) return;
-  if (tipHost === host) dismissTip();
-}
 
 function InfoMark() {
   return (
@@ -353,136 +168,6 @@ function DurationPick({
       </span>
     </div>
   );
-}
-
-function toMin(hm: string): number {
-  const [hRaw, mRaw] = hm.split(":");
-  const h = Number(hRaw);
-  const m = Number(mRaw);
-  if (!Number.isInteger(h) || !Number.isInteger(m)) return 0;
-  return h * 60 + m;
-}
-
-function inputTime(mins: number): string {
-  const capped = Math.min(mins, 23 * 60 + 59);
-  const h = Math.floor(capped / 60);
-  const m = capped % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-}
-
-function clockFace(mins: number): string {
-  if (mins >= DAY_MINUTES) return "24:00";
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-}
-
-function folderLabel(folder: string): string {
-  const parts = folder.split(/[/\\]/).filter(Boolean);
-  return parts[parts.length - 1] || folder;
-}
-
-function parentDir(file: string): string {
-  const trimmed = file.trim().replace(/[\\/]+$/, "");
-  const slash = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
-  if (slash <= 0) return "";
-  return trimmed.slice(0, slash);
-}
-
-function fileTitle(file: string): string {
-  const base = folderLabel(file);
-  const dot = base.lastIndexOf(".");
-  if (dot <= 0) return base;
-  return base.slice(0, dot);
-}
-
-function slotLabel(
-  block: { folder: string; file?: string; mode: BlockMode; name?: string },
-  titles: Readonly<Record<string, string>> = {},
-): string {
-  if (block.mode === "playlist") return (block.name ?? "").trim() || "Playlist";
-  if (block.mode === "specific-file" && block.file && parseYoutubeUrl(block.file)) {
-    const url = parseYoutubeUrl(block.file);
-    if (url && titles[url]) return titles[url];
-    return youtubeLabel(block.file);
-  }
-  if ((block.mode === "next-episode" || block.mode === "random-file") && canonicalPlaylistUrl(block.folder)) {
-    const url = canonicalPlaylistUrl(block.folder);
-    if (url && titles[url]) return titles[url];
-    return youtubeLabel(block.folder);
-  }
-  if (block.mode === "specific-file" && block.file) return fileTitle(block.file);
-  return folderLabel(block.folder);
-}
-
-function slotHover(
-  block: { folder: string; file?: string; mode: BlockMode; name?: string; items?: PlaylistEntry[] },
-  titles: Readonly<Record<string, string>>,
-): string {
-  if (block.mode === "playlist") {
-    const name = (block.name ?? "").trim();
-    const count = block.items?.length ?? 0;
-    return name && count ? `${name}\n${count}` : name || String(count);
-  }
-  if (block.mode === "specific-file" && block.file && parseYoutubeUrl(block.file)) {
-    const url = parseYoutubeUrl(block.file);
-    const title = url ? titles[url] : "";
-    if (title && url) return `${title}\n${url}`;
-    return block.file;
-  }
-  if ((block.mode === "next-episode" || block.mode === "random-file") && canonicalPlaylistUrl(block.folder)) {
-    const url = canonicalPlaylistUrl(block.folder);
-    const title = url ? titles[url] : "";
-    if (title && url) return `${title}\n${url}`;
-    return block.folder;
-  }
-  return block.file ?? block.folder;
-}
-
-function intermissionLabel(item: IntermissionItem, titles: Readonly<Record<string, string>> = {}): string {
-  if (item.kind === "youtube") {
-    const url = canonicalYoutubeIntermission(item.source);
-    if (url && titles[url]) return titles[url];
-    return youtubeLabel(item.source);
-  }
-  if (item.kind === "video") return fileTitle(item.source);
-  return folderLabel(item.source);
-}
-
-function youtubeScheduleKey(schedule: Schedule, extra = ""): string {
-  const urls = new Set<string>();
-  for (const item of schedule.intermissions) {
-    if (item.kind !== "youtube") continue;
-    const url = canonicalYoutubeIntermission(item.source);
-    if (url) urls.add(url);
-  }
-  for (const piece of extra.split("\n")) {
-    const url = canonicalYoutubeIntermission(piece) ?? parseYoutubeUrl(piece);
-    if (url) urls.add(url);
-  }
-  for (const block of schedule.blocks) {
-    const files =
-      block.mode === "playlist"
-        ? (block.items ?? []).flatMap((item) => youtubeRefsOf(item.mode, item.folder, item.file))
-        : youtubeRefsOf(block.mode, block.folder, block.file);
-    for (const file of files) urls.add(file);
-  }
-  return [...urls].sort().join("\n");
-}
-
-function pendingSource(
-  kind: IntermissionKind,
-  value: string,
-): { source: string; error: "youtube" | "youtube-in-path" | null } {
-  const trimmed = value.trim();
-  if (!trimmed) return { source: "", error: null };
-  if (kind === "youtube") {
-    const parsed = canonicalYoutubeIntermission(trimmed);
-    if (!parsed) return { source: trimmed, error: "youtube" };
-    return { source: parsed, error: null };
-  }
-  if (isYoutubeLink(trimmed)) return { source: trimmed, error: "youtube-in-path" };
-  return { source: trimmed, error: null };
 }
 
 function FolderPath({
@@ -618,59 +303,6 @@ function FolderPath({
   );
 }
 
-function youtubeRefsOf(mode: string, folder: string, file?: string): string[] {
-  if (mode === "specific-file") {
-    const url = parseYoutubeUrl(file ?? "");
-    return url ? [url] : [];
-  }
-  if (mode === "next-episode" || mode === "random-file") {
-    const url = canonicalPlaylistUrl(folder);
-    return url ? [url] : [];
-  }
-  return [];
-}
-
-function slotKind(block: { folder: string; mode: BlockMode }): string {
-  if (block.mode === "playlist") return " stack";
-  const name = folderLabel(block.folder).toLowerCase();
-  if (name === "shows" || block.mode === "next-episode") return " shows";
-  if (block.mode === "specific-file") return " film";
-  return "";
-}
-
-function modeHint(mode: ItemMode, t: ReturnType<typeof useI18n>["t"]): string {
-  if (mode === "next-episode") return t.nextHint;
-  if (mode === "specific-file") return t.oneHint;
-  return t.randomHint;
-}
-
-function modeLabel(mode: ItemMode, t: ReturnType<typeof useI18n>["t"]): string {
-  if (mode === "next-episode") return t.nextEpisode;
-  if (mode === "specific-file") return t.oneVideo;
-  return t.randomFile;
-}
-
-function modeClass(mode: ItemMode): string {
-  if (mode === "next-episode") return "shows";
-  if (mode === "specific-file") return "film";
-  return "movie";
-}
-
-function blockHint(mode: BlockMode, t: ReturnType<typeof useI18n>["t"]): string {
-  if (mode === "playlist") return t.playlistHint;
-  return modeHint(mode, t);
-}
-
-function blockClass(mode: BlockMode): string {
-  if (mode === "playlist") return "stack";
-  return modeClass(mode);
-}
-
-function blockLabel(mode: BlockMode, t: ReturnType<typeof useI18n>["t"]): string {
-  if (mode === "playlist") return t.playlist;
-  return modeLabel(mode, t);
-}
-
 function PencilIcon() {
   return (
     <svg class="glyph" viewBox="0 0 24 24" aria-hidden="true">
@@ -694,440 +326,6 @@ function TrashIcon() {
 
 const CHIP_MODES: BlockMode[] = ["random-file", "next-episode", "specific-file", "playlist"];
 const ADD_MODES: ItemMode[] = ["random-file", "next-episode", "specific-file"];
-
-function itemLabel(item: DraftItem, titles: Readonly<Record<string, string>>): string {
-  if (item.mode === "specific-file" && parseYoutubeUrl(item.file)) {
-    const url = parseYoutubeUrl(item.file)!;
-    return titles[url] || item.title || youtubeLabel(item.file);
-  }
-  if ((item.mode === "next-episode" || item.mode === "random-file") && canonicalPlaylistUrl(item.folder)) {
-    const url = canonicalPlaylistUrl(item.folder)!;
-    return titles[url] || youtubeLabel(item.folder);
-  }
-  if (item.title) return item.title;
-  if (item.mode === "specific-file" && item.file) return fileTitle(item.file);
-  return folderLabel(item.folder);
-}
-
-function stackItemLine(
-  item: DraftItem,
-  t: ReturnType<typeof useI18n>["t"],
-): string {
-  const kind = modeLabel(item.mode, t);
-  if (item.durationSec != null) {
-    return `${kind} · ${t.slotDurationOf(Math.max(1, Math.ceil(item.durationSec / 60)))}`;
-  }
-  if (item.error) return `${kind} · ${t.error(item.error)}`;
-  if (stackItemNeedsProbe(item)) return `${kind} · ${t.measuring}`;
-  if (item.mode === "random-file" && item.lengthMin) return `${kind} · ${t.minutes(item.lengthMin)}`;
-  return kind;
-}
-
-function clipLabel(name: string, max = 28): string {
-  const text = name.trim();
-  if (text.length <= max) return text;
-  return `${text.slice(0, Math.max(1, max - 3)).trimEnd()}...`;
-}
-
-function playlistGridName(
-  item: DraftItem,
-  titles: Readonly<Record<string, string>>,
-): string {
-  if (item.mode === "specific-file" || canonicalPlaylistUrl(item.folder)) return itemLabel(item, titles);
-  return folderLabel(item.folder);
-}
-
-function playlistGridLine(
-  item: DraftItem,
-  t: ReturnType<typeof useI18n>["t"],
-  titles: Readonly<Record<string, string>> = {},
-): string {
-  const kind = modeLabel(item.mode, t);
-  const name = playlistGridName(item, titles);
-  const shown =
-    item.mode === "specific-file" || canonicalPlaylistUrl(item.folder) ? clipLabel(name) : name;
-  return `${kind} - ${shown}`;
-}
-
-function rowStyle(span: number): Record<string, string> {
-  return { "--mins": String(Math.max(0, span)) };
-}
-
-// Lines of a playlist that air on one side of midnight. A video that crosses is on both.
-function playlistSliceLines(
-  block: ScheduleBlock,
-  origin: Day,
-  board: TvBoard | null,
-  spill: boolean,
-  t: ReturnType<typeof useI18n>["t"],
-  titles: Readonly<Record<string, string>>,
-): SliceLine[] {
-  const unused = playlistRowsOn(block, origin, board);
-  const placed = placedOn(block, origin, board);
-  let cursor: number | null = placed.startMin;
-  const lines: SliceLine[] = [];
-  const entries = block.items ?? [];
-  for (let index = 0; index < entries.length; index++) {
-    const entry = entries[index]!;
-    const row = takePlaylistRow(unused, entry);
-    const item = fromEntry(entry, row?.durationSec ?? null, row?.title ?? "");
-    const named = (row?.title ?? "").trim();
-    const name = named ? clipLabel(named) : playlistGridName(item, titles);
-    const gap = index < entries.length - 1 ? gapOf(entry) : 0;
-    let side: SliceSide = "start";
-    let text = name;
-    if (row && row.durationSec > 0) {
-      const startMin = toMin(row.start);
-      const beginsNext = startMin < placed.startMin;
-      const crosses = !beginsNext && toMin(row.end) < startMin;
-      side = beginsNext ? "next" : crosses ? "cross" : "start";
-      text =
-        side === "cross"
-          ? spill
-            ? `${name} · ${t.sliceFrom(row.start)}`
-            : `${name} · ${t.sliceEnds(row.end)}`
-          : `${name} · ${row.start}`;
-      cursor = (beginsNext ? DAY_MINUTES + startMin : startMin) + Math.ceil(row.durationSec / 60) + gap;
-    } else {
-      if (cursor == null) break;
-      const begin: number = cursor;
-      const sec = itemSeconds(item);
-      if (sec == null) {
-        side = begin >= DAY_MINUTES ? "next" : "start";
-        text = `${name} · ${clockOf(begin)}`;
-        lines.push({ key: entry.id, text, side });
-        break;
-      }
-      const endMin: number = begin + Math.max(1, Math.ceil(sec / 60));
-      cursor = endMin + gap;
-      side = endMin <= DAY_MINUTES ? "start" : begin >= DAY_MINUTES ? "next" : "cross";
-      text =
-        side === "cross"
-          ? spill
-            ? `${name} · ${t.sliceFrom(clockOf(begin))}`
-            : `${name} · ${t.sliceEnds(clockOf(endMin))}`
-          : `${name} · ${clockOf(begin)}`;
-    }
-    lines.push({ key: entry.id, text, side });
-    if (gap > 0) {
-      const gapSide: SliceSide = side === "start" ? "start" : "next";
-      lines.push({ key: `${entry.id}-gap`, text: t.playlistGapLine(gap), side: gapSide });
-    }
-  }
-  return lines.filter((line) => (spill ? line.side !== "start" : line.side !== "next"));
-}
-
-function takePlaylistRow(unused: RundownItem[], entry: PlaylistEntry): RundownItem | undefined {
-  const byId = unused.findIndex((item) => item.entryId === entry.id);
-  if (byId >= 0) return unused.splice(byId, 1)[0];
-  const byShape = unused.findIndex((item) => {
-    if (item.entryId) return false;
-    const itemMode = (item.mode as string) === "youtube" ? "specific-file" : item.mode;
-    if (itemMode !== entry.mode) return false;
-    if (entry.mode === "specific-file") {
-      const url = parseYoutubeUrl(entry.file ?? "");
-      return item.path === (url ?? (entry.file ?? "").trim());
-    }
-    return (item.folder ?? "") === entry.folder;
-  });
-  if (byShape >= 0) return unused.splice(byShape, 1)[0];
-  return undefined;
-}
-
-function fromPlaylist(block: ScheduleBlock, day: Day, board: TvBoard | null): DraftItem[] {
-  const unused = playlistRowsOn(block, day, board);
-  return (block.items ?? []).map((entry) => {
-    const row = takePlaylistRow(unused, entry);
-    return fromEntry(entry, row?.durationSec ?? null, row?.title ?? "");
-  });
-}
-
-function piecesFor(day: Day, blocks: ScheduleBlock[], board: TvBoard | null): Piece[] {
-  const mine: { block: ScheduleBlock; start: number; end: number; origin: Day }[] = [];
-  for (const block of blocks) {
-    if (block.days.includes(day)) {
-      const placed = placedOn(block, day, board);
-      const end = Math.min(placed.endMin, DAY_MINUTES);
-      if (end > placed.startMin) mine.push({ block, start: placed.startMin, end, origin: day });
-    }
-    const prev = prevDay(day);
-    if (block.days.includes(prev)) {
-      const leftover = leftoverMin(placedOn(block, prev, board));
-      if (leftover > 0) mine.push({ block, start: 0, end: leftover, origin: prev });
-    }
-  }
-  mine.sort((a, b) => a.start - b.start);
-  const out: Piece[] = [];
-  let cursor = 0;
-  for (const piece of mine) {
-    if (piece.start > cursor) out.push({ kind: "gap", start: cursor, end: piece.start });
-    out.push({ kind: "slot", ...piece });
-    cursor = Math.max(cursor, piece.end);
-  }
-  if (cursor < DAY_MINUTES) out.push({ kind: "gap", start: cursor, end: DAY_MINUTES });
-  return out;
-}
-
-function draftSpanMin(draft: Draft): number {
-  const fixed = fixedMinutes(draft);
-  if (fixed) return fixed;
-  if (!/^\d{2}:\d{2}$/.test(draft.start) || !/^\d{2}:\d{2}$/.test(draft.end)) return 0;
-  const start = toMin(draft.start);
-  const end = toMin(draft.end);
-  if (end > start) return end - start;
-  if (end < start) return DAY_MINUTES - start + end;
-  return 0;
-}
-
-function ghostsOn(
-  draft: Draft,
-  day: Day,
-  blocks: ScheduleBlock[],
-  board: TvBoard | null,
-): { start: number; end: number; continues: boolean; spill: boolean }[] {
-  const span = draftSpanMin(draft);
-  if (span < 1) return [];
-  const saved = draft.id ? blocks.find((block) => block.id === draft.id) : undefined;
-  const shown = saved ? (playlistMinutesOn(saved, draft.origin, board) ?? lengthMinutes(saved)) : 0;
-  if (saved && windowOn(saved, draft.origin).start === draft.start && shown === span) {
-    return [];
-  }
-  const out: { start: number; end: number; continues: boolean; spill: boolean }[] = [];
-  for (const air of draft.days) {
-    const start = toMin(startOnDraft(draft, air));
-    if (day === air) {
-      out.push({
-        start,
-        end: Math.min(start + span, DAY_MINUTES),
-        continues: start + span > DAY_MINUTES,
-        spill: false,
-      });
-    }
-    if (day === nextDay(air)) {
-      const leftover = start + span - DAY_MINUTES;
-      if (leftover > 0) out.push({ start: 0, end: leftover, continues: false, spill: true });
-    }
-  }
-  return out;
-}
-
-function endFromDuration(start: string, durationSec: number): string {
-  const endMin = toMin(start) + Math.max(1, Math.ceil(durationSec / 60));
-  return clockOf(endMin);
-}
-
-function endFace(start: string, durationSec: number): string {
-  const endMin = toMin(start) + Math.max(1, Math.ceil(durationSec / 60));
-  if (endMin > DAY_MINUTES) return clockOf(endMin);
-  return clockFace(endMin);
-}
-
-function minuteFace(mins: number): string {
-  if (mins > DAY_MINUTES) return clockOf(mins);
-  return clockFace(mins);
-}
-
-function stackClocks(start: string, items: DraftItem[]): { start: string; end: string }[] {
-  let cursor: number | null = toMin(start);
-  return items.map((item, index) => {
-    if (cursor == null) return { start: "/", end: "/" };
-    const begin = cursor;
-    const sec = itemSeconds(item);
-    if (sec == null) {
-      cursor = null;
-      return { start: minuteFace(begin), end: "/" };
-    }
-    const endMin = begin + Math.max(1, Math.ceil(sec / 60));
-    const gap = index < items.length - 1 ? gapOf(item) : 0;
-    cursor = endMin + gap;
-    return { start: minuteFace(begin), end: minuteFace(endMin) };
-  });
-}
-
-function nextItemMinute(start: string, items: DraftItem[]): number | null {
-  let cursor = toMin(start);
-  for (let index = 0; index < items.length; index++) {
-    const sec = itemSeconds(items[index]!);
-    if (sec == null) return null;
-    const endMin = cursor + Math.max(1, Math.ceil(sec / 60));
-    const gap = index < items.length - 1 ? gapOf(items[index]!) : 0;
-    cursor = endMin + gap;
-  }
-  return cursor;
-}
-
-function spillsPastDay(start: string, durationSec: number): boolean {
-  return toMin(start) + Math.max(1, Math.ceil(durationSec / 60)) > DAY_MINUTES;
-}
-
-function addMeasureCap(draft: Draft): number | undefined {
-  if (draft.mode !== "playlist" || draft.addMode !== "random-file") return undefined;
-  if (draft.addLengthChoice === "longest") return undefined;
-  return addFixedMinutes(draft) ?? undefined;
-}
-
-function playlistAddNeedsMeasure(draft: Draft): boolean {
-  return draft.addMode !== "random-file" || draft.addLengthChoice === "longest";
-}
-
-function measureKey(draft: Draft): string {
-  const mode = draft.mode === "playlist" ? draft.addMode : draft.mode;
-  const folder = draft.mode === "playlist" ? draft.addFolder : draft.folder;
-  const file = draft.mode === "playlist" ? draft.addFile : draft.file;
-  if (mode === "specific-file") {
-    return `video:${file.trim()}`;
-  }
-  const playlist = canonicalPlaylistUrl(folder);
-  if ((mode === "next-episode" || mode === "random-file") && playlist) return `${mode}:${playlist}`;
-  const cap = addMeasureCap(draft);
-  return cap ? `${mode}:${folder.trim()}:${cap}` : `${mode}:${folder.trim()}`;
-}
-
-function addSeconds(
-  draft: Draft,
-  measured: { key: string; length: SlotLength | null } | null,
-): number | null {
-  if (draft.addMode === "random-file" && draft.addLengthChoice !== "longest") {
-    const mins = addFixedMinutes(draft);
-    return mins ? mins * 60 : null;
-  }
-  if (measured?.key === measureKey(draft) && measured.length) return measured.length.durationSec;
-  return null;
-}
-
-function chosenSeconds(
-  draft: Draft,
-  measured: { key: string; length: SlotLength | null } | null,
-): number | null {
-  if (draft.mode === "playlist") return stackSeconds(draft.items);
-  if (draft.lengthChoice !== "longest") {
-    const mins = fixedMinutes(draft);
-    return mins ? mins * 60 : null;
-  }
-  if (!measured || measured.key !== measureKey(draft) || !measured.length) return null;
-  return measured.length.durationSec;
-}
-
-function nextOnDay(
-  day: Day,
-  start: string,
-  blocks: ScheduleBlock[],
-  exceptId: string | null,
-): ScheduleBlock | null {
-  if (!/^\d{2}:\d{2}$/.test(start)) return null;
-  const startMin = toMin(start);
-  let next: ScheduleBlock | null = null;
-  for (const block of blocks) {
-    if (block.id === exceptId) continue;
-    if (!block.days.includes(day)) continue;
-    const placed = windowOn(block, day);
-    if (toMin(placed.start) < startMin) continue;
-    if (!next || toMin(placed.start) < toMin(windowOn(next, day).start)) next = block;
-  }
-  return next;
-}
-
-function prevOnDay(
-  day: Day,
-  start: string,
-  blocks: ScheduleBlock[],
-  exceptId: string | null,
-): ScheduleBlock | null {
-  if (!/^\d{2}:\d{2}$/.test(start)) return null;
-  const startMin = toMin(start);
-  let prev: ScheduleBlock | null = null;
-  for (const block of blocks) {
-    if (block.id === exceptId) continue;
-    if (!block.days.includes(day)) continue;
-    const placed = windowOn(block, day);
-    if (toMin(placed.start) >= startMin) continue;
-    if (!prev || toMin(placed.start) > toMin(windowOn(prev, day).start)) prev = block;
-  }
-  return prev;
-}
-
-function startOnDraft(draft: Draft, day: Day): string {
-  if (day === draft.origin) return draft.start;
-  return draft.starts[day] ?? draft.start;
-}
-
-function selectedDays(draft: Draft): Day[] {
-  return [draft.origin, ...DAYS.filter((day) => day !== draft.origin && draft.days.includes(day))];
-}
-
-function draftAsBlock(draft: Draft, durationSec: number): ScheduleBlock {
-  const lengthMin = Math.max(1, Math.ceil(durationSec / 60));
-  return {
-    id: draft.id ?? "draft",
-    days: draft.days,
-    start: draft.start,
-    end: endFromDuration(draft.start, durationSec),
-    lengthMin,
-    starts: draft.starts,
-    folder: draft.folder,
-    file: draft.file,
-    mode: draft.mode,
-    ...(draft.mode === "playlist"
-      ? { name: draft.name.trim(), items: draft.items.map(toEntry) }
-      : {}),
-  };
-}
-
-function dayClashes(
-  draft: Draft,
-  blocks: ScheduleBlock[],
-  durationSec: number,
-  titles: Readonly<Record<string, string>> = {},
-  board: TvBoard | null = null,
-): { day: Day; title: string; start: string; end: string }[] {
-  const clashes: { day: Day; title: string; start: string; end: string }[] = [];
-  const next = draftAsBlock(draft, durationSec);
-  const draftSegs = segmentsOf(next);
-  for (const block of blocks) {
-    if (block.id === next.id) continue;
-    for (const other of segmentsPlaced(block, board)) {
-      for (const mine of draftSegs) {
-        if (mine.day !== other.day) continue;
-        if (mine.start < other.end && other.start < mine.end) {
-          clashes.push({
-            day: mine.day,
-            title: slotLabel(block, titles),
-            start: clockOf(other.start),
-            end: clockOf(other.end),
-          });
-        }
-      }
-    }
-  }
-  return clashes;
-}
-
-function emptySchedule(): Schedule {
-  return { blocks: [], intermissions: [], activeIntermission: "", intermissionRandomStart: false };
-}
-
-function occupancyOf(board: TvBoard | null, id: string): string {
-  if (!board) return "";
-  return board.days
-    .filter((day) => day.date >= board.today)
-    .flatMap((day) => day.items.filter((item) => item.blockId === id && !item.overnight))
-    .map((item) => `${item.path}:${item.durationSec}:${item.start}`)
-    .join("|");
-}
-
-function changedBlockIds(before: ScheduleBlock[], after: ScheduleBlock[]): string[] {
-  return after
-    .filter((block) => {
-      const old = before.find((item) => item.id === block.id);
-      return !old || JSON.stringify(old) !== JSON.stringify(block);
-    })
-    .map((block) => block.id);
-}
-
-function slotIsBuilding(board: TvBoard | null, id: string, local: string[]): boolean {
-  if (board && Array.isArray(board.building)) return board.building.includes(id);
-  return local.includes(id);
-}
 
 function SourcePick({
   mode,
