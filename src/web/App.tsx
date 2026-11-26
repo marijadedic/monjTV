@@ -4,18 +4,19 @@ import { GroveFrame } from "./Grove.tsx";
 import { pageHref } from "./href.ts";
 import { TvSchedule } from "./pages/TvSchedule.tsx";
 import { Admin } from "./pages/Admin.tsx";
-import { RecentWindow } from "./Recent.tsx";
+import { RecentWindow } from "./components/sections/Recent.tsx";
+import { THEME_STORAGE_KEY } from "./constants/themeStorageKey.ts";
+import { THEMES } from "./constants/themes.ts";
+import { LANGS } from "./constants/langs.ts";
 import { useI18n, type Lang } from "./i18n.tsx";
 
-type Theme = "dark" | "dusk" | "light" | "teletext";
-
-const THEMES: Theme[] = ["dark", "dusk", "light", "teletext"];
-const LANGS: Lang[] = ["en", "hr"];
+type Theme = (typeof THEMES)[number];
 
 function readTheme(): Theme {
   try {
-    const stored = localStorage.getItem("monjtv-theme");
-    if (stored === "dark" || stored === "dusk" || stored === "light" || stored === "teletext") return stored;
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    const name = stored === "dusk" ? "meadow" : stored;
+    if (name && (THEMES as readonly string[]).includes(name)) return name as Theme;
   } catch {
     /* private mode */
   }
@@ -48,7 +49,7 @@ export function App() {
   const prefsRef = useRef<HTMLDetailsElement>(null);
   const themeLabel: Record<Theme, string> = {
     dark: t.dark,
-    dusk: t.meadow,
+    meadow: t.meadow,
     light: t.light,
     teletext: t.teletext,
   };
@@ -58,7 +59,7 @@ export function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     try {
-      localStorage.setItem("monjtv-theme", theme);
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
     } catch {
       /* private mode */
     }
@@ -106,7 +107,7 @@ export function App() {
 
   return (
     <>
-      {theme === "dusk" && <GroveFrame />}
+      {theme === "meadow" && <GroveFrame />}
       <div class={admin ? "shell wide" : "shell tv-chrome"}>
         <header class="top">
           <a class="brand" href={pageHref("/")}>

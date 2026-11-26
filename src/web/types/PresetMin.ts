@@ -1,3 +1,3 @@
-export const PRESETS = [30, 60, 90, 120, 260] as const;
+import { PRESETS } from "../constants/presets.ts";
 
 export type PresetMin = (typeof PRESETS)[number];

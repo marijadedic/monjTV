@@ -21,7 +21,7 @@
   --pill-skip: rgba(110, 118, 134, 0.22);
 }
 
-[data-theme="dusk"] {
+[data-theme="meadow"] {
   color-scheme: light;
   --bg: #d5e6b4;
   --panel: #f3ead4;
@@ -121,16 +121,16 @@ body {
   }
 }
 
-html[data-theme="dusk"] body {
+html[data-theme="meadow"] body {
   font-family: Palatino, "Palatino Linotype", "Iowan Old Style", Georgia, serif;
   background: #e4edf2;
 }
 
-html[data-theme="dusk"] .card,
-html[data-theme="dusk"] .add-form,
-html[data-theme="dusk"] .recent-window,
-html[data-theme="dusk"] .now-strip,
-html[data-theme="dusk"] .empty {
+html[data-theme="meadow"] .card,
+html[data-theme="meadow"] .add-form,
+html[data-theme="meadow"] .recent-window,
+html[data-theme="meadow"] .now-strip,
+html[data-theme="meadow"] .empty {
   border-radius: 18px;
 }
 
@@ -330,7 +330,7 @@ button:disabled {
   background: #222836;
 }
 
-.themes button[data-choice="dusk"] .swatch {
+.themes button[data-choice="meadow"] .swatch {
   background: #f3ead4;
   box-shadow: inset 0 0 0 1px rgba(90, 70, 30, 0.35);
 }
@@ -620,7 +620,7 @@ html[data-theme="teletext"] .item-actions [data-tip]:focus-visible::after {
   padding: 4px 10px;
 }
 
-html[data-theme="dusk"] .card.playing {
+html[data-theme="meadow"] .card.playing {
   box-shadow: inset 5px 0 0 #8ea384;
 }
 
@@ -690,7 +690,7 @@ html[data-theme="teletext"] .card.passed {
   background: color-mix(in srgb, var(--accent) 28%, var(--panel));
 }
 
-html[data-theme="dusk"] .pill.playing {
+html[data-theme="meadow"] .pill.playing {
   background: color-mix(in srgb, #8ea384 28%, var(--panel));
 }
 
@@ -920,8 +920,8 @@ html[data-theme="dusk"] .pill.playing {
   max-width: calc(100vw - 48px);
 }
 
-html[data-theme="dusk"] .prefs .seg button.on,
-html[data-theme="dusk"] .prefs .themes button.on {
+html[data-theme="meadow"] .prefs .seg button.on,
+html[data-theme="meadow"] .prefs .themes button.on {
   background: #5a6e4a;
   color: #fff;
 }
@@ -959,13 +959,13 @@ html[data-theme="dusk"] .prefs .themes button.on {
   border-color: #a8322a;
 }
 
-html[data-theme="dusk"] .prefs-quit,
+html[data-theme="meadow"] .prefs-quit,
 html[data-theme="light"] .prefs-quit {
   border-color: #b3261e;
   background: #b3261e;
 }
 
-html[data-theme="dusk"] .prefs-quit:hover:not(:disabled),
+html[data-theme="meadow"] .prefs-quit:hover:not(:disabled),
 html[data-theme="light"] .prefs-quit:hover:not(:disabled) {
   background: #8c1e18;
   border-color: #8c1e18;
@@ -983,7 +983,7 @@ html[data-theme="light"] .prefs-quit:hover:not(:disabled) {
   backdrop-filter: blur(6px);
 }
 
-html[data-theme="dusk"] .app-scrim {
+html[data-theme="meadow"] .app-scrim {
   background: rgba(36, 42, 28, 0.38);
 }
 
@@ -1192,7 +1192,7 @@ html[data-theme="light"] .app-scrim {
   box-shadow: inset 0 0 0 2px var(--accent);
 }
 
-html[data-theme="dusk"] .rail-item.playing .dot {
+html[data-theme="meadow"] .rail-item.playing .dot {
   background: #8ea384;
 }
 
@@ -1231,7 +1231,7 @@ html[data-theme="dusk"] .rail-item.playing .dot {
   background: color-mix(in srgb, var(--line) 70%, transparent);
 }
 
-html[data-theme="dusk"] .now-strip .track > i {
+html[data-theme="meadow"] .now-strip .track > i {
   background: #8ea384;
 }
 
@@ -1240,14 +1240,14 @@ html[data-theme="dusk"] .now-strip .track > i {
   box-shadow: none;
 }
 
-html[data-theme="dusk"] .tv .time,
-html[data-theme="dusk"] .tv .pill,
-html[data-theme="dusk"] .tv button,
-html[data-theme="dusk"] .tv .muted {
+html[data-theme="meadow"] .tv .time,
+html[data-theme="meadow"] .tv .pill,
+html[data-theme="meadow"] .tv button,
+html[data-theme="meadow"] .tv .muted {
   font-family: Palatino, "Palatino Linotype", "Iowan Old Style", Georgia, serif;
 }
 
-html[data-theme="dusk"] .tv button.primary {
+html[data-theme="meadow"] .tv button.primary {
   background: #5a6e4a;
   border-color: #5a6e4a;
   color: #fff;
@@ -1323,11 +1323,11 @@ html[data-theme="light"] .week-scale .track {
   background: var(--browse);
 }
 
-html[data-theme="dusk"] .week-scale .track {
+html[data-theme="meadow"] .week-scale .track {
   background: var(--panel);
 }
 
-html[data-theme="dusk"] .week-scale button.gap:hover {
+html[data-theme="meadow"] .week-scale button.gap:hover {
   background: rgba(196, 180, 138, 0.28);
 }
 
@@ -1564,8 +1564,8 @@ html[data-theme="dusk"] .week-scale button.gap:hover {
   border-top-color: currentColor;
 }
 
-html[data-theme="dusk"] .week-scale button.slot.stack,
-html[data-theme="dusk"] .week-scale .ghost.stack {
+html[data-theme="meadow"] .week-scale button.slot.stack,
+html[data-theme="meadow"] .week-scale .ghost.stack {
   background: #7eb8a8;
   color: #142824;
 }
@@ -1605,7 +1605,7 @@ html[data-theme="dusk"] .week-scale .ghost.stack {
   z-index: 22;
 }
 
-html[data-theme="dusk"] .week-wrap .scrim {
+html[data-theme="meadow"] .week-wrap .scrim {
   background: rgba(36, 42, 28, 0.38);
 }
 
@@ -2388,13 +2388,13 @@ html[data-theme="light"] .week-wrap .scrim {
   animation: spin 0.8s linear infinite;
 }
 
-html[data-theme="dusk"] .add-form .spin {
+html[data-theme="meadow"] .add-form .spin {
   border-color: #7dae68;
   border-top-color: #146b28;
   border-width: 3px;
 }
 
-html[data-theme="dusk"] .add-form .info {
+html[data-theme="meadow"] .add-form .info {
   font-family: system-ui, sans-serif;
 }
 
@@ -2410,7 +2410,7 @@ html[data-theme="dusk"] .add-form .info {
     border-top-color: var(--accent);
   }
 
-  html[data-theme="dusk"] .add-form .spin {
+  html[data-theme="meadow"] .add-form .spin {
     border-top-color: #146b28;
   }
 
@@ -2569,7 +2569,7 @@ html[data-theme="dusk"] .add-form .info {
   background: var(--browse-hover);
 }
 
-html[data-theme="dusk"] .path-suggest {
+html[data-theme="meadow"] .path-suggest {
   font-family: Palatino, "Palatino Linotype", "Iowan Old Style", Georgia, serif;
 }
 
@@ -2682,27 +2682,27 @@ html[data-theme="light"] .add-form .mode.on.stack {
   background: color-mix(in srgb, #2f7a6c 28%, var(--panel));
 }
 
-html[data-theme="dusk"] .add-form .mode.on.movie {
+html[data-theme="meadow"] .add-form .mode.on.movie {
   border-color: #8ea384;
   background: color-mix(in srgb, #8ea384 28%, var(--panel));
 }
 
-html[data-theme="dusk"] .add-form .mode.on.shows {
+html[data-theme="meadow"] .add-form .mode.on.shows {
   border-color: #7f97ad;
   background: color-mix(in srgb, #7f97ad 28%, var(--panel));
 }
 
-html[data-theme="dusk"] .add-form .mode.on.film {
+html[data-theme="meadow"] .add-form .mode.on.film {
   border-color: #c45c28;
   background: color-mix(in srgb, #c45c28 28%, var(--panel));
 }
 
-html[data-theme="dusk"] .add-form .mode.on.stack {
+html[data-theme="meadow"] .add-form .mode.on.stack {
   border-color: #4a8a78;
   background: color-mix(in srgb, #4a8a78 28%, var(--panel));
 }
 
-html[data-theme="dusk"] .add-form .mode.on.tube {
+html[data-theme="meadow"] .add-form .mode.on.tube {
   border-color: #b45448;
   background: color-mix(in srgb, #b45448 28%, var(--panel));
 }
@@ -2728,29 +2728,29 @@ html[data-theme="dusk"] .add-form .mode.on.tube {
   overflow-wrap: break-word;
 }
 
-html[data-theme="dusk"] .add-form .day-name,
-html[data-theme="dusk"] .add-form .day-start .note,
-html[data-theme="dusk"] .add-form .picked,
-html[data-theme="dusk"] .add-form .k,
-html[data-theme="dusk"] .add-form label,
-html[data-theme="dusk"] .add-form input,
-html[data-theme="dusk"] .add-form .mode,
-html[data-theme="dusk"] .add-form select,
-html[data-theme="dusk"] .add-form .measure-label,
-html[data-theme="dusk"] .add-form .chip,
-html[data-theme="dusk"] .add-form .actions button,
-html[data-theme="dusk"] .week-scale button.slot i {
+html[data-theme="meadow"] .add-form .day-name,
+html[data-theme="meadow"] .add-form .day-start .note,
+html[data-theme="meadow"] .add-form .picked,
+html[data-theme="meadow"] .add-form .k,
+html[data-theme="meadow"] .add-form label,
+html[data-theme="meadow"] .add-form input,
+html[data-theme="meadow"] .add-form .mode,
+html[data-theme="meadow"] .add-form select,
+html[data-theme="meadow"] .add-form .measure-label,
+html[data-theme="meadow"] .add-form .chip,
+html[data-theme="meadow"] .add-form .actions button,
+html[data-theme="meadow"] .week-scale button.slot i {
   font-family: Palatino, "Palatino Linotype", "Iowan Old Style", Georgia, serif;
 }
 
-html[data-theme="dusk"] .week-scale button.slot.stack .stack-lines,
-html[data-theme="dusk"] .week-scale button.slot .slot-calc {
+html[data-theme="meadow"] .week-scale button.slot.stack .stack-lines,
+html[data-theme="meadow"] .week-scale button.slot .slot-calc {
   font-family: system-ui, sans-serif;
 }
 
-html[data-theme="dusk"] .playlist-tools button,
-html[data-theme="dusk"] .playlist-gap .gap-plus,
-html[data-theme="dusk"] .playlist-gap .gap-mins {
+html[data-theme="meadow"] .playlist-tools button,
+html[data-theme="meadow"] .playlist-gap .gap-plus,
+html[data-theme="meadow"] .playlist-gap .gap-mins {
   font-family: system-ui, sans-serif;
 }
 
@@ -2766,8 +2766,8 @@ html[data-theme="dusk"] .playlist-gap .gap-mins {
   font-size: 0.85rem;
 }
 
-html[data-theme="dusk"] .add-form .chip.on,
-html[data-theme="dusk"] .add-form button.primary {
+html[data-theme="meadow"] .add-form .chip.on,
+html[data-theme="meadow"] .add-form button.primary {
   background: linear-gradient(180deg, #c5d3b6 0%, #8ea384 100%);
   border-color: #8ea384;
   color: #243024;
@@ -2806,7 +2806,7 @@ html[data-theme="light"] .add-form .chip.on {
 }
 
 .add-form .actions .spin,
-html[data-theme="dusk"] .add-form .actions .spin {
+html[data-theme="meadow"] .add-form .actions .spin {
   width: 14px;
   height: 14px;
   border-width: 2px;
@@ -2868,16 +2868,16 @@ html[data-theme="dusk"] .add-form .actions .spin {
   background: var(--browse);
 }
 
-html[data-theme="dusk"] .intermission {
+html[data-theme="meadow"] .intermission {
   border-color: #8ea384;
   color: #2a331c;
 }
 
-html[data-theme="dusk"] .intermission i {
+html[data-theme="meadow"] .intermission i {
   color: #5a6e4a;
 }
 
-html[data-theme="dusk"] .intermission.on {
+html[data-theme="meadow"] .intermission.on {
   background: #e7f0d8;
 }
 

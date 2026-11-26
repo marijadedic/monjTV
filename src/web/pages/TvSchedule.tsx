@@ -1,34 +1,23 @@
-import { Fragment } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { dateOffset, weekdayOfKey } from "../../shared/dates.ts";
-import type { ItemStatus, PlayerStatus, RundownItem, TvBoard } from "../../shared/types.ts";
-import { itemHasPassed, itemProgress, prevDay } from "../../shared/window.ts";
-import { canonicalYoutubeIntermission, isYoutubeUrl, parseYoutubeUrl } from "../../shared/youtube.ts";
+import type { PlayerStatus, RundownItem, TvBoard } from "../../shared/types.ts";
+import { itemProgress, prevDay } from "../../shared/window.ts";
+import { canonicalYoutubeIntermission, parseYoutubeUrl } from "../../shared/youtube.ts";
 import { api } from "../api.ts";
-import { pageHref } from "../href.ts";
 import { useI18n } from "../i18n.tsx";
-import { beganPreviousDay } from "../utils/beganPreviousDay.ts";
-import { canStepEpisode } from "../utils/canStepEpisode.ts";
-import { carryGroups } from "../utils/carryGroups.ts";
-import { folderName } from "../utils/folderName.ts";
-import { gapStillSrc } from "../utils/gapStillSrc.ts";
-import { heldItem } from "../utils/heldItem.ts";
-import { nextPlanned } from "../utils/nextPlanned.ts";
-import { nowSec } from "../utils/nowSec.ts";
-import { onNowPlanned } from "../utils/onNowPlanned.ts";
-import { playedPaths } from "../utils/playedPaths.ts";
-import { rowWatched } from "../utils/rowWatched.ts";
-import { showsFrame } from "../utils/showsFrame.ts";
-import { stillSrc } from "../utils/stillSrc.ts";
+import { DayTabs, EmptyDay } from "../components/sections/DayTabs.tsx";
+import { NowStrip } from "../components/sections/NowStrip.tsx";
+import { ErrorNote } from "../components/parts/ErrorNote.tsx";
+import { Rail, RailCard } from "../components/sections/Rail.tsx";
+import { carryGroups } from "../utils/rundown/carryGroups.ts";
+import { heldItem } from "../utils/rundown/heldItem.ts";
+import { nextPlanned } from "../utils/rundown/nextPlanned.ts";
+import { nowSec } from "../utils/clock/nowSec.ts";
+import { onNowPlanned } from "../utils/rundown/onNowPlanned.ts";
+import { playedPaths } from "../utils/rundown/playedPaths.ts";
 
 export function TvSchedule() {
   const { t } = useI18n();
-  const pill: Record<ItemStatus, string> = {
-    planned: t.planned,
-    playing: t.onAir,
-    done: t.done,
-    skipped: t.skipped,
-  };
   const [board, setBoard] = useState<TvBoard | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [status, setStatus] = useState<PlayerStatus | null>(null);
@@ -202,24 +191,12 @@ export function TvSchedule() {
         : gapTitle && status?.intermissionKind === "youtube"
           ? parseYoutubeUrl(status.intermissionSource ?? "")
           : null;
-  const gapPath = gapFile && !missed[gapFile] ? gapFile : null;
   const air = current ?? due;
-  const stripStill = air && showsFrame(air) && !missed[air.path] ? air : null;
 
   function hideStill(filePath: string) {
     setMissed((currentMissed) => ({ ...currentMissed, [filePath]: true }));
   }
   const fraction = air ? itemProgress(air, sec) : 0;
-  const modeLabel = (mode: RundownItem["mode"]) => {
-    if (mode === "next-episode") return t.nextEpisode;
-    if (mode === "specific-file") return t.oneVideo;
-    return t.random;
-  };
-
-  function sourceLabel(item: RundownItem): string {
-    if (isYoutubeUrl(item.path)) return t.youtube;
-    return folderName(item.path);
-  }
 
   function capitalise(label: string): string {
     const first = label.charAt(0).toLocaleUpperCase();
@@ -238,292 +215,71 @@ export function TvSchedule() {
   const showColumn = Boolean(day && (items.length > 0 || gapTitle));
   const episodeItem = current?.mode === "next-episode" ? current : due?.mode === "next-episode" ? due : null;
 
-  function itemMenu(item: RundownItem, place: string, passed: boolean, canEdit: boolean, airing: boolean) {
-    const done = rowWatched(item, played);
-    const trackable = item.mode === "next-episode" || item.mode === "random-file";
-    const canStep = canEdit && canStepEpisode(item, passed);
-    const onAirMovie = item.mode === "random-file" && (airing || item.status === "playing");
-    const canShuffle = canEdit && item.mode === "random-file" && (onAirMovie || !passed);
-    const canDone = onAirMovie || (trackable && !done && !airing && item.status !== "playing");
-    const earlier = passed || (live && item.status === "done");
-    const canSkip = trackable && done && !airing && item.status !== "playing" && earlier;
-    const hasMenu = canShuffle || canDone || canSkip;
-    if (!canStep && !hasMenu) return null;
-    const key = `${place}:${item.id}`;
-    const open = menuKey === key;
-    const pending =
-      busy === item.id ||
-      busy === `${item.id}:done` ||
-      busy === `${item.id}:skipped` ||
-      busy === `${item.id}:prev` ||
-      busy === `${item.id}:next`;
-    const upcoming = !passed && item.status !== "done" && item.status !== "skipped";
-    const doneTip =
-      item.mode === "next-episode"
-        ? upcoming
-          ? t.markDoneEpisode
-          : t.markDoneEpisodeAired
-        : upcoming
-          ? t.markDoneMovie
-          : t.markDoneMovieAired;
-    const skipTip = item.mode === "next-episode" ? t.markSkippedEpisode : t.markSkippedMovie;
-    function choose(action: () => void) {
-      setMenuKey(null);
-      action();
-    }
-    return (
-      <div class="item-actions">
-        {canStep && (
-          <>
-            <button
-              type="button"
-              class="item-step"
-              data-tip={t.previousEpisodeLabel}
-              aria-label={t.previousEpisodeLabel}
-              disabled={pending}
-              onClick={() => step(item, "prev")}
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M15 5 L8 12 L15 19" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              class="item-step"
-              data-tip={t.nextEpisodeLabel}
-              aria-label={t.nextEpisodeLabel}
-              disabled={pending}
-              onClick={() => step(item, "next")}
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M9 5 L16 12 L9 19" />
-              </svg>
-            </button>
-          </>
-        )}
-        {hasMenu && (
-          <div class={`item-menu${open ? " open" : ""}`}>
-            <button
-              type="button"
-              class="item-menu-toggle"
-              aria-label={t.itemOptions}
-              aria-expanded={open}
-              aria-haspopup="menu"
-              disabled={pending}
-              onClick={() => setMenuKey(open ? null : key)}
-            >
-              <i />
-              <i />
-              <i />
-            </button>
-            {open && (
-              <div class="item-menu-list" role="menu">
-                {canShuffle && (
-                  <button type="button" role="menuitem" data-tip={t.shuffleHint} onClick={() => choose(() => shuffle(item))}>
-                    {t.shuffle}
-                  </button>
-                )}
-                {canDone && (
-                  <button type="button" role="menuitem" data-tip={doneTip} onClick={() => choose(() => markDone(item))}>
-                    {t.markDone}
-                  </button>
-                )}
-                {canSkip && (
-                  <button type="button" role="menuitem" data-tip={skipTip} onClick={() => choose(() => markSkipped(item))}>
-                    {t.markSkipped}
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  }
-
   const fromDay = day ? t.dayName[prevDay(weekdayOfKey(day.date))] : "";
   const carried = past ? [] : carryGroups(items);
   const ownItems = past ? items : items.filter((item) => !item.overnight);
+  const actions = {
+    played,
+    busy,
+    menuKey,
+    onStep: step,
+    onShuffle: shuffle,
+    onDone: markDone,
+    onSkip: markSkipped,
+    onMenu: setMenuKey,
+    onHideStill: hideStill,
+  };
 
-  function railCard(item: RundownItem) {
-    const passed = past || (live && itemHasPassed(item, sec));
-    const shown: ItemStatus = past
-      ? item.mode === "next-episode"
-        ? item.status === "done"
-          ? "done"
-          : "skipped"
-        : item.mode === "random-file"
-          ? rowWatched(item, played)
-            ? "done"
-            : "skipped"
-          : "done"
-      : item.status;
-    const canEdit = !past && (live || !item.overnight);
-    const cardStill = showsFrame(item) && !missed[item.path];
-    const airing = Boolean(live && air?.id === item.id);
-    const coming = Boolean(live && gapTitle && next?.id === item.id);
-    const wontStart = Boolean(live && held?.id === item.id);
-    const carriedRow = !past && Boolean(item.overnight);
-    const started = carriedRow && beganPreviousDay(item);
+  function card(item: RundownItem) {
     return (
-      <div
+      <RailCard
         key={item.id}
-        class={`rail-item ${shown}${airing ? " playing" : ""}${passed ? " passed" : ""}${carriedRow ? " carry-row" : ""}`}
-      >
-        <i class="dot" />
-        <article
-          class={`card ${shown}${airing ? " playing" : ""}${passed ? " passed" : ""}${cardStill ? " has-still" : ""}${menuKey === `card:${item.id}` ? " menu-open" : ""}`}
-        >
-          {cardStill && (
-            <img
-              key={item.path}
-              class="still"
-              src={stillSrc(item)}
-              alt=""
-              onError={() => hideStill(item.path)}
-            />
-          )}
-          <div class="time">
-            {item.start}–{item.end}
-          </div>
-          <div>
-            <div class="title-row">
-              {coming && <span class="next-plain">{t.nextMark}</span>}
-              <div class="title">{item.title}</div>
-              {airing && <span class="pill on-air">{t.onAir}</span>}
-              {shown !== "planned" && shown !== "playing" && !airing && (
-                <span class={`pill ${shown}`}>{pill[shown]}</span>
-              )}
-            </div>
-            <div class="muted" title={item.path}>
-              {modeLabel(item.mode)} · {sourceLabel(item)}
-              {started ? ` · ${t.startedDay(fromDay)}` : ""}
-              {wontStart ? ` · ${t.willNotStart}` : ""}
-            </div>
-          </div>
-          {itemMenu(item, "card", passed, canEdit, airing)}
-        </article>
-      </div>
+        item={item}
+        past={past}
+        live={live}
+        sec={sec}
+        missed={missed}
+        airId={air?.id ?? null}
+        gapTitle={gapTitle}
+        nextId={next?.id ?? null}
+        heldId={held?.id ?? null}
+        fromDay={fromDay}
+        {...actions}
+      />
     );
   }
 
   const rail =
-    day && items.length > 0 ? (
-      <div class="rail">
-        {carried.map((group) => (
-          <Fragment key={group.id}>
-            <div class="carry">{t.fromDayUntil(fromDay, group.until)}</div>
-            {group.rows.map((item) => railCard(item))}
-          </Fragment>
-        ))}
-        {carried.length > 0 && ownItems.length > 0 ? <hr class="rail-split" /> : null}
-        {ownItems.map((item) => railCard(item))}
-      </div>
-    ) : null;
+    day && items.length > 0 ? <Rail carried={carried} ownItems={ownItems} fromDay={fromDay} card={card} /> : null;
 
   return (
     <section class={`tv${past ? " is-past" : ""}`}>
-      {status?.error && <p class="error">{t.error(status.error)}</p>}
-      {error && <p class="error">{t.error(error)}</p>}
+      {status?.error && <ErrorNote message={status.error} />}
+      {error && <ErrorNote message={error} />}
       {board && (
-        <div class="day-tabs" role="tablist" aria-label={t.days}>
-          {board.days.map((entry) => {
-            const on = entry.date === day?.date;
-            const offset = dateOffset(board.today, entry.date);
-            return (
-              <button
-                key={entry.date}
-                type="button"
-                role="tab"
-                id={`day-${entry.date}`}
-                aria-selected={on}
-                aria-controls="tv-day"
-                class={`${on ? "on" : ""}${offset < 0 ? " past" : ""}`}
-                onClick={() => setSelected(entry.date)}
-              >
-                {tabLabel(entry.date)}
-              </button>
-            );
-          })}
-        </div>
+        <DayTabs
+          days={board.days}
+          today={board.today}
+          selected={day?.date}
+          labelFor={tabLabel}
+          onSelect={setSelected}
+        />
       )}
-      {day && items.length === 0 && !gapTitle && (
-        <div class="empty" id="tv-day" role="tabpanel">
-          <p>{live ? t.noSlots : t.noSlotsDay}</p>
-          <a href={pageHref("/admin")}>{t.addInAdmin}</a>
-        </div>
-      )}
+      {day && items.length === 0 && !gapTitle && <EmptyDay live={live} />}
       {live && showColumn && day && (
         <div id="tv-day" role="tabpanel" aria-labelledby={`day-${day.date}`}>
-          <div class={`now-strip${stripStill || gapPath ? " has-still" : ""}`}>
-            {stripStill && (
-              <img
-                key={stripStill.path}
-                class="still"
-                src={stillSrc(stripStill)}
-                alt=""
-                onError={() => hideStill(stripStill.path)}
-              />
-            )}
-            {gapPath && (
-              <img
-                key={gapPath}
-                class="still"
-                src={gapStillSrc(gapPath)}
-                alt=""
-                onError={() => hideStill(gapPath)}
-              />
-            )}
-            <div>
-              {air ? (
-                <>
-                  <span class="pill on-air">{t.onAir}</span>
-                  <h2 class="strip-title">{air.title}</h2>
-                  <div class="muted" title={air.path}>
-                    {air.start}–{air.end} · {modeLabel(air.mode)} · {sourceLabel(air)}
-                  </div>
-                  <div
-                    class="track"
-                    role="progressbar"
-                    aria-valuenow={Math.round(fraction * 100)}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-label={t.progress}
-                  >
-                    <i style={{ width: `${fraction * 100}%` }} />
-                  </div>
-                </>
-              ) : gapTitle ? (
-                <>
-                  <span class="pill gap">{t.intermission}</span>
-                  <h2 class="strip-title">{gapTitle}</h2>
-                  {next && (
-                    <p class="will-line">
-                      <span class="next-plain">{t.nextMark}</span>
-                      <b>
-                        {next.title} · {next.start}
-                      </b>
-                    </p>
-                  )}
-                </>
-              ) : (
-                <>
-                  <h2 class="strip-title">{t.nothingOn}</h2>
-                  {next ? (
-                    <div class="muted">{t.startsAt(next.title, next.start)}</div>
-                  ) : (
-                    status?.waitingUntil && <div class="muted">{t.nextAt(status.waitingUntil)}</div>
-                  )}
-                </>
-              )}
-            </div>
-            <div class="now-actions">
-              {air && itemMenu(air, "strip", false, true, true)}
-              <button class="primary" onClick={start} disabled={busy === "start"}>
-                {status?.running ? t.playNow : t.startTv}
-              </button>
-            </div>
-          </div>
+          <NowStrip
+            air={air}
+            fraction={fraction}
+            gapTitle={gapTitle}
+            gapFile={gapFile}
+            missed={missed}
+            next={next}
+            waitingUntil={status?.waitingUntil || null}
+            running={Boolean(status?.running)}
+            onStart={start}
+            {...actions}
+          />
           {rail && (
             <>
               <hr class="tv-break" />

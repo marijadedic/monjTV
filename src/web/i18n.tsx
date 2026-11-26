@@ -1,10 +1,9 @@
 import { createContext, type ComponentChildren } from "preact";
 import { useContext, useEffect, useState } from "preact/hooks";
 import type { Day } from "../shared/types.ts";
+import { LANG_STORAGE_KEY } from "./constants/langStorageKey.ts";
 
 export type Lang = "en" | "hr";
-
-const STORAGE_KEY = "monjtv-lang";
 
 type Copy = {
   sections: string;
@@ -827,7 +826,7 @@ const I18nContext = createContext<I18nValue | null>(null);
 
 export function readLang(): Lang {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(LANG_STORAGE_KEY);
     if (stored === "en" || stored === "hr") return stored;
   } catch {
     /* private mode */
@@ -844,7 +843,7 @@ export function I18nProvider({ children }: { children: ComponentChildren }) {
   useEffect(() => {
     document.documentElement.lang = lang;
     try {
-      localStorage.setItem(STORAGE_KEY, lang);
+      localStorage.setItem(LANG_STORAGE_KEY, lang);
     } catch {
       /* private mode */
     }
