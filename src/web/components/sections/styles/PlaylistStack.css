@@ -1,0 +1,9 @@
+.tally {
+  margin: 18px 0;
+}
+.tally .slash {
+  margin: 0 0.75em;
+}
+.add-form .stack-head {
+  margin-top: 18px;
+}

@@ -1,0 +1,25 @@
+.summary {
+  display: grid;
+}
+.summary-row {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.summary-row .hint {
+  color: var(--muted);
+}
+.add-form header {
+  flex-wrap: nowrap;
+}
+.add-form header b {
+  min-width: 0;
+}
+.mode-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}

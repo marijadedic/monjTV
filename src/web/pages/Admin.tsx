@@ -1,3 +1,8 @@
+import "./styles/admin/controls.css";
+import "./styles/admin/week.css";
+import "./styles/admin/mode.css";
+import "./styles/admin/chips.css";
+import "./styles/admin/narrow.css";
 import { useEffect, useRef, useState } from "preact/hooks";
 import {
   DAYS,

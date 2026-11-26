@@ -1,3 +1,4 @@
+import "./styles/FolderPath.css";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { api } from "../../api.ts";
 import type { FolderHit } from "../../types/FolderHit.ts";

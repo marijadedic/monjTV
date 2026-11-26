@@ -1,0 +1,151 @@
+[data-theme="meadow"] {
+  color-scheme: light;
+  --bg: #d5e6b4;
+  --panel: #f3ead4;
+  --line: #c4b48a;
+  --text: #2a331c;
+  --muted: #5c6b46;
+  --accent: #d4a24a;
+  --ok: #2f7a45;
+  --warn: #a86212;
+  --skip: #7d8a6a;
+  --primary: #3f6b3a;
+  --primary-line: #2f5228;
+  --on-primary: #f6ffe8;
+  --browse: #e7f0d8;
+  --browse-hover: #dce8c4;
+  --pill-air: rgba(212, 162, 74, 0.2);
+  --pill-done: rgba(168, 98, 18, 0.16);
+  --pill-wait: rgba(92, 107, 70, 0.14);
+  --pill-skip: rgba(125, 138, 106, 0.18);
+}
+html[data-theme="meadow"] body {
+  font-family: Palatino, "Palatino Linotype", "Iowan Old Style", Georgia, serif;
+  background: #e4edf2;
+}
+.meadow-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: #e4edf2 url("/sunrise.jpg") center 68% / cover no-repeat;
+}
+html[data-theme="meadow"] .card, html[data-theme="meadow"] .add-form, html[data-theme="meadow"] .recent-window, html[data-theme="meadow"] .now-strip, html[data-theme="meadow"] .empty {
+  border-radius: 18px;
+}
+html[data-theme="meadow"] .card.playing {
+  box-shadow: inset 5px 0 0 #8ea384;
+}
+html[data-theme="meadow"] .pill.playing {
+  background: color-mix(in srgb, #8ea384 28%, var(--panel));
+}
+html[data-theme="meadow"] .prefs .seg button.on, html[data-theme="meadow"] .prefs .themes button.on {
+  background: #5a6e4a;
+  color: #fff;
+}
+html[data-theme="meadow"] .prefs-quit {
+  border-color: #b3261e;
+  background: #b3261e;
+}
+html[data-theme="meadow"] .prefs-quit:hover:not(:disabled) {
+  background: #8c1e18;
+  border-color: #8c1e18;
+}
+html[data-theme="meadow"] .app-scrim {
+  background: rgba(36, 42, 28, 0.38);
+}
+html[data-theme="meadow"] .rail-item.playing .dot {
+  background: #8ea384;
+}
+html[data-theme="meadow"] .now-strip .track > i {
+  background: #8ea384;
+}
+html[data-theme="meadow"] .tv .time, html[data-theme="meadow"] .tv .pill, html[data-theme="meadow"] .tv button, html[data-theme="meadow"] .tv .muted {
+  font-family: Palatino, "Palatino Linotype", "Iowan Old Style", Georgia, serif;
+}
+html[data-theme="meadow"] .tv button.primary {
+  background: #5a6e4a;
+  border-color: #5a6e4a;
+  color: #fff;
+}
+html[data-theme="meadow"] .week-scale .track {
+  background: var(--panel);
+}
+html[data-theme="meadow"] .week-scale button.gap:hover {
+  background: rgba(196, 180, 138, 0.28);
+}
+html[data-theme="meadow"] .week-scale button.slot.stack, html[data-theme="meadow"] .week-scale .ghost.stack {
+  background: #7eb8a8;
+  color: #142824;
+}
+html[data-theme="meadow"] .week-wrap .scrim {
+  background: rgba(36, 42, 28, 0.38);
+}
+html[data-theme="meadow"] .add-form .spin {
+  border-color: #7dae68;
+  border-top-color: #146b28;
+  border-width: 3px;
+}
+html[data-theme="meadow"] .add-form .info {
+  font-family: system-ui, sans-serif;
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme="meadow"] .add-form .spin {
+    border-top-color: #146b28;
+  }
+}
+html[data-theme="meadow"] .path-suggest {
+  font-family: Palatino, "Palatino Linotype", "Iowan Old Style", Georgia, serif;
+}
+html[data-theme="meadow"] .add-form .mode.on.movie {
+  border-color: #8ea384;
+  background: color-mix(in srgb, #8ea384 28%, var(--panel));
+}
+html[data-theme="meadow"] .add-form .mode.on.shows {
+  border-color: #7f97ad;
+  background: color-mix(in srgb, #7f97ad 28%, var(--panel));
+}
+html[data-theme="meadow"] .add-form .mode.on.film {
+  border-color: #c45c28;
+  background: color-mix(in srgb, #c45c28 28%, var(--panel));
+}
+html[data-theme="meadow"] .add-form .mode.on.stack {
+  border-color: #4a8a78;
+  background: color-mix(in srgb, #4a8a78 28%, var(--panel));
+}
+html[data-theme="meadow"] .add-form .mode.on.tube {
+  border-color: #b45448;
+  background: color-mix(in srgb, #b45448 28%, var(--panel));
+}
+html[data-theme="meadow"] .add-form .day-name, html[data-theme="meadow"] .add-form .day-start .note, html[data-theme="meadow"] .add-form .picked, html[data-theme="meadow"] .add-form .k, html[data-theme="meadow"] .add-form label, html[data-theme="meadow"] .add-form input, html[data-theme="meadow"] .add-form .mode, html[data-theme="meadow"] .add-form select, html[data-theme="meadow"] .add-form .measure-label, html[data-theme="meadow"] .add-form .chip, html[data-theme="meadow"] .add-form .actions button, html[data-theme="meadow"] .week-scale button.slot i {
+  font-family: Palatino, "Palatino Linotype", "Iowan Old Style", Georgia, serif;
+}
+html[data-theme="meadow"] .week-scale button.slot.stack .stack-lines, html[data-theme="meadow"] .week-scale button.slot .slot-calc {
+  font-family: system-ui, sans-serif;
+}
+html[data-theme="meadow"] .playlist-tools button, html[data-theme="meadow"] .playlist-gap .gap-plus, html[data-theme="meadow"] .playlist-gap .gap-mins {
+  font-family: system-ui, sans-serif;
+}
+html[data-theme="meadow"] .add-form .chip.on, html[data-theme="meadow"] .add-form button.primary {
+  background: linear-gradient(180deg, #c5d3b6 0%, #8ea384 100%);
+  border-color: #8ea384;
+  color: #243024;
+  box-shadow: none;
+}
+html[data-theme="meadow"] .add-form .actions .spin {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+  border-color: color-mix(in srgb, currentColor 35%, transparent);
+  border-top-color: currentColor;
+}
+html[data-theme="meadow"] .intermission {
+  border-color: #8ea384;
+  color: #2a331c;
+}
+html[data-theme="meadow"] .intermission i {
+  color: #5a6e4a;
+}
+html[data-theme="meadow"] .intermission.on {
+  background: #e7f0d8;
+}

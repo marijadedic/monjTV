@@ -1,0 +1,36 @@
+.add-form .mode {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 12px 14px;
+  text-align: left;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.add-form .modes .mode {
+  width: auto;
+  min-width: 0;
+  padding: 8px 12px;
+  text-align: center;
+  align-items: center;
+  justify-content: center;
+}
+.add-form .mode b {
+  display: block;
+  font-size: 1rem;
+  overflow-wrap: break-word;
+}
+.add-form .modes .mode b {
+  font-size: 0.95rem;
+}
+.add-form .mode span {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 450;
+  letter-spacing: 0;
+  text-transform: none;
+  overflow-wrap: break-word;
+}

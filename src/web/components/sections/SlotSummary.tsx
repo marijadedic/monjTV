@@ -1,3 +1,5 @@
+import "./styles/SlotSummary.css";
+import "./styles/SlotSummary.layout.css";
 import type { Draft } from "../../types/Draft.ts";
 import { canonicalPlaylistUrl, parseYoutubeUrl } from "../../../shared/youtube.ts";
 import { useI18n } from "../../i18n.tsx";

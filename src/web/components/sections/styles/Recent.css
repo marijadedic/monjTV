@@ -1,0 +1,99 @@
+.app-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(10, 12, 16, 0.55);
+  backdrop-filter: blur(6px);
+}
+.recent-window {
+  position: fixed;
+  z-index: 31;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  gap: 1rem;
+  width: min(36rem, calc(100% - 48px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 1rem 1.5rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 6px 16px rgba(60, 70, 40, 0.1);
+  font-family: system-ui, sans-serif;
+}
+.recent-window header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.recent-window header b {
+  font-size: 1.05rem;
+}
+.recent-window header p, .recent-order, .recent-empty {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.recent-window .x {
+  padding: 4px 8px;
+  background: transparent;
+  color: var(--muted);
+}
+.recent-folders {
+  display: grid;
+  gap: 14px;
+}
+.recent-folder {
+  display: grid;
+  gap: 6px;
+}
+.recent-folder h2 {
+  margin: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.recent-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.recent-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  background: var(--browse);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.recent-list .n {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 0.75rem;
+  min-width: 1.2rem;
+}
+.recent-list .name {
+  min-width: 0;
+}
+.recent-list b {
+  display: block;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.recent-list .place {
+  display: block;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}

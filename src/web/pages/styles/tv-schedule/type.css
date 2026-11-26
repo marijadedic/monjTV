@@ -1,0 +1,9 @@
+.now-strip .track {
+  height: 3px;
+  margin-top: 12px;
+  background: color-mix(in srgb, var(--line) 70%, transparent);
+}
+.tv button {
+  appearance: none;
+  box-shadow: none;
+}

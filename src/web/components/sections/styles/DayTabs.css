@@ -1,0 +1,26 @@
+.day-tabs {
+  display: flex;
+  gap: 2px;
+  margin: 0 0 1.25rem;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+.day-tabs button {
+  flex: 0 0 auto;
+  margin-bottom: -1px;
+  padding: 6px 12px 8px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+  background: transparent;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.day-tabs button.on {
+  background: var(--panel);
+  color: var(--text);
+  border-color: var(--line);
+}
+.day-tabs button.past:not(.on) {
+  opacity: 0.55;
+}

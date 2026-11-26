@@ -1,3 +1,5 @@
+import "./styles/WeekHead.css";
+import "./styles/WeekHead.chip.css";
 import type { ComponentChildren, Ref } from "preact";
 import { useI18n } from "../../i18n.tsx";
 

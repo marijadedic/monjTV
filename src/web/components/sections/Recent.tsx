@@ -1,3 +1,4 @@
+import "./styles/Recent.css";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { RecentPlays } from "../../../shared/types.ts";
 import { api } from "../../api.ts";

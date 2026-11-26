@@ -1,0 +1,24 @@
+.modes {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+.add-form .pick-mode .modes .mode {
+  grid-column: span 2;
+}
+.add-form .pick-mode .modes .mode:nth-child(n + 4) {
+  grid-column: span 3;
+}
+.add-form .mode-list {
+  grid-template-columns: minmax(0, 1fr);
+}
+.add-form .mode-list .mode {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+.add-next .modes {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.add-next .modes .mode {
+  grid-column: auto;
+}

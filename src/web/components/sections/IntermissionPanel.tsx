@@ -1,3 +1,4 @@
+import "./styles/IntermissionPanel.css";
 import type { Ref } from "preact";
 import type { IntermissionItem, IntermissionKind, Schedule } from "../../../shared/types.ts";
 import { useI18n } from "../../i18n.tsx";

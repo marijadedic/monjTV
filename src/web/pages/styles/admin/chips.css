@@ -1,0 +1,10 @@
+.add-form .days {
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+.add-form .chip {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  text-transform: capitalize;
+  font-size: 0.85rem;
+}

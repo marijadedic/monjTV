@@ -1,0 +1,189 @@
+.add-form label, .folder-block, .pick-mode, .also {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.add-form label input {
+  font-size: 0.95rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+}
+.add-form input {
+  font-family: inherit;
+  font-size: 0.92rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px;
+  min-height: 34px;
+}
+.picked {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  margin-top: 12px;
+}
+.picked.one {
+  grid-template-columns: auto;
+}
+.picked div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.picked .value {
+  color: var(--muted);
+  font-size: 0.95rem;
+  letter-spacing: 0;
+  text-transform: none;
+  overflow-wrap: anywhere;
+}
+.picked .value.dash {
+  margin-left: 0.35rem;
+}
+.add-form .source {
+  border: 0;
+  margin: 14px 0 0;
+  padding: 0;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+.add-form .source-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+.add-form .source-grid .mode.on {
+  border-color: var(--primary-line);
+  background: color-mix(in srgb, var(--primary) 28%, var(--panel));
+}
+.add-form .fixed, .add-form .wait {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.add-form .dur-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.add-form .dur-pick select {
+  flex: 0 0 auto;
+  max-width: 100%;
+  min-height: 34px;
+  padding: 6px 8px;
+}
+.add-form .info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+.add-form .info:hover, .add-form .info:focus-visible {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.add-form .cloud-host {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+}
+.add-form .cloud, .cloud.lifted {
+  position: absolute;
+  z-index: 40;
+  width: max-content;
+  max-width: min(16rem, calc(100vw - 32px));
+  padding: 8px 12px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 8px 18px rgba(20, 24, 32, 0.14);
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  display: none;
+}
+.cloud.lifted {
+  position: fixed;
+}
+.add-form .cloud::after, .add-form .cloud::before, .cloud.lifted::after, .cloud.lifted::before {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: var(--tail, 14px);
+  transform: translateX(-50%);
+  border-style: solid;
+  border-color: transparent;
+}
+.add-form .cloud::after, .cloud.lifted::after {
+  border-width: 7px 6px 0;
+  border-top-color: var(--line);
+}
+.add-form .cloud::before, .cloud.lifted::before {
+  border-width: 6px 5px 0;
+  border-top-color: var(--panel);
+  margin-top: -3px;
+  z-index: 1;
+}
+.cloud.lifted.below::after, .cloud.lifted.below::before {
+  top: auto;
+  bottom: 100%;
+}
+.cloud.lifted.below::after {
+  border-width: 0 6px 7px;
+  border-top-color: transparent;
+  border-bottom-color: var(--line);
+}
+.cloud.lifted.below::before {
+  border-width: 0 5px 6px;
+  border-top-color: transparent;
+  border-bottom-color: var(--panel);
+  margin-top: 0;
+  margin-bottom: -3px;
+}
+.add-form .custom {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.add-form .custom input {
+  width: 6.5rem;
+  min-width: 0;
+}
+.add-form .custom em {
+  font-style: normal;
+  color: var(--muted);
+}
+.add-form .wait-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: var(--text);
+}
+.add-form .measure-label {
+  overflow-wrap: anywhere;
+}

@@ -1,3 +1,4 @@
+import "./styles/DayTabs.css";
 import { dateOffset } from "../../../shared/dates.ts";
 import { useI18n } from "../../i18n.tsx";
 import { pageHref } from "../../href.ts";

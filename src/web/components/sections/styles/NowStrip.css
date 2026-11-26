@@ -1,0 +1,25 @@
+.now-strip {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 18px 18px 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: end;
+  margin: 0;
+}
+.now-strip.has-still {
+  grid-template-columns: 168px minmax(0, 1fr) auto;
+  align-items: stretch;
+}
+.now-strip.has-still .primary {
+  align-self: end;
+}
+.now-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 8px;
+  align-self: end;
+}

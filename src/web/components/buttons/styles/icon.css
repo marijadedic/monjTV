@@ -1,0 +1,41 @@
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--primary-line);
+}
+.icon-btn .glyph {
+  display: block;
+  width: 16px;
+  height: 16px;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.mode-pill .icon-btn {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+}
+.icon-btn.trash {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  margin-left: auto;
+  color: #ff4d4d;
+}
+.icon-btn.trash .glyph {
+  width: 24px;
+  height: 24px;
+}

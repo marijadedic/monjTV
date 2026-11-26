@@ -1,3 +1,7 @@
+import "./styles/WhenEditor.css";
+import "./styles/WhenEditor.row.css";
+import "./styles/WhenEditor.fields.css";
+import "./styles/WhenEditor.times.css";
 import type { StateUpdater } from "preact/hooks";
 import { DAYS, type Day, type ScheduleBlock, type SlotLength, type TvBoard } from "../../../shared/types.ts";
 import { placedOn } from "../../../shared/placed.ts";

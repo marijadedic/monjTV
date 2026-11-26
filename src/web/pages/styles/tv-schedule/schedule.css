@@ -1,0 +1,171 @@
+.strip-title {
+  margin: 4px 0 2px;
+  font-size: 1.55rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.track {
+  margin-top: 10px;
+  height: 4px;
+  border-radius: 99px;
+  background: var(--line);
+  overflow: hidden;
+}
+.track > i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: grid;
+  grid-template-columns: minmax(72px, 110px) minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+.card.playing {
+  border: 1px solid var(--line);
+  padding: 18px 16px;
+  box-shadow: inset 5px 0 0 var(--ok);
+  background: color-mix(in srgb, var(--ok) 10%, var(--panel));
+}
+.card.playing.has-still {
+  grid-template-columns: 132px minmax(84px, 130px) minmax(0, 1fr) auto;
+}
+.card.playing .still {
+  width: 132px;
+  height: 74px;
+}
+.card.playing .title {
+  font-size: 1.28rem;
+}
+.card.playing .pill.playing {
+  font-size: 0.95rem;
+  padding: 4px 10px;
+}
+.card.playing .time {
+  color: var(--text);
+}
+.card.done, .card.skipped, .card.passed {
+  opacity: 0.45;
+}
+.card.done .still, .card.skipped .still, .card.passed .still {
+  filter: grayscale(1);
+}
+.card.skipped .title {
+  color: var(--skip);
+}
+.time {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 1px 7px;
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--pill-wait);
+}
+.pill.playing {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 28%, var(--panel));
+}
+.now-strip .pill.playing, .pill.on-air {
+  color: var(--ok);
+  background: var(--pill-air);
+  letter-spacing: 0.01em;
+  font-weight: 700;
+  padding: 2px 8px;
+}
+.pill.gap {
+  color: var(--text);
+  background: var(--pill-wait);
+  letter-spacing: 0.01em;
+  font-weight: 700;
+  padding: 2px 8px;
+}
+.card.playing .pill.on-air {
+  font-size: 0.95rem;
+  padding: 4px 10px;
+}
+.tv-break {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 40px 0 32px;
+}
+.next-plain {
+  color: var(--text);
+  font-weight: 400;
+}
+.will-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 12px 0 0;
+}
+.will-line b {
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.now-strip .pill.next {
+  color: var(--text);
+  background: var(--pill-wait);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+}
+.strip-note {
+  margin: 8px 0 0;
+}
+.pill.next {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 18%, var(--panel));
+}
+.pill.done {
+  color: var(--warn);
+  background: var(--pill-done);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.pill.skipped {
+  color: var(--skip);
+  background: var(--pill-skip);
+}
+.empty {
+  margin-top: 8px;
+  padding: 28px 16px;
+  text-align: center;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  color: var(--muted);
+}
+.empty p {
+  margin: 0 0 8px;
+}

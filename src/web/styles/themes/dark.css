@@ -1,0 +1,41 @@
+:root, [data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #222836;
+  --panel: #2e3648;
+  --line: #44506a;
+  --text: #eef1f6;
+  --muted: #a3adc0;
+  --accent: #8ec0ff;
+  --ok: #7dcc9b;
+  --warn: #d6b15c;
+  --skip: #8b94a6;
+  --primary: #3a6aa8;
+  --primary-line: #5a8cc4;
+  --on-primary: #f4f7fb;
+  --browse: #262e40;
+  --browse-hover: #38425a;
+  --pill-air: rgba(125, 204, 155, 0.16);
+  --pill-done: rgba(214, 177, 92, 0.16);
+  --pill-wait: rgba(139, 149, 168, 0.16);
+  --pill-skip: rgba(110, 118, 134, 0.22);
+}
+html[data-theme="dark"] .add-form .mode.on.movie {
+  border-color: #3f6ca3;
+  background: color-mix(in srgb, #3f6ca3 28%, var(--panel));
+}
+html[data-theme="dark"] .add-form .mode.on.shows {
+  border-color: #9a5a74;
+  background: color-mix(in srgb, #9a5a74 28%, var(--panel));
+}
+html[data-theme="dark"] .add-form .mode.on.film {
+  border-color: #c4842a;
+  background: color-mix(in srgb, #c4842a 28%, var(--panel));
+}
+html[data-theme="dark"] .add-form .mode.on.tube {
+  border-color: #a33a3a;
+  background: color-mix(in srgb, #a33a3a 28%, var(--panel));
+}
+html[data-theme="dark"] .add-form .mode.on.stack {
+  border-color: #3a8a7a;
+  background: color-mix(in srgb, #3a8a7a 28%, var(--panel));
+}

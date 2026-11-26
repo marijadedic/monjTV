@@ -1,0 +1,20 @@
+.when-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 10px;
+}
+.when-row input.time {
+  width: 8.2rem;
+}
+.when-end {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.when-note {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+.when-note.warn {
+  color: var(--warn, #9a3b2f);
+}

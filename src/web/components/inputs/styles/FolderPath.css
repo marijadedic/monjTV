@@ -1,0 +1,38 @@
+.folder-name {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+.path-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.path-suggest {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 160px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--browse);
+}
+.path-suggest button {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font-weight: 500;
+}
+.path-suggest button:hover, .path-suggest button.on {
+  background: var(--browse-hover);
+}

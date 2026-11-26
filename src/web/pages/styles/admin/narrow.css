@@ -1,0 +1,8 @@
+@media (max-width: 640px) {
+  .day-start {
+    grid-template-columns: 2.8rem minmax(0, 1fr);
+  }
+  .day-start .note {
+    grid-column: 1 / -1;
+  }
+}

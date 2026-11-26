@@ -1,3 +1,4 @@
+import "./styles/icon.css";
 import { TrashIcon } from "../parts/TrashIcon.tsx";
 
 export function DeleteButton({ label, onClick }: { label: string; onClick: () => void }) {

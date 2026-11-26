@@ -1,3 +1,4 @@
+import "./styles/SlotNotices.css";
 import { useI18n } from "../../i18n.tsx";
 import { FieldNote } from "../parts/FieldNote.tsx";
 

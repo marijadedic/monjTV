@@ -1,3 +1,4 @@
+import "./styles/WeekScale.css";
 import type { Day, Schedule, ScheduleBlock, TvBoard } from "../../../shared/types.ts";
 import type { Draft } from "../../types/Draft.ts";
 import { piecesFor } from "../../utils/week/piecesFor.ts";

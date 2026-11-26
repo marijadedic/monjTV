@@ -1,3 +1,4 @@
+import "./styles/NowStrip.css";
 import type { RundownItem } from "../../../shared/types.ts";
 import { useI18n } from "../../i18n.tsx";
 import { gapStillSrc } from "../../utils/rundown/gapStillSrc.ts";

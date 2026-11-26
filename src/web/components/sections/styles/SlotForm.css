@@ -1,0 +1,111 @@
+.add-form {
+  position: fixed;
+  z-index: 21;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: min(46rem, calc(100% - 64px));
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
+  padding: 1rem 1.5rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 6px 16px rgba(60, 70, 40, 0.1);
+}
+.add-form.gap-form {
+  z-index: 23;
+  width: min(22rem, calc(100% - 48px));
+}
+.add-form.gap-form .custom, .add-form.gap-form .actions {
+  width: 100%;
+}
+.add-form header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.mode-pill {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  border: 1px solid var(--line);
+}
+.step-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--line);
+}
+.step-tabs button {
+  margin: 0 0 -1px;
+  padding: 6px 14px 8px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+  background: transparent;
+  color: var(--muted);
+}
+.step-tabs button.on {
+  background: var(--bg);
+  color: var(--text);
+  border-color: var(--line);
+  font-weight: 650;
+}
+.step-body {
+  overflow: auto;
+  min-height: 0;
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+  margin-right: -1.5rem;
+  padding-right: 1.5rem;
+}
+.step-body.slide-next {
+  animation: step-next 320ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.step-body.slide-back {
+  animation: step-back 320ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+@keyframes step-next {
+  from {
+    transform: translateX(28%);
+    opacity: 0.4;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes step-back {
+  from {
+    transform: translateX(-28%);
+    opacity: 0.4;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .step-body.slide-next, .step-body.slide-back {
+    animation: none;
+  }
+}
+.add-form .mode-list {
+  display: grid;
+  gap: 8px;
+}
+.add-form .mode-list .mode {
+  width: 100%;
+  min-height: 0;
+  padding: 10px 12px;
+  text-align: left;
+  align-items: flex-start;
+  justify-content: flex-start;
+  flex-direction: column;
+  gap: 2px;
+}

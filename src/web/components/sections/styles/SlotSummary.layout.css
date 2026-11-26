@@ -1,0 +1,49 @@
+.summary-title {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 18px 0 16px;
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+.summary-title span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.summary-title .icon-btn, .summary-label .icon-btn {
+  margin-left: auto;
+}
+.summary-fact {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.summary-fact .len {
+  margin-left: auto;
+  color: var(--muted);
+}
+.summary-label {
+  display: flex;
+  align-items: center;
+  margin-top: 16px;
+}
+.summary-line {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+.folder-block > button.wide {
+  width: 100%;
+  margin-top: 12px;
+}
+.folder-block > .tally {
+  margin: 8px 0 0;
+}
+.folder-block > .tally + button.wide {
+  margin-top: 8px;
+}
+.add-form.asking > :not(.ask) {
+  filter: blur(6px);
+  pointer-events: none;
+}

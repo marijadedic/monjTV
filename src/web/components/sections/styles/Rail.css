@@ -1,0 +1,52 @@
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 0 8px 4px;
+  border-left: 1px solid var(--line);
+}
+.rail-item {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--panel);
+  box-shadow: inset 0 0 0 1.5px var(--line);
+  margin: 20px 0 0 -4px;
+}
+.rail-item.playing .dot {
+  background: var(--ok);
+  box-shadow: none;
+}
+.rail-item.will-start .dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.rail-item.done .dot, .rail-item.passed .dot {
+  background: var(--warn);
+  box-shadow: none;
+}
+.rail-item.skipped .dot {
+  background: var(--skip);
+  box-shadow: none;
+}
+.carry {
+  margin: 2px 0 0 24px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+.rail-split {
+  margin: 6px 0 2px 24px;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+.rail-item.carry-row:not(.playing) .card {
+  box-shadow: inset 3px 0 0 #8ecfc4;
+}

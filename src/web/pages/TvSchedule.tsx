@@ -1,3 +1,5 @@
+import "./styles/tv-schedule/schedule.css";
+import "./styles/tv-schedule/type.css";
 import { useEffect, useState } from "preact/hooks";
 import { dateOffset, weekdayOfKey } from "../../shared/dates.ts";
 import type { PlayerStatus, RundownItem, TvBoard } from "../../shared/types.ts";

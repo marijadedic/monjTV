@@ -1,0 +1,258 @@
+.week-scale {
+  --name-h: 1.2rem;
+  --name-gap: 4px;
+  --slot-floor: 3.4rem;
+  --slot-cap: 3.8rem;
+  --gap-floor: 1.4rem;
+  --minute: 0.0285rem;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  align-items: start;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+.shell.wide .week-scale {
+  overflow: visible;
+}
+.day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.day.editing {
+  z-index: 2;
+}
+.day .name {
+  display: block;
+  height: var(--name-h);
+  margin: 0 0 var(--name-gap);
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: var(--name-h);
+  text-transform: capitalize;
+}
+.day.on .name {
+  color: var(--text);
+}
+.week-scale .track {
+  position: relative;
+  flex: 0 0 auto;
+  min-height: min-content;
+  margin-top: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+  background: #1c2333;
+}
+.day:has(.gap.first) {
+  align-self: stretch;
+  min-height: 100%;
+}
+.day:has(.gap.first) .track {
+  flex: 1 1 auto;
+  min-height: 100%;
+}
+.day.on .track {
+  border-color: var(--accent);
+}
+.week-scale button.gap, .week-scale button.slot {
+  appearance: none;
+  position: relative;
+  flex: 0 0 auto;
+  left: auto;
+  right: auto;
+  width: auto;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  cursor: pointer;
+  font: inherit;
+  min-height: 0;
+}
+.week-scale button.gap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: max(var(--gap-floor), calc(var(--mins) * var(--minute)));
+  padding: 1px 4px;
+  overflow: hidden;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.7rem;
+  line-height: 1.15;
+  text-align: center;
+}
+.week-scale button.gap.long {
+  height: var(--slot-cap);
+}
+.week-scale button.gap.first {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 100%;
+}
+.week-scale button.gap.tight {
+  color: var(--warn);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 55%, transparent);
+}
+.week-scale button.gap:hover, .week-scale button.gap.pick {
+  background: var(--browse-hover);
+}
+.gap.long, .gap.first {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.gap.first {
+  flex-direction: column;
+  gap: 4px;
+}
+.gap b, .slot b, .slot .tm, .slot i, .slot .stack-lines, .slot .stack-lines > span {
+  display: block;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gap b, .slot b {
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+.gap i, .slot i, .slot .tm {
+  font-style: normal;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.88;
+}
+.week-scale button.slot, .week-scale .ghost {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  gap: 1px;
+  height: min(var(--slot-cap), max(var(--slot-floor), calc(var(--mins) * var(--minute))));
+  padding: 2px 6px;
+  overflow: hidden;
+  line-height: 1.1;
+  text-align: left;
+  background: #8ec0ff;
+  color: #102038;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 12%, transparent);
+}
+.week-scale button.slot.spill {
+  box-shadow:
+    inset 0 2px 0 var(--accent),
+    inset 0 0 0 1px color-mix(in srgb, currentColor 12%, transparent);
+}
+.week-scale button.slot.pick, .week-scale button.gap.pick {
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+.week-scale button.slot.shows, .week-scale .ghost.shows {
+  background: #e7b7c8;
+  color: #2e1420;
+}
+.week-scale button.slot.film, .week-scale .ghost.film {
+  background: #f0d7a2;
+  color: #2c1c08;
+}
+.week-scale button.slot.tube, .week-scale .ghost.tube {
+  background: #f0b2ac;
+  color: #2c1010;
+}
+.week-scale button.slot.stack, .week-scale .ghost.stack {
+  justify-content: flex-start;
+  background: #8ecfc4;
+  color: #10302c;
+}
+.week-scale button.slot.stack {
+  height: auto;
+  min-height: min(var(--slot-cap), max(var(--slot-floor), calc(var(--mins) * var(--minute))));
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+.week-scale button.slot.stack.slice {
+  height: min(var(--slot-cap), max(var(--slot-floor), calc(var(--mins) * var(--minute))));
+  min-height: 0;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.slot .more {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.88;
+}
+.week-scale .ghost i {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  font-style: normal;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.88;
+}
+.week-scale button.slot.stack .stack-lines {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  margin: 3px 0 2px;
+  white-space: normal;
+  overflow: hidden;
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 1.32;
+  opacity: 0.95;
+}
+.week-scale button.slot.stack.slice .stack-lines {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 1px 0;
+}
+.week-scale button.slot.stack > i {
+  margin-top: 2px;
+}
+.week-scale button.slot .slot-calc {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% - 8px);
+  color: inherit;
+  font-size: 0.62rem;
+  font-weight: 650;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.week-scale button.slot .slot-calc .spin {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-color: color-mix(in srgb, currentColor 35%, transparent);
+  border-top-color: currentColor;
+}
+.week-scale .ghost {
+  position: relative;
+  flex: 0 0 auto;
+  z-index: 1;
+  min-width: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1.5px var(--primary-line);
+}
+.week-scale .ghost b {
+  font-size: 0.72rem;
+  font-weight: 650;
+  white-space: nowrap;
+}

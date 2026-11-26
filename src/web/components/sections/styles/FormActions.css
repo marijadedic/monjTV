@@ -1,0 +1,31 @@
+.add-form .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+.add-form .actions .cancel {
+  margin-right: auto;
+}
+.add-form .actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.add-form .actions .quiet {
+  margin-right: auto;
+  padding: 6px 4px;
+}
+.add-form .actions .spin {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+  border-color: color-mix(in srgb, currentColor 35%, transparent);
+  border-top-color: currentColor;
+}
+.add-form .actions button.working:disabled {
+  opacity: 1;
+  cursor: progress;
+}

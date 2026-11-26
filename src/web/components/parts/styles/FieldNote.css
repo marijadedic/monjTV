@@ -1,0 +1,11 @@
+.field-error {
+  margin: 0;
+  color: #c45c5c;
+  font-size: 0.85rem;
+}
+.add-form .k, .add-form label {
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  font-weight: 500;
+}

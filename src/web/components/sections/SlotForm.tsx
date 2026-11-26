@@ -1,3 +1,4 @@
+import "./styles/SlotForm.css";
 import type { StateUpdater } from "preact/hooks";
 import type { Schedule, SlotLength, TvBoard } from "../../../shared/types.ts";
 import { placedOn } from "../../../shared/placed.ts";

@@ -1,3 +1,4 @@
+import "./styles/FieldNote.css";
 import type { ComponentChildren, Ref } from "preact";
 
 export function FieldNote({

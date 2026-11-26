@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "preact/hooks";
+import "./styles/chrome.css";
+import "./App.css";
+import "./styles/nav.css";
 import { api } from "./api.ts";
-import { GroveFrame } from "./Grove.tsx";
+import { MeadowFrame } from "./Meadow.tsx";
 import { pageHref } from "./href.ts";
 import { TvSchedule } from "./pages/TvSchedule.tsx";
 import { Admin } from "./pages/Admin.tsx";
@@ -107,7 +110,7 @@ export function App() {
 
   return (
     <>
-      {theme === "meadow" && <GroveFrame />}
+      {theme === "meadow" && <MeadowFrame />}
       <div class={admin ? "shell wide" : "shell tv-chrome"}>
         <header class="top">
           <a class="brand" href={pageHref("/")}>

@@ -1,3 +1,4 @@
+import "./styles/ModeList.css";
 import { ModeOption } from "./ModeOption.tsx";
 
 export function ModeList<T extends string>({

@@ -1,0 +1,16 @@
+.week-wrap {
+  position: relative;
+}
+.week-wrap.drafting .week-scale {
+  pointer-events: none;
+}
+.week-wrap .scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgba(10, 12, 16, 0.55);
+  backdrop-filter: blur(6px);
+}
+.week-wrap .scrim.gap-scrim {
+  z-index: 22;
+}

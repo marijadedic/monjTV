@@ -1,3 +1,4 @@
+import "./styles/Rail.css";
 import { Fragment, type ComponentChildren } from "preact";
 import type { ItemStatus, RundownItem } from "../../../shared/types.ts";
 import { itemHasPassed } from "../../../shared/window.ts";
