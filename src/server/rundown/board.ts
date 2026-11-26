@@ -41,12 +41,14 @@ async function fillMissingDays(): Promise<void> {
 export function presentBoard(board: BoardFile): TvBoard {
   const today = dateKey();
   const days: DayRundown[] = [];
+
   for (let offset = -TV_PAST; offset <= TV_AHEAD; offset++) {
     const date = shiftDateKey(today, offset);
     const saved = board.days.find((day) => day.date === date);
     if (saved) days.push(saved);
     else if (date === today) days.push({ date, items: [] });
   }
+
   const misses = listedSaveMisses();
   return {
     today,
@@ -125,6 +127,7 @@ export async function syncBoard(fillAhead: boolean): Promise<BoardFile> {
   };
   await reflowSeries(next);
   await writeBoard(next);
+
   return next;
 }
 
@@ -155,6 +158,7 @@ export function ensureToday(): Promise<TodayRundown> {
 // Yesterday through the next six days. Today is returned as saved; a missing later day is filled afterwards.
 export function ensureBoard(): Promise<TvBoard> {
   if (boardWait) return boardWait;
+
   const run = ensureBoardBody().finally(() => {
     if (boardWait === run) boardWait = null;
   });
@@ -168,6 +172,7 @@ function closePassedSlots(board: BoardFile): boolean {
   const now = nowSec();
   const day = board.days.find((entry) => entry.date === today);
   if (!day) return false;
+
   let changed = false;
   for (const item of day.items) {
     if (item.status !== "planned") continue;
@@ -190,6 +195,7 @@ async function ensureBoardBody(): Promise<TvBoard> {
   if (rebuildingAhead > 0 && !(await scheduleAheadOfBoard())) {
     return presentBoard(await exclusive(async () => settlePassed(await readBoard())));
   }
+
   return exclusive(async () => {
     if (await scheduleAheadOfBoard()) {
       try {
@@ -219,6 +225,7 @@ export function saveToday(rundown: TodayRundown): Promise<void> {
     const today = dateKey();
     const days = board.days.filter((day) => day.date !== rundown.date && inWindow(today, day.date));
     days.push(rundown);
+
     await writeBoard({ carriedInto: board.carriedInto, days });
   });
 }
@@ -251,6 +258,7 @@ async function scheduleAheadOfBoard(): Promise<boolean> {
 async function rebuildTodayPreservingPlaybackLocked(changedIds?: Set<string>): Promise<TodayRundown> {
   if (changedIds?.size) markBuilding(changedIds);
   else markBuilding((await loadSchedule()).blocks.map((block) => block.id));
+
   try {
     return await rebuildTodayPreservingPlaybackBody(changedIds);
   } catch (err) {
@@ -265,15 +273,19 @@ async function rebuildTodayPreservingPlaybackBody(changedIds?: Set<string>): Pro
   const today = dateKey();
   const current = board.days.find((day) => day.date === today) ?? { date: today, items: [] };
   const rebuilt = await rebuildLiveDay(current, changedIds, scheduledRandomPaths(board.days, ""));
+
   const savedYesterday = board.days.find((day) => day.date === shiftDateKey(today, -1));
   const head: DayRundown[] = [];
   if (savedYesterday) head.push(savedYesterday);
   head.push(rebuilt);
+
   const drafted: BoardFile = { carriedInto: today, days: head };
   await reflowSeries(drafted);
+
   const later = board.days.filter((day) => day.date > today && inWindow(today, day.date));
   await writeBoard({ carriedInto: today, days: [...drafted.days, ...later] });
   scheduleAheadRebuild(changedIds);
+
   return rebuilt;
 }
 
@@ -307,14 +319,17 @@ async function rebuildDaysAfterToday(changedIds?: Set<string>): Promise<void> {
     const board = await readBoard();
     const live = board.days.find((day) => day.date === today);
     if (!live) return;
+
     const stamp = dayFiles(live);
     const schedule = await loadSchedule();
     let progress = notePicks(await loadProgress(), live.items, schedule, true);
     let previous = live;
+
     const days: DayRundown[] = [];
     const savedYesterday = board.days.find((day) => day.date === shiftDateKey(today, -1));
     if (savedYesterday) days.push(savedYesterday);
     days.push(live);
+
     for (let offset = 1; offset <= TV_AHEAD; offset++) {
       const date = shiftDateKey(today, offset);
       const saved = board.days.find((day) => day.date === date);
@@ -325,8 +340,10 @@ async function rebuildDaysAfterToday(changedIds?: Set<string>): Promise<void> {
       previous = day;
       progress = own.progress;
     }
+
     const next: BoardFile = { carriedInto: today, days };
     await reflowSeries(next);
+
     await exclusive(async () => {
       const latest = await readBoard();
       const current = latest.days.find((day) => day.date === today);
@@ -334,11 +351,13 @@ async function rebuildDaysAfterToday(changedIds?: Set<string>): Promise<void> {
         if (current) scheduleAheadRebuild(changedIds);
         return;
       }
+
       const yesterday = latest.days.find((day) => day.date === shiftDateKey(today, -1));
       const kept: DayRundown[] = [];
       if (yesterday) kept.push(yesterday);
       kept.push(current);
       kept.push(...next.days.filter((day) => day.date > today));
+
       await writeBoard({ carriedInto: today, days: kept });
     });
   } catch (err) {

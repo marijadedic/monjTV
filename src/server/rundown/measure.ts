@@ -154,6 +154,7 @@ async function missForBlock(block: ScheduleBlock, progress: Progress): Promise<S
     }
     return null;
   }
+
   const slotSec = tightestSlotSec(block);
   const limitSec = maxPlayableSec(slotSec);
   if (block.mode === "specific-file") {
@@ -208,6 +209,7 @@ async function missForRandomFolder(blockId: string, folder: string, slotSec: num
     }
   }
   if (timed.length === 0) return null;
+
   const limitSec = maxPlayableSec(slotSec);
   let shortest: { title: string; durationSec: number } | null = null;
   for (const video of timed) {

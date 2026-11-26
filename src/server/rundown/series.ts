@@ -84,9 +84,11 @@ export async function reflowSeries(board: BoardFile): Promise<boolean> {
         follow: false,
       };
       cursors.set(folder, cursor);
+
       const played = item.status === "done" || item.status === "playing";
       const missed =
         item.status === "skipped" || (day.date === today && !played && itemHasPassed(item, now));
+
       if (played) {
         cursor.last = item.path;
         cursor.consumed = item.path;
@@ -94,8 +96,10 @@ export async function reflowSeries(board: BoardFile): Promise<boolean> {
         cursor.day = day.date;
         continue;
       }
+
       if (cursor.day !== day.date) cursor.last = cursor.consumed;
       const laterSameDay = cursor.day === day.date;
+
       if (item.chosen && files.includes(item.path)) {
         holdChosenEpisode(cursor, item.path, files, missed, day.date);
         if (missed && item.status !== "skipped") {
@@ -104,15 +108,19 @@ export async function reflowSeries(board: BoardFile): Promise<boolean> {
         }
         continue;
       }
+
       if (item.chosen) {
         delete item.chosen;
         changed = true;
       }
+
       if (missed || cursor.follow || laterSameDay) {
         const episode = nextFrom(files, cursor.last);
         if (!episode) continue;
+
         await place(item, episode, day.date, item.blockId);
         cursor.last = episode;
+
         if (missed) {
           if (item.status !== "skipped") {
             item.status = "skipped";
@@ -125,6 +133,7 @@ export async function reflowSeries(board: BoardFile): Promise<boolean> {
         cursor.day = day.date;
         continue;
       }
+
       cursor.last = item.path;
       cursor.consumed = item.path;
       cursor.day = day.date;
@@ -236,22 +245,27 @@ async function mirrorYesterdaySkips(
   const today = dateKey();
   const yesterday = days.find((day) => day.date === shiftDateKey(today, -1));
   if (!yesterday) return false;
+
   const skippedCursor = new Map<string, string>();
   let changed = false;
+
   for (const item of sortRundown(yesterday.items)) {
     if (item.overnight) continue;
+
     const folder = seriesFolder(item, schedule);
     if (!folder || (folderFilter && folder !== folderFilter)) continue;
     if (item.status === "done") {
       skippedCursor.set(folder, item.path);
       continue;
     }
+
     const files = await filesOf(folder);
     const previous = skippedCursor.get(folder);
     const episode = previous
       ? nextFrom(files, previous)
       : (firstUpcomingPath(days, folder, schedule, today) ?? nextFrom(files, progress.lastCompleted[folder]));
     if (!episode) continue;
+
     if (item.path !== episode) {
       item.path = episode;
       item.title = nameOf(episode);
@@ -259,6 +273,7 @@ async function mirrorYesterdaySkips(
       changed = true;
       touched.add(`${yesterday.date}|${item.blockId}`);
     }
+
     skippedCursor.set(folder, episode);
     if (item.status !== "skipped") {
       item.status = "skipped";
@@ -281,22 +296,27 @@ export async function continueShowAfter(
   const days = board.days.filter((day) => inWindow(today, day.date)).sort((a, b) => a.date.localeCompare(b.date));
   const touched = new Set<string>();
   let cursor = origin.path;
+
   for (const day of days) {
     if (day.date < origin.date) continue;
     for (const item of sortRundown(day.items)) {
       if (seriesFolder(item, schedule) !== folder) continue;
       if (item.overnight) continue;
       if (!laterInWeek(day.date, item, origin)) continue;
+
       delete item.chosen;
       const played = item.status === "done" || item.status === "playing";
       const missed =
         item.status === "skipped" || (day.date === today && !played && itemHasPassed(item, now));
+
       if (played) {
         cursor = item.path;
         continue;
       }
+
       const episode = nextFrom(files, cursor);
       if (!episode) continue;
+
       if (item.path !== episode) {
         item.path = episode;
         item.title = nameOf(episode);
@@ -310,6 +330,7 @@ export async function continueShowAfter(
       }
     }
   }
+
   syncOvernightCopies(days, schedule, touched);
   await mirrorYesterdaySkips(days, schedule, await loadProgress(), async () => files, touched, folder);
   applyTouched(days, schedule, touched);

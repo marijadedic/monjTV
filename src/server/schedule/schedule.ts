@@ -178,8 +178,10 @@ export function validateSchedule(
   if (!input || !Array.isArray(input.blocks)) {
     throw new Error("Schedule must have a blocks array");
   }
+
   const blocks = input.blocks.map(normalizeBlock);
   const touched = before ? new Set(changedBlocks(before, blocks).map((block) => block.id)) : null;
+
   for (const day of DAYS) {
     const ofDay = blocks
       .flatMap((block) =>
@@ -201,6 +203,7 @@ export function validateSchedule(
       throw new Error(`Overlapping blocks on ${day}: ${prev.label} and ${cur.label}`);
     }
   }
+
   const { intermissions, activeIntermission } = intermissionsFrom(input, true);
   return {
     blocks,

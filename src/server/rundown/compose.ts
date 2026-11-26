@@ -27,6 +27,7 @@ export async function buildOwnItems(
   const shadow = cloneProgress(progress);
   const day = weekdayOfKey(date);
   const items: RundownItem[] = [];
+
   for (const block of blocksForDay(schedule, day)) {
     const placed = windowOn(block, day);
     const kept = keptForBlock(existing, block.id);
@@ -42,6 +43,7 @@ export async function buildOwnItems(
             reserved,
           );
     items.push(...built);
+
     for (const item of built) {
       const folder = sourceFolder(item, block);
       if (!folder) continue;
@@ -83,6 +85,7 @@ export async function buildRundown(
             reserved,
           );
     items.push(...built);
+
     for (const item of built) {
       const folder = sourceFolder(item, block);
       if (!folder) continue;
@@ -99,15 +102,18 @@ export async function buildRundown(
   for (const block of blocksForDay(schedule, yesterday)) {
     const placed = windowOn(block, yesterday);
     if (block.mode !== "playlist" && placed.endMin <= DAY_MINUTES) continue;
+
     if (changedIds && existing && !changedIds.has(block.id)) {
       items.push(...existing.items.filter((item) => item.blockId === block.id && item.overnight));
       continue;
     }
+
     const existingOvernight = existing?.items.filter((item) => item.blockId === block.id && item.overnight) ?? [];
     if (existingOvernight.length) {
       items.push(...existingOvernight);
       continue;
     }
+
     const built = await itemsForWindow(
       block,
       parseHm(placed.start),
@@ -118,6 +124,7 @@ export async function buildRundown(
     );
     const leftoverEndSec = blockLeftoverSec(block, yesterday, built);
     if (leftoverEndSec <= 0) continue;
+
     for (const item of built) {
       const leftover = { ...item, overnight: true };
       if (leftoverStillActive(leftover, now, leftoverEndSec)) items.push(leftover);
@@ -164,5 +171,6 @@ export async function rebuildLiveDay(
     );
   }
   merged.push(...built.items.filter((item) => item.overnight && !overnightLockedBlocks.has(item.blockId)));
+
   return { date: today, items: sortRundown(merged) };
 }

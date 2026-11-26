@@ -31,16 +31,20 @@ export async function itemsForWindow(
       try {
         const meta = await probeYoutube(youtube);
         if (!itemFits(meta.durationSec, blockEnd - cursorStart)) return items;
+
         items.push(makeItem(block, meta.url, cursorStart, meta.durationSec, { title: meta.title }));
       } catch {
         return items;
       }
       return items;
     }
+
     const file = block.file;
     if (!file || !(await isVideoFile(file))) return items;
+
     const durationSec = await lengthOf(file);
     if (!itemFits(durationSec, blockEnd - cursorStart)) return items;
+
     items.push(makeItem(block, file, cursorStart, durationSec));
     return items;
   }
@@ -62,33 +66,40 @@ export async function itemsForWindow(
     if (block.mode === "next-episode") {
       const file = nextFrom(files, lastCompleted);
       if (!file) break;
+
       durationSec = await lengthOf(file);
       if (!itemFits(durationSec, remaining)) break;
+
       picked = file;
     } else {
       const recent = progress.recentRandom[series] ?? [];
       const pool = files.filter((candidate) => !passed.has(candidate) && !used.includes(candidate));
       if (pool.length === 0) break;
+
       const choice = takeRandom(pool, recent, {
         avoid: [...otherFolderPlays(progress.recentRandom, series), ...reserved],
         block: used,
         all: files,
       });
       if (!choice) break;
+
       const timed = await tryLength(choice.path);
       if (timed == null || !itemFits(timed, remaining)) {
         passed.add(choice.path);
         continue;
       }
+
       durationSec = timed;
       picked = choice.path;
       progress.recentRandom[series] = choice.recent;
     }
+
     if (!picked) break;
 
     items.push(makeItem(block, picked, cursor, durationSec));
     used.push(picked);
     if (block.mode === "next-episode") lastCompleted = picked;
+
     cursor += durationSec;
   }
 
@@ -116,6 +127,7 @@ async function itemsForPlaylist(
     const used = usedByFolder.get(entry.folder) ?? [];
     const prev = takeKeptEntry(unused, entry);
     let picked: { path: string; durationSec: number; title: string } | null = null;
+
     if (entry.mode === "random-file" && prev && (await randomPickStillValid(entry, prev, used))) {
       picked = { path: prev.path, durationSec: prev.durationSec, title: prev.title };
     } else if (entry.mode === "next-episode" && prev?.chosen) {
@@ -124,6 +136,7 @@ async function itemsForPlaylist(
       picked = await pickEntry(entry, shadow, used, reserved);
     }
     if (!picked) continue;
+
     pickedList.push({ entry, prev, picked });
     if (entry.folder) {
       usedByFolder.set(entry.folder, [...used, picked.path]);
@@ -134,11 +147,13 @@ async function itemsForPlaylist(
       }
     }
   }
+
   let cursor = cursorStart;
   for (let i = 0; i < pickedList.length; i++) {
     const { entry, prev, picked } = pickedList[i]!;
     items.push(placePlaylistItem(block, entry, prev, picked, cursor));
     cursor += picked.durationSec;
+
     if (i < pickedList.length - 1) {
       const gap = entry.gapAfterMin ?? 0;
       if (gap > 0) cursor += gap * 60;
@@ -173,10 +188,13 @@ async function randomPickStillValid(
 ): Promise<boolean> {
   if (item.mode !== "random-file" || !item.path) return false;
   if (used.includes(item.path)) return false;
+
   const files = await seriesFiles(canonicalPlaylistUrl(entry.folder) ?? entry.folder);
   if (!files.includes(item.path)) return false;
+
   const durationSec = item.durationSec > 0 ? item.durationSec : await lengthOf(item.path);
   if (entry.lengthMin && !itemFits(durationSec, entry.lengthMin * 60)) return false;
+
   return true;
 }
 
@@ -230,36 +248,45 @@ async function pickEntry(
     }
     const file = entry.file;
     if (!file || !(await isVideoFile(file))) return null;
+
     return { path: file, durationSec: await lengthOf(file), title: nameOf(file) };
   }
+
   if (entry.mode === "next-episode") {
     const series = canonicalPlaylistUrl(entry.folder) ?? entry.folder;
     const episodes = await seriesFiles(series);
     const file = nextFrom(episodes, progress.lastCompleted[series]);
     if (!file) return null;
+
     const durationSec = await lengthOf(file);
     return { path: file, durationSec, title: nameOf(file) };
   }
+
   const series = canonicalPlaylistUrl(entry.folder) ?? entry.folder;
   const files = await seriesFiles(series);
   if (files.length === 0) return null;
+
   const recent = progress.recentRandom[series] ?? [];
   const remaining = entry.lengthMin ? entry.lengthMin * 60 : null;
   const passed = new Set<string>();
+
   while (true) {
     const pool = files.filter((candidate) => !passed.has(candidate) && !used.includes(candidate));
     if (pool.length === 0) return null;
+
     const choice = takeRandom(pool, recent, {
       avoid: [...otherFolderPlays(progress.recentRandom, series), ...reserved],
       block: used,
       all: files,
     });
     if (!choice) return null;
+
     const durationSec = await tryLength(choice.path);
     if (durationSec != null && (remaining == null || itemFits(durationSec, remaining))) {
       progress.recentRandom[series] = choice.recent;
       return { path: choice.path, durationSec, title: nameOf(choice.path) };
     }
+
     passed.add(choice.path);
   }
 }

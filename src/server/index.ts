@@ -55,13 +55,16 @@ app.put("/api/schedule", async (c) => {
       await assertBlockSource(block);
     }
     const saved = await saveSchedule(body);
+
     if (sameBlocks(previous.blocks, saved.blocks)) {
       void keepIntermission();
       return c.json({ schedule: saved, today: await savedToday(), misses: [] });
     }
+
     await forgetUnusedFolders(previous.blocks, saved.blocks);
     const changed = changedBlocks(previous.blocks, saved.blocks);
     if (changed.length) markBuilding(changed.map((block) => block.id));
+
     void noteSlotMisses(changed);
     void rebuildSavedWeek(changed.map((block) => block.id));
     return c.json({ schedule: saved, today: await savedToday(), misses: [] });

@@ -91,12 +91,14 @@ export function markItemDone(date: string, itemId: string): Promise<TvBoard> {
         next = choice?.path ?? null;
         if (playingMovie && (!next || next === marked)) throw new Error("No other files in this folder");
       }
+
       await markRandomPlayed(folder, marked);
       if (replace && next && next !== marked) {
         item.path = next;
         item.title = nameOf(next);
         item.durationSec = await lengthOf(next);
         item.status = playingMovie ? "playing" : "planned";
+
         recomputeBlockTimes(rundown, block);
         await writeBoard(board);
       }
@@ -119,11 +121,13 @@ export function markItemDone(date: string, itemId: string): Promise<TvBoard> {
     if (!aired) {
       const next = nextFrom(files, item.path);
       if (!next) throw new Error("Episode is no longer in this folder");
+
       item.path = next;
       item.title = nameOf(next);
       item.durationSec = await lengthOf(next);
       item.status = "planned";
       item.chosen = true;
+
       recomputeBlockTimes(rundown, block);
     } else {
       item.status = "done";
@@ -180,6 +184,7 @@ export function markItemSkipped(date: string, itemId: string): Promise<TvBoard> 
       else delete progress.lastCompleted[folder];
       await saveProgress(progress);
     }
+
     item.status = "skipped";
     delete item.chosen;
     if (rewound) {
@@ -242,7 +247,9 @@ export function shuffleItem(date: string, itemId: string): Promise<TvBoard> {
     item.title = nameOf(next);
     item.durationSec = await lengthOf(next);
     item.status = playing ? "playing" : "planned";
+
     recomputeBlockTimes(rundown, block);
+
     await writeBoard(board);
     return presentBoard(board);
   });
@@ -306,12 +313,14 @@ export function stepEpisode(date: string, itemId: string, direction: -1 | 1): Pr
         drop.add(row.id);
         continue;
       }
+
       row.path = file;
       row.title = nameOf(file);
       row.durationSec = await lengthOf(file);
       if (row.status !== "playing") row.status = "planned";
       if (row.id === item.id) row.chosen = true;
       else delete row.chosen;
+
       cursor += 1;
     }
     if (drop.size > 0) rundown.items = rundown.items.filter((row) => !drop.has(row.id));

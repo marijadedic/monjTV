@@ -194,6 +194,7 @@ async function onEndFile(reason: string): Promise<void> {
         handlingEnd = false;
       }
     }
+
     if (fallbackPlay?.playlist && reason === "error") {
       if (!queuePlaylist(fallbackPlay, true)) {
         lastError = "Could not play this YouTube playlist";
@@ -208,6 +209,7 @@ async function onEndFile(reason: string): Promise<void> {
       }
       return;
     }
+
     if (fallbackPlay?.kind === "youtube" && reason !== "quit") {
       if (fallbackPlay.playlist) {
         fallbackPlay = { ...fallbackPlay, queued: true };
@@ -217,6 +219,7 @@ async function onEndFile(reason: string): Promise<void> {
       retryYoutubeIntermission();
       return;
     }
+
     if ((reason === "error" || reason === "unknown") && youtubeReloads < 2) {
       youtubeReloads += 1;
       lastError = "Could not play this YouTube video";
@@ -229,6 +232,7 @@ async function onEndFile(reason: string): Promise<void> {
     }
     return;
   }
+
   youtubeReloads = 0;
   handlingEnd = true;
   try {
@@ -236,9 +240,11 @@ async function onEndFile(reason: string): Promise<void> {
     const today = await loadToday();
     const current = today.items.find((i) => i.status === "playing");
     const finishedIntermission = current ? null : fallbackPlay;
+
     if (current) {
       current.status = "done";
       await saveToday(today);
+
       const schedule = await loadSchedule();
       const block = schedule.blocks.find((b) => b.id === current.blockId);
       if (block) {
@@ -249,6 +255,7 @@ async function onEndFile(reason: string): Promise<void> {
           await markRandomPlayed(folder, current.path);
         }
       }
+
       const next = nextPlaylistItem(today, current, schedule);
       if (next) {
         const offset = joinOffset(next, nowSec());
@@ -265,6 +272,7 @@ async function onEndFile(reason: string): Promise<void> {
         fallbackPlay = null;
       }
     }
+
     await playNow();
   } finally {
     handlingEnd = false;
@@ -275,6 +283,7 @@ async function onEndFile(reason: string): Promise<void> {
 async function playNow(): Promise<void> {
   clearWait();
   waitingUntil = null;
+
   const today = await ensureToday();
   const schedule = await loadSchedule();
   const day = weekday();
@@ -309,6 +318,7 @@ async function playNow(): Promise<void> {
     const next = dayBlocks.find((block) => parseHm(windowOn(block, day).start) > now);
     if (next) armWaitUntil(parseHm(windowOn(next, day).start));
   }
+
   await playActiveIntermission();
 }
 
@@ -698,6 +708,7 @@ async function playItem(item: RundownItem, offsetSec: number): Promise<void> {
     else if (row.status === "playing") row.status = "planned";
   }
   await saveToday(today);
+
   replacing = true;
   try {
     const tries = isYoutubeUrl(item.path) ? 3 : 1;
@@ -715,6 +726,7 @@ async function playItem(item: RundownItem, offsetSec: number): Promise<void> {
         if (attempt + 1 < tries) await new Promise((resolve) => setTimeout(resolve, 1500));
       }
     }
+
     if (loaded) {
       if (epoch !== playEpoch) await restoreCurrentLoad();
       return;
