@@ -52,6 +52,8 @@ let boardWait: Promise<TvBoard> | null = null;
 let rebuildingAhead = 0;
 let aheadChain: Promise<void> = Promise.resolve();
 let buildingIds: Set<string> | null = null;
+let saveMissToken = 0;
+let saveMisses: SlotMiss[] = [];
 
 // One board write at a time, so a playback save cannot drop another day.
 function exclusive<T>(task: () => Promise<T>): Promise<T> {
@@ -536,7 +538,19 @@ function presentBoard(board: BoardFile): TvBoard {
     if (saved) days.push(saved);
     else if (date === today) days.push({ date, items: [] });
   }
-  return { today, days, building: buildingIds ? [...buildingIds] : [] };
+  return {
+    today,
+    days,
+    building: buildingIds ? [...buildingIds] : [],
+    missToken: saveMissToken,
+    misses: saveMisses,
+  };
+}
+
+// Remember whether the latest save found a video that does not fit.
+export function noteSaveMisses(misses: SlotMiss[]): void {
+  saveMisses = misses;
+  saveMissToken += 1;
 }
 
 // Mark these week slots as still being timed.

@@ -24,6 +24,22 @@ const extraTitles = new Map<string, string>();
 
 const PLAYLIST_LIMIT = 500;
 
+// 30fps AVC DASH stays near 1–2 Mbps. 1080p60 DASH is several Mbps and googlevideo answers 403.
+function youtubePlaybackFormat(): string {
+  return [
+    "bestvideo[height<=1080][fps<=30][vcodec^=avc][protocol=https]+bestaudio[ext=m4a]",
+    "bestvideo[height<=1080][vcodec^=avc][protocol=https]+bestaudio[ext=m4a]",
+    "bestvideo[height<=1080][fps<=30][vcodec^=avc][protocol^=m3u8]+bestaudio[protocol^=m3u8]",
+    "18",
+    "best",
+  ].join("/");
+}
+
+export type YoutubeStream = {
+  videoUrl: string;
+  audioUrl: string | null;
+};
+
 export type YoutubePlaylistVideo = {
   id: string;
   url: string;
@@ -129,6 +145,54 @@ export async function probeYoutube(
     throw new Error("Could not read this YouTube video's length");
   }
   return meta;
+}
+
+// Direct stream URLs. The watch page through ytdl_hook comes back 403.
+export async function youtubeStreamUrls(raw: string): Promise<YoutubeStream> {
+  const url = parseYoutubeUrl(raw);
+  if (!url) throw new Error("Not a YouTube video URL");
+  let stdout = "";
+  let stderr = "";
+  try {
+    const ytdlp = await ensureYtdlp();
+    const result = await execFileAsync(
+      ytdlp,
+      [
+        "--ignore-config",
+        "--no-playlist",
+        "--no-warnings",
+        "--socket-timeout",
+        "30",
+        "--extractor-retries",
+        "3",
+        ...ytdlpRuntimeArgs(),
+        "-f",
+        youtubePlaybackFormat(),
+        "-g",
+        url,
+      ],
+      { timeout: 45_000, maxBuffer: 2_000_000 },
+    );
+    stdout = result.stdout;
+    stderr = result.stderr;
+  } catch (err) {
+    const record = err as { message?: string; stderr?: string; stdout?: string };
+    stdout = record.stdout ?? "";
+    stderr = `${record.stderr ?? ""}\n${record.message ?? ""}`;
+    if (/ENOENT|not found/i.test(stderr)) {
+      throw new Error("yt-dlp is not installed or not on PATH");
+    }
+  }
+  const lines = stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => /^https?:\/\//.test(line));
+  if (lines.length < 1) {
+    const detail = stderr.trim().replaceAll(/\s+/g, " ").slice(0, 300);
+    if (detail) console.error("youtube stream", detail);
+    throw new Error("Could not play this YouTube video");
+  }
+  return { videoUrl: lines[0], audioUrl: lines[1] ?? null };
 }
 
 // Titles for timetable labels. A failed lookup is omitted so the id can stay.
@@ -269,25 +333,63 @@ async function readPlaylistTitle(ref: YoutubePlaylistRef): Promise<string> {
 }
 
 async function readPlaylist(ref: YoutubePlaylistRef): Promise<YoutubePlaylist> {
-  const { stdout, stderr } = await runYtdlp(
-    [
-      "--flat-playlist",
-      "--yes-playlist",
-      "--playlist-end",
-      String(PLAYLIST_LIMIT),
-      "--dump-single-json",
-      ref.url,
-    ],
-    90_000,
-    8_000_000,
-  );
+  const fallback = videosFromIdList(ref);
+  let stdout = "";
+  let stderr = "";
+  try {
+    const result = await runYtdlp(
+      [
+        "--flat-playlist",
+        "--yes-playlist",
+        "--playlist-end",
+        String(PLAYLIST_LIMIT),
+        "--dump-single-json",
+        ref.url,
+      ],
+      90_000,
+      8_000_000,
+    );
+    stdout = result.stdout;
+    stderr = result.stderr;
+  } catch (err) {
+    if (fallback.length) return storePlaylist(ref, fallback, "");
+    throw err;
+  }
   const dump = parseYoutubePrint(stdout) as { title?: string; entries?: unknown } | null;
   const videos = playlistVideos(dump?.entries);
-  if (!videos.length) {
+  const queued = videos.length > 0 ? videos : fallback;
+  if (!queued.length) {
     if (stderr.trim() || stdout.trim().startsWith("ERROR")) throw playlistReadError(stderr || stdout);
     throw new Error("This YouTube playlist has no videos");
   }
-  const title = (dump?.title ?? "").trim();
+  return storePlaylist(ref, queued, (dump?.title ?? "").trim());
+}
+
+// Listed videos for a watch_videos URL when yt-dlp did not return entries.
+function videosFromIdList(ref: YoutubePlaylistRef): YoutubePlaylistVideo[] {
+  if (!ref.id.startsWith("video_ids:")) return [];
+  const videos: YoutubePlaylistVideo[] = [];
+  const seen = new Set<string>();
+  for (const id of ref.id.slice("video_ids:".length).split(",")) {
+    if (!/^[\w-]{11}$/.test(id) || seen.has(id)) continue;
+    seen.add(id);
+    videos.push({
+      id,
+      url: `https://www.youtube.com/watch?v=${id}`,
+      title: `YouTube · ${id}`,
+      durationSec: 0,
+      isLive: false,
+    });
+  }
+  return videos;
+}
+
+// Remember this list for the life of the process.
+function storePlaylist(
+  ref: YoutubePlaylistRef,
+  videos: YoutubePlaylistVideo[],
+  title: string,
+): YoutubePlaylist {
   const playlist: YoutubePlaylist = {
     id: ref.id,
     url: ref.url,

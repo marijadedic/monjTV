@@ -48,6 +48,8 @@ let playlistFetch = 0;
 let fallbackRetry: ReturnType<typeof setTimeout> | null = null;
 let playEpoch = 0;
 let provisionalSkips: string[] = [];
+let youtubeReloads = 0;
+let intermissionTries = 0;
 
 mpv.onEndFile = (reason) => {
   void onEndFile(reason);
@@ -75,19 +77,25 @@ export async function getStatus(): Promise<PlayerStatus> {
     currentItemId: current?.id ?? null,
     willStartItemId,
     fallbackTitle: current || !fallbackPlay ? null : fallbackTitleOf(fallbackPlay.path),
-    fallbackPath: current || !fallbackPlay || isYoutubeUrl(fallbackPlay.path) ? null : fallbackPlay.path,
+    fallbackPath: current || !fallbackPlay ? null : fallbackPlay.path,
     intermissionTitle: filler ? selectedFillerTitle(filler) : null,
     intermissionKind: filler?.kind ?? null,
     intermissionSource: filler?.source ?? null,
   };
 }
 
-// A local gap file the still route may frame: the one on screen, or the selected video while idle.
+// A gap file the still route may show: the one on screen, or the selected video while idle.
 export async function intermissionStillAllowed(filePath: string): Promise<boolean> {
-  if (!filePath || isYoutubeUrl(filePath)) return false;
+  if (!filePath) return false;
   if (intermissionFile() === filePath) return true;
+  if (fallbackPlay?.path === filePath) return true;
   const filler = playingIntermission(await loadSchedule());
-  return filler?.kind === "video" && filler.source === filePath;
+  if (!filler) return false;
+  if (filler.kind === "video" && filler.source === filePath) return true;
+  if (filler.kind !== "youtube") return false;
+  const selected = parseYoutubeUrl(filler.source);
+  if (!selected) return false;
+  return filePath === filler.source || parseYoutubeUrl(filePath) === selected;
 }
 
 // Local file filling a gap, if one is on screen.
@@ -206,9 +214,21 @@ async function onEndFile(reason: string): Promise<void> {
         return;
       }
       retryYoutubeIntermission();
+      return;
+    }
+    if ((reason === "error" || reason === "unknown") && youtubeReloads < 2) {
+      youtubeReloads += 1;
+      lastError = "Could not play this YouTube video";
+      handlingEnd = true;
+      try {
+        await playNow();
+      } finally {
+        handlingEnd = false;
+      }
     }
     return;
   }
+  youtubeReloads = 0;
   handlingEnd = true;
   try {
     provisionalSkips = [];
@@ -458,9 +478,17 @@ async function playYoutubeIntermission(source: string, randomStart: boolean): Pr
       return;
     }
     if (fallbackPlay?.path === url) fallbackPlay.startAt = used;
+    lastError = null;
+    intermissionTries = 0;
   } catch (err) {
     if (epoch !== playEpoch) return;
     lastError = err instanceof Error ? err.message : String(err);
+    if (intermissionTries < 3) {
+      intermissionTries += 1;
+      retryYoutubeIntermission(2000);
+      return;
+    }
+    intermissionTries = 0;
     fallbackPlay = null;
   } finally {
     replacing = false;
@@ -536,6 +564,7 @@ async function playYoutubePlaylist(
       fallbackPlay.startAt = used;
     }
     lastError = null;
+    intermissionTries = 0;
   } catch (err) {
     if (epoch !== playEpoch) return;
     lastError = err instanceof Error ? err.message : String(err);
@@ -670,10 +699,25 @@ async function playItem(item: RundownItem, offsetSec: number): Promise<void> {
   await saveToday(today);
   replacing = true;
   try {
-    await mpv.loadFile(item.path, offsetSec);
-    if (epoch !== playEpoch) await restoreCurrentLoad();
-  } catch (err) {
-    lastError = err instanceof Error ? err.message : String(err);
+    const tries = isYoutubeUrl(item.path) ? 3 : 1;
+    let loaded = false;
+    for (let attempt = 0; attempt < tries; attempt++) {
+      if (epoch !== playEpoch || stopping) return;
+      const at = attempt === 0 ? offsetSec : 0;
+      try {
+        await mpv.loadFile(item.path, at);
+        loaded = true;
+        lastError = null;
+        break;
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err);
+        if (attempt + 1 < tries) await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+    }
+    if (loaded) {
+      if (epoch !== playEpoch) await restoreCurrentLoad();
+      return;
+    }
     replacing = false;
     if (epoch !== playEpoch) return;
     if (stopping || !mpv.running) {
@@ -687,9 +731,9 @@ async function playItem(item: RundownItem, offsetSec: number): Promise<void> {
       await saveToday(again);
     }
     await playNow();
-    return;
+  } finally {
+    replacing = false;
   }
-  replacing = false;
 }
 
 // Wake at a clock time inside the current block, such as the next episode.

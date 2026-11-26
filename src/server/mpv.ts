@@ -5,6 +5,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { isYoutubeUrl } from "../shared/youtube.ts";
+import { cachedYoutubeTitle, youtubeStreamUrls } from "./youtube.ts";
 import { ensureYtdlp } from "./ytdlp.ts";
 
 type MpvEvent = {
@@ -51,6 +52,9 @@ function decodeArgs(): string[] {
     "--gpu-api=opengl",
     "--hwdec=auto-copy",
     "--vd-lavc-software-fallback=yes",
+    "--scale=bilinear",
+    "--dither=no",
+    "--deband=no",
   ];
 }
 
@@ -98,6 +102,9 @@ export class Mpv {
   private sockPath = path.join(os.tmpdir(), `monjtv-${process.pid}.sock`);
   onEndFile: ((reason: string) => void) | null = null;
   onExit: (() => void) | null = null;
+  private lastEndReason: string | null = null;
+  private fileStarted = false;
+  private sourcePath: string | null = null;
 
   // True while the mpv process is still alive.
   get running(): boolean {
@@ -118,6 +125,9 @@ export class Mpv {
         "--force-window=yes",
         "--keep-open=no",
         "--no-terminal",
+        // The hook opens the watch page, and YouTube answers 403. Streams are loaded directly.
+        // Turning the hook off during loadfile unloads it, and the new file ends before it is on screen.
+        "--ytdl=no",
         `--script-opts=ytdl_hook-ytdl_path=${ytdlp}`,
         "--ytdl-format=bestvideo[height<=1080][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=1080][vcodec^=avc]+bestaudio/bestvideo[height<=1080]+bestaudio/best[height<=1080]/18/best",
         "--ytdl-raw-options-append=no-playlist=",
@@ -128,6 +138,9 @@ export class Mpv {
         "--demuxer-lavf-o-append=reconnect=1",
         "--demuxer-lavf-o-append=reconnect_streamed=1",
         "--demuxer-lavf-o-append=reconnect_delay_max=5",
+        "--cache=yes",
+        "--demuxer-readahead-secs=20",
+        "--demuxer-max-bytes=150MiB",
         ...decodeArgs(),
       ],
       { stdio: ["ignore", "ignore", "inherit"], env: sessionEnv() },
@@ -146,12 +159,82 @@ export class Mpv {
   // Replace the current file. A start of seconds or a percent seeks into it.
   async loadFile(filePath: string, start: number | string = 0): Promise<void> {
     const startArg = startArgOf(start);
-    const timeoutMs = isYoutubeUrl(filePath) ? 60_000 : 8_000;
-    if (startArg) {
-      await this.command(["loadfile", filePath, "replace", -1, { start: startArg }], timeoutMs);
+    if (!isYoutubeUrl(filePath)) {
+      this.sourcePath = null;
+      if (startArg) {
+        await this.command(["loadfile", filePath, "replace", -1, { start: startArg }], 8_000);
+        return;
+      }
+      await this.command(["loadfile", filePath, "replace"], 8_000);
       return;
     }
-    await this.command(["loadfile", filePath, "replace"], timeoutMs);
+    await this.loadYoutube(filePath, start, startArg);
+  }
+
+  // Open the stream URL yt-dlp returns. The watch page through ytdl_hook comes back 403.
+  private async loadYoutube(
+    filePath: string,
+    start: number | string,
+    startArg: string,
+  ): Promise<void> {
+    const began = Date.now();
+    const streams = await youtubeStreamUrls(filePath);
+    this.sourcePath = filePath;
+    const title = cachedYoutubeTitle(filePath);
+    if (title) {
+      await this.command(["set_property", "force-media-title", title]).catch(() => undefined);
+    }
+    this.watchNewFile();
+    await this.command(["loadfile", streams.videoUrl, "replace"], 15_000);
+    if (!(await this.waitForPlayback(20_000))) {
+      this.sourcePath = null;
+      console.error("youtube playback did not start", this.lastEndReason ?? "timeout");
+      throw new Error("Could not play this YouTube video");
+    }
+    if (title) {
+      await this.command(["set_property", "force-media-title", title]).catch(() => undefined);
+    }
+    if (streams.audioUrl) {
+      await this.command(["audio-add", streams.audioUrl, "select"], 15_000).catch(() => undefined);
+    }
+    if (!startArg) return;
+    if (typeof start === "string" && start.trim().endsWith("%")) {
+      await this.command(["seek", Number.parseFloat(start), "absolute-percent"]).catch(() => undefined);
+      return;
+    }
+    const extra = (Date.now() - began) / 1000;
+    await this.command(["seek", Number(startArg) + extra, "absolute"]).catch(() => undefined);
+  }
+
+  // Ignore the file being replaced. Its end arrives before the new file starts.
+  private watchNewFile(): void {
+    this.fileStarted = false;
+    this.lastEndReason = null;
+  }
+
+  // True when mpv has a file on screen and a clock.
+  private async isPlaying(): Promise<boolean> {
+    try {
+      const idle = (await this.command(["get_property", "idle-active"], 1500)) as { data?: unknown };
+      if (idle.data === true) return false;
+      const pos = (await this.command(["get_property", "time-pos"], 1500)) as { data?: unknown };
+      return typeof pos.data === "number" && Number.isFinite(pos.data);
+    } catch {
+      return false;
+    }
+  }
+
+  // Wait until the stream is on screen, or until it has failed.
+  private async waitForPlayback(timeoutMs: number): Promise<boolean> {
+    const began = Date.now();
+    while (Date.now() - began < timeoutMs) {
+      const failed =
+        this.fileStarted && (this.lastEndReason === "error" || this.lastEndReason === "unknown");
+      if (failed) return false;
+      if (await this.isPlaying()) return true;
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    return this.isPlaying();
   }
 
   // Path of the file on screen. Empty when mpv is idle.
@@ -159,7 +242,12 @@ export class Mpv {
     if (!this.running || !this.sock) return null;
     try {
       const msg = (await this.command(["get_property", "path"])) as { data?: unknown };
-      return typeof msg.data === "string" ? msg.data : null;
+      const actual = typeof msg.data === "string" ? msg.data : null;
+      if (!actual) {
+        this.sourcePath = null;
+        return null;
+      }
+      return this.sourcePath ?? actual;
     } catch {
       return null;
     }
@@ -168,6 +256,7 @@ export class Mpv {
   // Stop the current file without quitting mpv.
   async stopPlayback(): Promise<void> {
     if (!this.running) return;
+    this.sourcePath = null;
     await this.command(["stop"]).catch(() => undefined);
   }
 
@@ -214,8 +303,13 @@ export class Mpv {
       } catch {
         continue;
       }
+      if (msg.event === "start-file") {
+        this.fileStarted = true;
+        this.lastEndReason = null;
+      }
       if (msg.event === "end-file") {
-        this.onEndFile?.(msg.reason ?? "unknown");
+        this.lastEndReason = msg.reason ?? "unknown";
+        this.onEndFile?.(this.lastEndReason);
       }
       if (msg.request_id !== undefined && this.pending.has(msg.request_id)) {
         const pending = this.pending.get(msg.request_id)!;
@@ -234,6 +328,7 @@ export class Mpv {
     this.sock?.destroy();
     this.sock = null;
     this.proc = null;
+    this.sourcePath = null;
     this.pending.clear();
     unlink(this.sockPath).catch(() => undefined);
   }

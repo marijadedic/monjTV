@@ -9,6 +9,7 @@ const WATCH_HOSTS = new Set([
 
 const VIDEO_ID = /^[\w-]{11}$/;
 const PLAYLIST_ID = /^[\w-]{2,80}$/;
+const WATCH_VIDEO_LIMIT = 500;
 
 export type YoutubePlaylistRef = {
   id: string;
@@ -68,10 +69,12 @@ export function isYoutubeUrl(raw: string): boolean {
   return parseYoutubeUrl(raw) !== null;
 }
 
-// Playlist link, including a watch URL that also names a list.
+// Playlist link: list=, or watch_videos with video_ids. A generated TLG list is not stored.
 export function parseYoutubePlaylist(raw: string): YoutubePlaylistRef | null {
   const url = parseHttpUrl(raw);
   if (!url || !isYoutubeHost(url)) return null;
+  const queued = watchVideoIds(url);
+  if (queued) return videoIdsPlaylist(queued);
   const id = url.searchParams.get("list");
   if (!id || !PLAYLIST_ID.test(id)) return null;
   const indexRaw = url.searchParams.get("index");
@@ -82,6 +85,33 @@ export function parseYoutubePlaylist(raw: string): YoutubePlaylistRef | null {
     url: `https://www.youtube.com/playlist?list=${id}`,
     startVideoId: videoIdOf(url),
     startIndex,
+  };
+}
+
+// Ordered unique ids from /watch_videos?video_ids=, or null when none are valid.
+function watchVideoIds(url: URL): string[] | null {
+  const path = url.pathname.replace(/\/+$/, "") || "/";
+  if (path !== "/watch_videos") return null;
+  const raw = url.searchParams.get("video_ids");
+  if (raw == null || !raw.trim()) return null;
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  for (const part of raw.split(",")) {
+    const id = part.trim();
+    if (!VIDEO_ID.test(id) || seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+    if (ids.length >= WATCH_VIDEO_LIMIT) break;
+  }
+  return ids.length > 0 ? ids : null;
+}
+
+function videoIdsPlaylist(ids: string[]): YoutubePlaylistRef {
+  return {
+    id: `video_ids:${ids.join(",")}`,
+    url: `https://www.youtube.com/watch_videos?video_ids=${ids.join(",")}`,
+    startVideoId: null,
+    startIndex: 0,
   };
 }
 
@@ -98,6 +128,7 @@ export function canonicalPlaylistUrl(raw: string): string | null {
 }
 
 export function formatPlaylistSource(playlist: YoutubePlaylistRef): string {
+  if (playlist.id.startsWith("video_ids:")) return playlist.url;
   if (playlist.startVideoId) {
     const index = playlist.startIndex > 0 ? `&index=${playlist.startIndex + 1}` : "";
     return `https://www.youtube.com/watch?v=${playlist.startVideoId}&list=${playlist.id}${index}`;
@@ -129,6 +160,7 @@ export function youtubeId(raw: string): string | null {
 
 export function youtubeLabel(raw: string): string {
   const playlist = parseYoutubePlaylist(raw);
+  if (playlist?.id.startsWith("video_ids:")) return "YouTube · queue";
   if (playlist) return `YouTube · ${playlist.id}`;
   const id = youtubeId(raw);
   return id ? `YouTube · ${id}` : "YouTube";

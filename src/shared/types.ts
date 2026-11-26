@@ -128,6 +128,10 @@ export interface TvBoard {
   days: DayRundown[];
   /** Block ids still being timed after a save. Empty when the rundown is current. */
   building?: string[];
+  /** Bumps when a save has finished checking whether a video fits. */
+  missToken?: number;
+  /** Too-long files from the latest finished save check. */
+  misses?: SlotMiss[];
 }
 
 export interface SlotMiss {
@@ -154,7 +158,7 @@ export interface PlayerStatus {
   currentItemId: string | null;
   willStartItemId: string | null;
   fallbackTitle: string | null;
-  /** Local file filling the gap. Null for a YouTube filler or when a show is on. */
+  /** File filling the gap, including a YouTube watch URL. Null when a show is on. */
   fallbackPath: string | null;
   /** Chosen gap filler. Set whenever one is selected, even if the player is idle. */
   intermissionTitle: string | null;

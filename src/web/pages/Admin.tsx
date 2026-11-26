@@ -36,64 +36,23 @@ import {
 } from "../../shared/youtube.ts";
 import { api } from "../api.ts";
 import { useI18n } from "../i18n.tsx";
+import type { Draft } from "../types/Draft.ts";
+import type { DraftItem } from "../types/DraftItem.ts";
+import type { FieldError } from "../types/FieldError.ts";
+import type { FolderHit } from "../types/FolderHit.ts";
+import type { LengthChoice } from "../types/LengthChoice.ts";
+import type { Piece } from "../types/Piece.ts";
+import type { PlaySource } from "../types/PlaySource.ts";
+import { PRESETS, type PresetMin } from "../types/PresetMin.ts";
+import type { SliceLine } from "../types/SliceLine.ts";
+import type { SliceSide } from "../types/SliceSide.ts";
+import type { SlotOp } from "../types/SlotOp.ts";
+import type { TipKey } from "../types/TipKey.ts";
 
-const PRESETS = [30, 60, 90, 120, 260] as const;
 const MANY_FILES = 20;
 const BUSY_SPIN_MS = 400;
 
-type PresetMin = (typeof PRESETS)[number];
-type LengthChoice = "longest" | PresetMin | "custom";
-type TipKey = "30" | "60" | "90" | "120" | "260" | "custom";
-
 const WEEKDAY: Day[] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
-
-type Piece =
-  | { kind: "gap"; start: number; end: number }
-  | { kind: "slot"; block: ScheduleBlock; start: number; end: number; origin: Day };
-
-type DraftItem = {
-  id: string;
-  mode: ItemMode;
-  folder: string;
-  file: string;
-  title: string;
-  durationSec: number | null;
-  lengthMin?: number;
-  gapAfterMin?: number;
-  error?: string;
-};
-
-type FormStep = "how" | "when" | "what" | "name" | "summary";
-type AddPhase = "list" | "kind" | "source";
-type PlaySource = "path" | "youtube";
-
-type Draft = {
-  id: string | null;
-  origin: Day;
-  days: Day[];
-  start: string;
-  end: string;
-  starts: Partial<Record<Day, string>>;
-  folder: string;
-  file: string;
-  source: PlaySource;
-  mode: BlockMode;
-  name: string;
-  items: DraftItem[];
-  addMode: ItemMode;
-  addSource: PlaySource;
-  addFolder: string;
-  addFile: string;
-  addLengthChoice: LengthChoice;
-  addCustomMin: string;
-  lengthChoice: LengthChoice;
-  customMin: string;
-  freeEnd: number;
-  gapStart: number;
-  formStep: FormStep;
-  addPhase: AddPhase;
-  returnTo: "summary" | null;
-};
 
 function emptyStack(): Pick<
   Draft,
@@ -187,10 +146,6 @@ function stackSeconds(items: DraftItem[]): number | null {
 function stackItemNeedsProbe(item: DraftItem): boolean {
   if (item.durationSec != null || item.error) return false;
   return item.mode === "next-episode" || item.mode === "specific-file";
-}
-
-function knownStackSeconds(items: DraftItem[]): number {
-  return items.reduce((sum, item) => sum + (itemSeconds(item) ?? 0), 0) + stackGapSeconds(items);
 }
 
 function isPreset(value: number): value is PresetMin {
@@ -400,14 +355,6 @@ function DurationPick({
   );
 }
 
-type FieldError = {
-  time?: string;
-  folder?: string;
-  form?: string;
-};
-
-type SlotOp = "save" | "remove";
-
 function toMin(hm: string): number {
   const [hRaw, mRaw] = hm.split(":");
   const h = Number(hRaw);
@@ -537,8 +484,6 @@ function pendingSource(
   if (isYoutubeLink(trimmed)) return { source: trimmed, error: "youtube-in-path" };
   return { source: trimmed, error: null };
 }
-
-type FolderHit = { name: string; path: string };
 
 function FolderPath({
   value,
@@ -778,15 +723,6 @@ function stackItemLine(
   return kind;
 }
 
-function itemGridDuration(
-  item: DraftItem,
-  t: ReturnType<typeof useI18n>["t"],
-): string {
-  if (item.durationSec != null) return t.lengthOf(Math.max(1, Math.ceil(item.durationSec / 60)));
-  if (item.mode === "random-file" && item.lengthMin) return t.lengthOf(item.lengthMin);
-  return "–";
-}
-
 function clipLabel(name: string, max = 28): string {
   const text = name.trim();
   if (text.length <= max) return text;
@@ -807,15 +743,78 @@ function playlistGridLine(
   titles: Readonly<Record<string, string>> = {},
 ): string {
   const kind = modeLabel(item.mode, t);
-  const duration = itemGridDuration(item, t);
   const name = playlistGridName(item, titles);
   const shown =
     item.mode === "specific-file" || canonicalPlaylistUrl(item.folder) ? clipLabel(name) : name;
-  return `${kind} - ${shown} - ${duration}`;
+  return `${kind} - ${shown}`;
 }
 
 function rowStyle(span: number): Record<string, string> {
   return { "--mins": String(Math.max(0, span)) };
+}
+
+// Lines of a playlist that air on one side of midnight. A video that crosses is on both.
+function playlistSliceLines(
+  block: ScheduleBlock,
+  origin: Day,
+  board: TvBoard | null,
+  spill: boolean,
+  t: ReturnType<typeof useI18n>["t"],
+  titles: Readonly<Record<string, string>>,
+): SliceLine[] {
+  const unused = playlistRowsOn(block, origin, board);
+  const placed = placedOn(block, origin, board);
+  let cursor: number | null = placed.startMin;
+  const lines: SliceLine[] = [];
+  const entries = block.items ?? [];
+  for (let index = 0; index < entries.length; index++) {
+    const entry = entries[index]!;
+    const row = takePlaylistRow(unused, entry);
+    const item = fromEntry(entry, row?.durationSec ?? null, row?.title ?? "");
+    const named = (row?.title ?? "").trim();
+    const name = named ? clipLabel(named) : playlistGridName(item, titles);
+    const gap = index < entries.length - 1 ? gapOf(entry) : 0;
+    let side: SliceSide = "start";
+    let text = name;
+    if (row && row.durationSec > 0) {
+      const startMin = toMin(row.start);
+      const beginsNext = startMin < placed.startMin;
+      const crosses = !beginsNext && toMin(row.end) < startMin;
+      side = beginsNext ? "next" : crosses ? "cross" : "start";
+      text =
+        side === "cross"
+          ? spill
+            ? `${name} · ${t.sliceFrom(row.start)}`
+            : `${name} · ${t.sliceEnds(row.end)}`
+          : `${name} · ${row.start}`;
+      cursor = (beginsNext ? DAY_MINUTES + startMin : startMin) + Math.ceil(row.durationSec / 60) + gap;
+    } else {
+      if (cursor == null) break;
+      const begin: number = cursor;
+      const sec = itemSeconds(item);
+      if (sec == null) {
+        side = begin >= DAY_MINUTES ? "next" : "start";
+        text = `${name} · ${clockOf(begin)}`;
+        lines.push({ key: entry.id, text, side });
+        break;
+      }
+      const endMin: number = begin + Math.max(1, Math.ceil(sec / 60));
+      cursor = endMin + gap;
+      side = endMin <= DAY_MINUTES ? "start" : begin >= DAY_MINUTES ? "next" : "cross";
+      text =
+        side === "cross"
+          ? spill
+            ? `${name} · ${t.sliceFrom(clockOf(begin))}`
+            : `${name} · ${t.sliceEnds(clockOf(endMin))}`
+          : `${name} · ${clockOf(begin)}`;
+    }
+    lines.push({ key: entry.id, text, side });
+    if (gap > 0) {
+      const gapSide: SliceSide = side === "start" ? "start" : "next";
+      lines.push({ key: `${entry.id}-gap`, text: t.playlistGapLine(gap), side: gapSide });
+    }
+  }
+  return lines.filter((line) => (spill ? line.side !== "start" : line.side !== "next"));
 }
 
 function takePlaylistRow(unused: RundownItem[], entry: PlaylistEntry): RundownItem | undefined {
@@ -885,7 +884,7 @@ function ghostsOn(
   day: Day,
   blocks: ScheduleBlock[],
   board: TvBoard | null,
-): { start: number; end: number }[] {
+): { start: number; end: number; continues: boolean; spill: boolean }[] {
   const span = draftSpanMin(draft);
   if (span < 1) return [];
   const saved = draft.id ? blocks.find((block) => block.id === draft.id) : undefined;
@@ -893,13 +892,20 @@ function ghostsOn(
   if (saved && windowOn(saved, draft.origin).start === draft.start && shown === span) {
     return [];
   }
-  const out: { start: number; end: number }[] = [];
+  const out: { start: number; end: number; continues: boolean; spill: boolean }[] = [];
   for (const air of draft.days) {
     const start = toMin(startOnDraft(draft, air));
-    if (day === air) out.push({ start, end: Math.min(start + span, DAY_MINUTES) });
+    if (day === air) {
+      out.push({
+        start,
+        end: Math.min(start + span, DAY_MINUTES),
+        continues: start + span > DAY_MINUTES,
+        spill: false,
+      });
+    }
     if (day === nextDay(air)) {
       const leftover = start + span - DAY_MINUTES;
-      if (leftover > 0) out.push({ start: 0, end: leftover });
+      if (leftover > 0) out.push({ start: 0, end: leftover, continues: false, spill: true });
     }
   }
   return out;
@@ -936,6 +942,18 @@ function stackClocks(start: string, items: DraftItem[]): { start: string; end: s
     cursor = endMin + gap;
     return { start: minuteFace(begin), end: minuteFace(endMin) };
   });
+}
+
+function nextItemMinute(start: string, items: DraftItem[]): number | null {
+  let cursor = toMin(start);
+  for (let index = 0; index < items.length; index++) {
+    const sec = itemSeconds(items[index]!);
+    if (sec == null) return null;
+    const endMin = cursor + Math.max(1, Math.ceil(sec / 60));
+    const gap = index < items.length - 1 ? gapOf(items[index]!) : 0;
+    cursor = endMin + gap;
+  }
+  return cursor;
 }
 
 function spillsPastDay(start: string, durationSec: number): boolean {
@@ -1248,6 +1266,7 @@ export function Admin() {
   addKindRef.current = addKind;
   addDraftRef.current = addDraft;
   const formRef = useRef<HTMLFormElement>(null);
+  const draggingId = useRef<string | null>(null);
   const [gapEdit, setGapEdit] = useState<{ itemId: string; minutes: string } | null>(null);
   const [gapError, setGapError] = useState<string | null>(null);
   const gapEditRef = useRef(gapEdit);
@@ -1255,6 +1274,8 @@ export function Admin() {
   const gapInputRef = useRef<HTMLInputElement>(null);
   const formErrorRef = useRef<HTMLParagraphElement>(null);
   const slotOpRef = useRef<SlotOp | null>(null);
+  const missTokenSeen = useRef<number | null>(null);
+  const savedBlockId = useRef<string | null>(null);
   const intermissionButtonRef = useRef<HTMLButtonElement>(null);
   const intermissionPanelRef = useRef<HTMLDivElement>(null);
 
@@ -1276,6 +1297,13 @@ export function Admin() {
 
   function applyBoard(loaded: TvBoard) {
     setBoard(loaded);
+    const token = loaded.missToken ?? 0;
+    if (missTokenSeen.current === null) missTokenSeen.current = token;
+    else if (token !== missTokenSeen.current) {
+      missTokenSeen.current = token;
+      const id = savedBlockId.current;
+      setFitMiss(id ? (loaded.misses ?? []).find((miss) => miss.blockId === id) ?? null : null);
+    }
     if (Array.isArray(loaded.building)) {
       setBuilding(loaded.building);
       return;
@@ -1906,6 +1934,44 @@ export function Admin() {
     });
   }
 
+  function clearStackDrag() {
+    draggingId.current = null;
+    formRef.current
+      ?.querySelectorAll(".playlist-item.dragging, .playlist-item.over-before, .playlist-item.over-after, .playlist-gap.over")
+      .forEach((el) => el.classList.remove("dragging", "over-before", "over-after", "over"));
+  }
+
+  function markStackDrop(target: HTMLElement, after: boolean) {
+    const root = formRef.current;
+    if (!root) return;
+    root.querySelectorAll(".playlist-item.over-before, .playlist-item.over-after, .playlist-gap.over").forEach((el) => {
+      el.classList.remove("over-before", "over-after", "over");
+    });
+    target.classList.add(target.classList.contains("playlist-gap") ? "over" : after ? "over-after" : "over-before");
+  }
+
+  function placeStackItem(id: string, targetId: string, after: boolean) {
+    clearStackDrag();
+    setDraft((current) => {
+      if (!current || id === targetId) return current;
+      const items = [...current.items];
+      const from = items.findIndex((item) => item.id === id);
+      if (from < 0) return current;
+      const [row] = items.splice(from, 1);
+      let to = items.findIndex((item) => item.id === targetId);
+      if (!row || to < 0) return current;
+      if (after) to += 1;
+      items.splice(to, 0, row);
+      return { ...current, items };
+    });
+  }
+
+  function dropStackItem(targetId: string, after: boolean) {
+    const id = draggingId.current;
+    if (!id) return;
+    placeStackItem(id, targetId, after);
+  }
+
   function removeStackItem(id: string) {
     setDraft((current) => (current ? { ...current, items: current.items.filter((item) => item.id !== id) } : current));
   }
@@ -2161,10 +2227,11 @@ export function Admin() {
     const blocks = draft.id
       ? schedule.blocks.map((item) => (item.id === draft.id ? block : item))
       : [...schedule.blocks, block];
+    savedBlockId.current = block.id;
+    setFitMiss(null);
     beginSlotOp("save");
     try {
-      const res = await persist({ ...schedule, blocks });
-      setFitMiss(res.misses.find((miss) => miss.blockId === block.id) ?? null);
+      await persist({ ...schedule, blocks });
       dismissTip();
       setDraft(null);
       setFieldError({});
@@ -2278,10 +2345,11 @@ export function Admin() {
   const editingGap = draft && gapEdit ? draft.items.find((item) => item.id === gapEdit.itemId) : undefined;
   const editingGapSet = editingGap ? gapOf(editingGap) > 0 : false;
   const addSec = draft?.mode === "playlist" && pathChosen ? addSeconds(draft, matched) : null;
-  const addPreviewSec =
-    draft?.mode === "playlist" && addSec != null ? knownStackSeconds(draft.items) + addSec : null;
-  const addPreviewEnd = draft && addPreviewSec != null ? endFace(draft.start, addPreviewSec) : undefined;
-  const addPreviewSpill = draft && addPreviewSec != null ? spillsPastDay(draft.start, addPreviewSec) : false;
+  const addStartMin = draft?.mode === "playlist" && addSec != null ? nextItemMinute(draft.start, draft.items) : null;
+  const addPreviewStart = addStartMin != null ? minuteFace(addStartMin) : undefined;
+  const addEndMin = addStartMin != null && addSec != null ? addStartMin + Math.max(1, Math.ceil(addSec / 60)) : null;
+  const addPreviewEnd = addEndMin != null ? minuteFace(addEndMin) : undefined;
+  const addPreviewSpill = addEndMin != null && addEndMin > DAY_MINUTES;
   const stackBusy = draft?.mode === "playlist" && draft.items.some(stackItemNeedsProbe);
   const activeSec = draft ? (chosenSeconds(draft, matched) ?? 0) : 0;
   const fixedMin = draft && draft.lengthChoice !== "longest" ? fixedMinutes(draft) : null;
@@ -2529,6 +2597,8 @@ export function Admin() {
                 kind: "ghost" as const,
                 start: ghost.start,
                 end: ghost.end,
+                continues: ghost.continues,
+                spill: ghost.spill,
               })),
             ].sort((a, b) => a.start - b.start || (a.kind === "ghost" ? 1 : -1));
             return (
@@ -2545,8 +2615,11 @@ export function Admin() {
                           style={rowStyle(span)}
                         >
                           <b>
-                            {clockFace(piece.start)}–{clockFace(piece.end)}
+                            {piece.spill
+                              ? t.sliceUntil(clockFace(piece.end))
+                              : `${clockFace(piece.start)}–${piece.continues ? "24:00" : clockFace(piece.end)}`}
                           </b>
+                          {piece.continues ? <i>{t.sliceContinues(t.dayName[nextDay(day)])}</i> : null}
                         </span>
                       );
                     }
@@ -2593,16 +2666,22 @@ export function Admin() {
                       draft.origin === piece.origin &&
                       draftTime === placed.start;
                     const spill = piece.origin !== day;
+                    const crosses = placed.endMin > DAY_MINUTES;
                     const calculating = slotIsBuilding(board, piece.block.id, building);
+                    const sliceLines =
+                      piece.block.mode === "playlist" && crosses
+                        ? playlistSliceLines(piece.block, piece.origin, board, spill, t, youtubeTitles)
+                        : null;
                     const stackLines =
-                      piece.block.mode === "playlist"
+                      sliceLines == null && piece.block.mode === "playlist"
                         ? fromPlaylist(piece.block, piece.origin, board)
                         : [];
+                    const endClock = clockOf(placed.endMin);
                     return (
                       <button
                         key={`${piece.block.id}-${piece.origin}-${piece.start}`}
                         type="button"
-                        class={`slot${slotKind(piece.block)}${picked ? " pick" : ""}${spill ? " spill" : ""}`}
+                        class={`slot${slotKind(piece.block)}${picked ? " pick" : ""}${spill ? " spill" : ""}${spill && crosses ? " slice" : ""}`}
                         style={rowStyle(span)}
                         title={slotHover(piece.block, youtubeTitles)}
                         aria-busy={calculating ? "true" : undefined}
@@ -2615,11 +2694,20 @@ export function Admin() {
                           </span>
                         ) : null}
                         <span class="tm">
-                          {clockFace(piece.start)}–{clockFace(piece.end)}
-                          {spill ? ` · ${t.day[piece.origin]}` : ""}
+                          {spill
+                            ? `${t.sliceUntil(clockFace(piece.end))} · ${t.day[piece.origin]}`
+                            : crosses
+                              ? `${clockFace(piece.start)}–24:00`
+                              : `${clockFace(piece.start)}–${clockFace(piece.end)}`}
                         </span>
                         <b>{slotLabel(piece.block, youtubeTitles)}</b>
-                        {stackLines.length ? (
+                        {sliceLines ? (
+                          <span class="stack-lines">
+                            {sliceLines.map((line) => (
+                              <span key={line.key}>{line.text}</span>
+                            ))}
+                          </span>
+                        ) : stackLines.length ? (
                           <span class="stack-lines">
                             {stackLines.map((item, index) => (
                               <Fragment key={item.id}>
@@ -2630,6 +2718,14 @@ export function Admin() {
                               </Fragment>
                             ))}
                           </span>
+                        ) : null}
+                        {!sliceLines && crosses && piece.block.mode !== "playlist" ? (
+                          <span class="more">
+                            {spill ? t.sliceFrom(placed.start) : t.sliceEnds(endClock)}
+                          </span>
+                        ) : null}
+                        {crosses && !spill ? (
+                          <span class="more">{t.sliceContinues(t.dayName[nextDay(piece.origin)])}</span>
                         ) : null}
                         <i>{t.lengthOf(span)}</i>
                       </button>
@@ -2805,6 +2901,22 @@ export function Admin() {
                 </label>
                 )}
                 <span class="k stack-head">{t.playlistStack}</span>
+                {draft.items.length > 0 && (
+                  <p class="tally">
+                    {t.videoCount(draft.items.length)}
+                    {stackSec != null && (
+                      <> · {t.slotDurationOf(Math.max(1, Math.ceil(stackSec / 60)))}</>
+                    )}
+                    <span class="slash">/</span>
+                    {t.startsMark} · {draft.start} - {t.endsMark} ·{" "}
+                    {stackSec != null
+                      ? `${endFace(draft.start, stackSec)}${spillsPastDay(draft.start, stackSec) ? ` ${t.day[nextDay(draft.origin)]}` : ""}`
+                      : "/"}
+                  </p>
+                )}
+                <button type="button" class="wide" onClick={beginAdd}>
+                  {t.addToPlaylist}
+                </button>
                 {draft.items.length === 0 ? (
                   <p class="mode-note">{t.playlistEmpty}</p>
                 ) : (
@@ -2813,7 +2925,30 @@ export function Admin() {
                       const clock = stackClocks(draft.start, draft.items)[index]!;
                       return (
                       <Fragment key={item.id}>
-                      <li class="playlist-item">
+                      <li
+                        class="playlist-item"
+                        draggable
+                        onDragStart={(event) => {
+                          const id = item.id;
+                          draggingId.current = id;
+                          event.dataTransfer?.setData("text/plain", id);
+                          if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+                          (event.currentTarget as HTMLElement).classList.add("dragging");
+                        }}
+                        onDragEnd={clearStackDrag}
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+                          if (draggingId.current === item.id) return;
+                          const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+                          markStackDrop(event.currentTarget as HTMLElement, event.clientY > rect.top + rect.height / 2);
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+                          dropStackItem(item.id, event.clientY > rect.top + rect.height / 2);
+                        }}
+                      >
                         <span class="item-when">
                           <span>{clock.start}</span>
                           <span class="dash">–</span>
@@ -2823,7 +2958,7 @@ export function Admin() {
                           <b>{itemLabel(item, youtubeTitles)}</b>
                           <span>{stackItemLine(item, t)}</span>
                         </div>
-                        <div class="playlist-tools">
+                        <div class="playlist-tools" onMouseDown={(event) => event.stopPropagation()}>
                           <button
                             type="button"
                             disabled={index === 0}
@@ -2854,7 +2989,19 @@ export function Admin() {
                         </div>
                       </li>
                       {index < draft.items.length - 1 && (
-                        <li class="playlist-gap">
+                        <li
+                          class="playlist-gap"
+                          onDragOver={(event) => {
+                            event.preventDefault();
+                            if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+                            if (draggingId.current === item.id) return;
+                            markStackDrop(event.currentTarget as HTMLElement, true);
+                          }}
+                          onDrop={(event) => {
+                            event.preventDefault();
+                            dropStackItem(item.id, true);
+                          }}
+                        >
                           <hr />
                           {gapOf(item) > 0 ? <span class="gap-mins">{t.minutes(gapOf(item))}</span> : null}
                           <span class="cloud-host" onMouseEnter={placeCloud} onMouseLeave={hideCloud}>
@@ -2879,22 +3026,6 @@ export function Admin() {
                     })}
                   </ol>
                 )}
-                {draft.items.length > 0 && (
-                  <p class="tally">
-                    {t.videoCount(draft.items.length)}
-                    {stackSec != null && (
-                      <> · {t.slotDurationOf(Math.max(1, Math.ceil(stackSec / 60)))}</>
-                    )}
-                    <span class="slash">/</span>
-                    {t.startsMark} · {draft.start} - {t.endsMark} ·{" "}
-                    {stackSec != null
-                      ? `${endFace(draft.start, stackSec)}${spillsPastDay(draft.start, stackSec) ? ` ${t.day[nextDay(draft.origin)]}` : ""}`
-                      : "/"}
-                  </p>
-                )}
-                <button type="button" class="wide" onClick={beginAdd}>
-                  {t.addToPlaylist}
-                </button>
                 </>
                 )}
                 {(showAddKind || showAddSource) && (
@@ -3017,7 +3148,7 @@ export function Admin() {
                         </span>
                       </div>
                       <p class="when-note">
-                        {t.startsMark} · {draft.start} · {t.endsMark} · {addPreviewEnd}
+                        {t.startsMark} · {addPreviewStart} · {t.endsMark} · {addPreviewEnd}
                         {addPreviewSpill ? ` ${t.day[nextDay(draft.origin)]}` : ""}
                       </p>
                     </div>

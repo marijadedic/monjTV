@@ -197,6 +197,12 @@ type Copy = {
   measuring: string;
   followsVideo: string;
   until: (time: string) => string;
+  sliceUntil: (time: string) => string;
+  sliceContinues: (day: string) => string;
+  sliceEnds: (time: string) => string;
+  sliceFrom: (time: string) => string;
+  fromDayUntil: (day: string, time: string) => string;
+  startedDay: (day: string) => string;
   noVideo: string;
 };
 
@@ -430,6 +436,12 @@ const en: Copy = {
   measuring: "Measuring…",
   followsVideo: "Follows the video",
   until: (time) => `Until ${time}`,
+  sliceUntil: (time) => `until ${time}`,
+  sliceContinues: (day) => `continues ${day}`,
+  sliceEnds: (time) => `ends ${time}`,
+  sliceFrom: (time) => `from ${time}`,
+  fromDayUntil: (day, time) => `From ${day} · until ${time}`,
+  startedDay: (day) => `Started ${day}`,
   noVideo: "No video found there.",
 };
 
@@ -794,6 +806,12 @@ const hr: Copy = {
   measuring: "Mjerenje…",
   followsVideo: "Slijedi video",
   until: (time) => `Do ${time}`,
+  sliceUntil: (time) => `do ${time}`,
+  sliceContinues: (day) => `nastavlja se ${day}`,
+  sliceEnds: (time) => `završava ${time}`,
+  sliceFrom: (time) => `od ${time}`,
+  fromDayUntil: (day, time) => `Od ${day} · do ${time}`,
+  startedDay: (day) => `Počelo ${day}`,
   noVideo: "Tamo nema videa.",
 };
 

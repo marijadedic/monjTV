@@ -16,6 +16,7 @@ import {
   loadToday,
   missesForBlocks,
   markBuilding,
+  noteSaveMisses,
   rebuildTodayPreservingPlayback,
   savedToday,
   markItemDone,
@@ -26,7 +27,7 @@ import {
   videoCount,
 } from "./rundown.ts";
 import { assertFolder, changedBlocks, loadSchedule, sameBlocks, saveSchedule, sourceChanged } from "./schedule.ts";
-import { canonicalPlaylistUrl, isYoutubeLink, isYoutubeUrl, parseYoutubeUrl } from "../shared/youtube.ts";
+import { canonicalPlaylistUrl, isYoutubeLink, parseYoutubeUrl } from "../shared/youtube.ts";
 import { frameOf } from "./still.ts";
 import { assertYoutubePlaylist, assertYoutubeVideo, youtubeTitles } from "./youtube.ts";
 import { closeAppTabs, portsFrom } from "./tabs.ts";
@@ -60,12 +61,17 @@ app.put("/api/schedule", async (c) => {
     }
     await forgetUnusedFolders(previous.blocks, saved.blocks);
     const changed = changedBlocks(previous.blocks, saved.blocks);
-    const misses = await missesForBlocks(changed);
     if (changed.length) markBuilding(changed.map((block) => block.id));
+    void missesForBlocks(changed)
+      .then((misses) => noteSaveMisses(misses))
+      .catch((err) => {
+        console.error("slot fit check failed", err);
+        noteSaveMisses([]);
+      });
     void rebuildTodayPreservingPlayback(changed.map((block) => block.id))
       .then(() => joinRundown())
       .catch((err) => console.error("rundown rebuild failed", err));
-    return c.json({ schedule: saved, today: await savedToday(), misses });
+    return c.json({ schedule: saved, today: await savedToday(), misses: [] });
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
   }
@@ -121,10 +127,10 @@ app.get("/api/tv", async (c) => {
   return c.json(await ensureBoard());
 });
 
-// Serve one cached frame for a local-file rundown item.
+// Serve one cached still for a rundown item: a matching YouTube poster, or a local frame.
 app.get("/api/tv/items/:id/still", async (c) => {
   const item = await findRundownItem(c.req.param("id"));
-  if (!item || isYoutubeUrl(item.path)) return c.notFound();
+  if (!item) return c.notFound();
   const file = await frameOf(item.path);
   if (!file) return c.notFound();
   const bytes = await readFile(file);
@@ -134,7 +140,7 @@ app.get("/api/tv/items/:id/still", async (c) => {
   });
 });
 
-// One cached frame for the local file filling a gap. The query must be that file.
+// One cached still for the file filling a gap. The query must be that file.
 app.get("/api/player/intermission-still", async (c) => {
   const filePath = c.req.query("file") ?? "";
   if (!(await intermissionStillAllowed(filePath))) return c.notFound();

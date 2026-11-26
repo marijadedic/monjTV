@@ -1,0 +1,34 @@
+import type { BlockMode, Day, ItemMode } from "../../shared/types.ts";
+import type { AddPhase } from "./AddPhase.ts";
+import type { DraftItem } from "./DraftItem.ts";
+import type { FormStep } from "./FormStep.ts";
+import type { LengthChoice } from "./LengthChoice.ts";
+import type { PlaySource } from "./PlaySource.ts";
+
+export type Draft = {
+  id: string | null;
+  origin: Day;
+  days: Day[];
+  start: string;
+  end: string;
+  starts: Partial<Record<Day, string>>;
+  folder: string;
+  file: string;
+  source: PlaySource;
+  mode: BlockMode;
+  name: string;
+  items: DraftItem[];
+  addMode: ItemMode;
+  addSource: PlaySource;
+  addFolder: string;
+  addFile: string;
+  addLengthChoice: LengthChoice;
+  addCustomMin: string;
+  lengthChoice: LengthChoice;
+  customMin: string;
+  freeEnd: number;
+  gapStart: number;
+  formStep: FormStep;
+  addPhase: AddPhase;
+  returnTo: "summary" | null;
+};

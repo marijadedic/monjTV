@@ -1,23 +1,23 @@
+import { Fragment } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { dateOffset, weekdayOfKey } from "../../shared/dates.ts";
 import type { ItemStatus, PlayerStatus, RecentPlays, RundownItem, TvBoard } from "../../shared/types.ts";
-import { itemCoversNow, itemHasPassed, itemProgress, itemStartsLater, secondsOf } from "../../shared/window.ts";
-import { canonicalYoutubeIntermission, isYoutubeUrl, youtubeId } from "../../shared/youtube.ts";
+import { itemCoversNow, itemHasPassed, itemProgress, itemStartsLater, prevDay, secondsOf } from "../../shared/window.ts";
+import { canonicalYoutubeIntermission, isYoutubeUrl, parseYoutubeUrl } from "../../shared/youtube.ts";
 import { api } from "../api.ts";
 import { pageHref } from "../href.ts";
 import { useI18n } from "../i18n.tsx";
 
 function showsFrame(item: RundownItem): boolean {
-  if (isYoutubeUrl(item.path)) return false;
   return item.mode === "next-episode" || item.mode === "random-file" || item.mode === "specific-file";
 }
 
 function stillSrc(item: RundownItem): string {
-  return `/api/tv/items/${encodeURIComponent(item.id)}/still?file=${encodeURIComponent(item.path)}`;
+  return `/api/tv/items/${encodeURIComponent(item.id)}/still?v=2&file=${encodeURIComponent(item.path)}`;
 }
 
 function gapStillSrc(filePath: string): string {
-  return `/api/player/intermission-still?file=${encodeURIComponent(filePath)}`;
+  return `/api/player/intermission-still?v=2&file=${encodeURIComponent(filePath)}`;
 }
 
 function folderName(filePath: string): string {
@@ -68,6 +68,39 @@ function playedPaths(recent: RecentPlays): Set<string> {
 function rowWatched(item: RundownItem, played: ReadonlySet<string>): boolean {
   if (item.mode === "random-file") return played.has(item.path);
   return item.status === "done";
+}
+
+// A file whose clock starts the previous evening and ends after midnight.
+function beganPreviousDay(item: RundownItem): boolean {
+  return Boolean(item.overnight) && secondsOf(item.start) > secondsOf(item.end);
+}
+
+// Overnight rows of one slot, with the latest real end.
+function carryGroups(items: RundownItem[]): { id: string; until: string; rows: RundownItem[] }[] {
+  const order: string[] = [];
+  const map = new Map<string, RundownItem[]>();
+  for (const item of items) {
+    if (!item.overnight) continue;
+    const rows = map.get(item.blockId);
+    if (rows) rows.push(item);
+    else {
+      map.set(item.blockId, [item]);
+      order.push(item.blockId);
+    }
+  }
+  return order.map((id) => {
+    const rows = map.get(id)!;
+    let until = rows[0]!.end;
+    let untilSec = secondsOf(until);
+    for (const row of rows) {
+      const sec = secondsOf(row.end);
+      if (sec >= untilSec) {
+        until = row.end;
+        untilSec = sec;
+      }
+    }
+    return { id, until, rows };
+  });
 }
 
 function heldItem(items: RundownItem[], sec: number): RundownItem | null {
@@ -261,13 +294,10 @@ export function TvSchedule() {
       ? status.fallbackPath
       : gapTitle && status?.intermissionKind === "video"
         ? status.intermissionSource
-        : null;
+        : gapTitle && status?.intermissionKind === "youtube"
+          ? parseYoutubeUrl(status.intermissionSource ?? "")
+          : null;
   const gapPath = gapFile && !missed[gapFile] ? gapFile : null;
-  const watchId =
-    gapTitle && !gapPath && status?.intermissionKind === "youtube" && status.intermissionSource
-      ? youtubeId(status.intermissionSource)
-      : null;
-  const watchStill = watchId && !missed[watchId] ? watchId : null;
   const air = current ?? due;
   const stripStill = air && showsFrame(air) && !missed[air.path] ? air : null;
 
@@ -406,64 +436,83 @@ export function TvSchedule() {
     );
   }
 
+  const fromDay = day ? t.dayName[prevDay(weekdayOfKey(day.date))] : "";
+  const carried = past ? [] : carryGroups(items);
+  const ownItems = past ? items : items.filter((item) => !item.overnight);
+
+  function railCard(item: RundownItem) {
+    const passed = past || (live && itemHasPassed(item, sec));
+    const shown: ItemStatus = past
+      ? item.mode === "next-episode"
+        ? item.status === "done"
+          ? "done"
+          : "skipped"
+        : item.mode === "random-file"
+          ? rowWatched(item, played)
+            ? "done"
+            : "skipped"
+          : "done"
+      : item.status;
+    const canEdit = !past && (live || !item.overnight);
+    const cardStill = showsFrame(item) && !missed[item.path];
+    const airing = Boolean(live && air?.id === item.id);
+    const coming = Boolean(live && gapTitle && next?.id === item.id);
+    const wontStart = Boolean(live && held?.id === item.id);
+    const carriedRow = !past && Boolean(item.overnight);
+    const started = carriedRow && beganPreviousDay(item);
+    return (
+      <div
+        key={item.id}
+        class={`rail-item ${shown}${airing ? " playing" : ""}${passed ? " passed" : ""}${carriedRow ? " carry-row" : ""}`}
+      >
+        <i class="dot" />
+        <article
+          class={`card ${shown}${airing ? " playing" : ""}${passed ? " passed" : ""}${cardStill ? " has-still" : ""}${menuKey === `card:${item.id}` ? " menu-open" : ""}`}
+        >
+          {cardStill && (
+            <img
+              key={item.path}
+              class="still"
+              src={stillSrc(item)}
+              alt=""
+              onError={() => hideStill(item.path)}
+            />
+          )}
+          <div class="time">
+            {item.start}–{item.end}
+          </div>
+          <div>
+            <div class="title-row">
+              {coming && <span class="next-plain">{t.nextMark}</span>}
+              <div class="title">{item.title}</div>
+              {airing && <span class="pill on-air">{t.onAir}</span>}
+              {shown !== "planned" && shown !== "playing" && !airing && (
+                <span class={`pill ${shown}`}>{pill[shown]}</span>
+              )}
+            </div>
+            <div class="muted" title={item.path}>
+              {modeLabel(item.mode)} · {sourceLabel(item)}
+              {started ? ` · ${t.startedDay(fromDay)}` : ""}
+              {wontStart ? ` · ${t.willNotStart}` : ""}
+            </div>
+          </div>
+          {itemMenu(item, "card", passed, canEdit, airing)}
+        </article>
+      </div>
+    );
+  }
+
   const rail =
     day && items.length > 0 ? (
       <div class="rail">
-        {items.map((item) => {
-          const passed = past || (live && itemHasPassed(item, sec));
-          const shown: ItemStatus = past
-            ? item.mode === "next-episode"
-              ? item.status === "done"
-                ? "done"
-                : "skipped"
-              : item.mode === "random-file"
-                ? rowWatched(item, played)
-                  ? "done"
-                  : "skipped"
-                : "done"
-            : item.status;
-          const canEdit = !past && (live || !item.overnight);
-          const cardStill = showsFrame(item) && !missed[item.path];
-          const airing = Boolean(live && air?.id === item.id);
-          const coming = Boolean(live && gapTitle && next?.id === item.id);
-          const wontStart = Boolean(live && held?.id === item.id);
-          return (
-            <div key={item.id} class={`rail-item ${shown}${airing ? " playing" : ""}${passed ? " passed" : ""}`}>
-              <i class="dot" />
-              <article
-                class={`card ${shown}${airing ? " playing" : ""}${passed ? " passed" : ""}${cardStill ? " has-still" : ""}${menuKey === `card:${item.id}` ? " menu-open" : ""}`}
-              >
-                {cardStill && (
-                  <img
-                    key={item.path}
-                    class="still"
-                    src={stillSrc(item)}
-                    alt=""
-                    onError={() => hideStill(item.path)}
-                  />
-                )}
-                <div class="time">
-                  {item.start}–{item.end}
-                </div>
-                <div>
-                  <div class="title-row">
-                    {coming && <span class="next-plain">{t.nextMark}</span>}
-                    <div class="title">{item.title}</div>
-                    {airing && <span class="pill on-air">{t.onAir}</span>}
-                    {shown !== "planned" && shown !== "playing" && !airing && (
-                      <span class={`pill ${shown}`}>{pill[shown]}</span>
-                    )}
-                  </div>
-                  <div class="muted" title={item.path}>
-                    {modeLabel(item.mode)} · {sourceLabel(item)}
-                    {wontStart ? ` · ${t.willNotStart}` : ""}
-                  </div>
-                </div>
-                {itemMenu(item, "card", passed, canEdit, airing)}
-              </article>
-            </div>
-          );
-        })}
+        {carried.map((group) => (
+          <Fragment key={group.id}>
+            <div class="carry">{t.fromDayUntil(fromDay, group.until)}</div>
+            {group.rows.map((item) => railCard(item))}
+          </Fragment>
+        ))}
+        {carried.length > 0 && ownItems.length > 0 ? <hr class="rail-split" /> : null}
+        {ownItems.map((item) => railCard(item))}
       </div>
     ) : null;
 
@@ -501,7 +550,7 @@ export function TvSchedule() {
       )}
       {live && showColumn && day && (
         <div id="tv-day" role="tabpanel" aria-labelledby={`day-${day.date}`}>
-          <div class={`now-strip${stripStill || gapPath || watchStill ? " has-still" : ""}`}>
+          <div class={`now-strip${stripStill || gapPath ? " has-still" : ""}`}>
             {stripStill && (
               <img
                 key={stripStill.path}
@@ -518,15 +567,6 @@ export function TvSchedule() {
                 src={gapStillSrc(gapPath)}
                 alt=""
                 onError={() => hideStill(gapPath)}
-              />
-            )}
-            {watchStill && (
-              <img
-                key={watchStill}
-                class="still"
-                src={`https://i.ytimg.com/vi/${watchStill}/hqdefault.jpg`}
-                alt=""
-                onError={() => hideStill(watchStill)}
               />
             )}
             <div>
