@@ -41,7 +41,8 @@
   letter-spacing: 0;
   text-transform: none;
 }
-.day-start .end b, .day-start .facts b {
+.day-start .end b,
+.day-start .facts b {
   color: var(--text);
   font-weight: 650;
 }

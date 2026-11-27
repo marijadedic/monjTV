@@ -23,8 +23,10 @@ export function DurationPick({
 }) {
   const { t } = useI18n();
   if (lengthChoice === "longest") return null;
-  const label = lengthChoice === "custom" ? t.customLength : t.minutes(lengthChoice);
-  const tipKey: TipKey = lengthChoice === "custom" ? "custom" : (`${lengthChoice}` as TipKey);
+  const label =
+    lengthChoice === "custom" ? t.customLength : t.minutes(lengthChoice);
+  const tipKey: TipKey =
+    lengthChoice === "custom" ? "custom" : (`${lengthChoice}` as TipKey);
   return (
     <div class="dur-pick">
       <select
@@ -57,12 +59,17 @@ export function DurationPick({
             value={customMin}
             placeholder="45"
             aria-label={t.customLength}
-            onInput={(event) => onCustom((event.target as HTMLInputElement).value)}
+            onInput={(event) =>
+              onCustom((event.target as HTMLInputElement).value)
+            }
           />
           <em>{t.minutesUnit}</em>
         </label>
       )}
-      <InfoButton label={t.aboutLength(label)} tip={tip ?? t.durationTip[tipKey]} />
+      <InfoButton
+        label={t.aboutLength(label)}
+        tip={tip ?? t.durationTip[tipKey]}
+      />
     </div>
   );
 }

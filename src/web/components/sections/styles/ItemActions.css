@@ -39,11 +39,13 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.item-step:hover, .item-step:focus-visible {
+.item-step:hover,
+.item-step:focus-visible {
   color: var(--text);
   background: color-mix(in srgb, var(--line) 55%, transparent);
 }
-.item-actions [data-tip]:hover::after, .item-actions [data-tip]:focus-visible::after {
+.item-actions [data-tip]:hover::after,
+.item-actions [data-tip]:focus-visible::after {
   content: attr(data-tip);
   position: absolute;
   right: calc(100% + 8px);
@@ -87,7 +89,8 @@
   border-radius: 50%;
   background: currentColor;
 }
-.item-menu.open .item-menu-toggle, .item-menu-toggle:hover {
+.item-menu.open .item-menu-toggle,
+.item-menu-toggle:hover {
   color: var(--text);
   background: color-mix(in srgb, var(--line) 55%, transparent);
 }

@@ -4,7 +4,14 @@ import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
-import { browse, isDir, isVideoFile, listVideos, suggestPaths, titleFromPath } from "./files.ts";
+import {
+  browse,
+  isDir,
+  isVideoFile,
+  listVideos,
+  suggestPaths,
+  titleFromPath,
+} from "./files.ts";
 
 const dir = await mkdtemp(path.join(os.tmpdir(), "monjtv-"));
 after(() => rm(dir, { recursive: true, force: true }));
@@ -64,7 +71,10 @@ describe("the folder picker", () => {
       ["serial"],
     );
     assert.deepEqual(hits.videos, []);
-    assert.deepEqual(await suggestPaths("  ", "folder"), { dirs: [], videos: [] });
+    assert.deepEqual(await suggestPaths("  ", "folder"), {
+      dirs: [],
+      videos: [],
+    });
     const videos = await suggestPaths(path.join(dir, "library", "Ni"), "video");
     assert.deepEqual(
       videos.videos.map((entry) => entry.name),

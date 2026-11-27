@@ -1,5 +1,11 @@
 // How long a new slot is, and which files do not fit.
-import type { ItemMode, Progress, ScheduleBlock, SlotLength, SlotMiss } from "../../shared/types.ts";
+import type {
+  ItemMode,
+  Progress,
+  ScheduleBlock,
+  SlotLength,
+  SlotMiss,
+} from "../../shared/types.ts";
 import { canonicalPlaylistUrl, parseYoutubeUrl } from "../../shared/youtube.ts";
 import { isDir, isVideoFile } from "../files/files.ts";
 import { episodePaths, nextEpisode, videosIn } from "../files/picker.ts";
@@ -15,8 +21,10 @@ function scanTimedPool(
 ): SlotLength | null {
   const remaining = maxMin && maxMin > 0 ? maxMin * 60 : null;
   if (timed.length === 0) return null;
-  let longest: { url: string; title: string; durationSec: number } | null = null;
-  let shortest: { url: string; title: string; durationSec: number } | null = null;
+  let longest: { url: string; title: string; durationSec: number } | null =
+    null;
+  let shortest: { url: string; title: string; durationSec: number } | null =
+    null;
   for (const video of timed) {
     if (remaining != null && !itemFits(video.durationSec, remaining)) continue;
     if (!longest || video.durationSec > longest.durationSec) longest = video;
@@ -38,7 +46,10 @@ function scanTimedPool(
 }
 
 // Longest video in this pool, or the longest that still fits a cap.
-async function scanRandomPool(files: string[], maxMin?: number): Promise<SlotLength | null> {
+async function scanRandomPool(
+  files: string[],
+  maxMin?: number,
+): Promise<SlotLength | null> {
   const timed: { url: string; title: string; durationSec: number }[] = [];
   for (const file of files) {
     const durationSec = await tryLength(file);
@@ -130,7 +141,11 @@ export async function videoCount(folder: string): Promise<number> {
 }
 
 // True when every file in a random folder is too long for this window.
-async function missForRandomFolder(blockId: string, folder: string, slotSec: number): Promise<SlotMiss | null> {
+async function missForRandomFolder(
+  blockId: string,
+  folder: string,
+  slotSec: number,
+): Promise<SlotMiss | null> {
   const playlist = canonicalPlaylistUrl(folder);
   const timed: { url: string; title: string; durationSec: number }[] = playlist
     ? await youtubePlaylistTimed(playlist)
@@ -163,7 +178,10 @@ async function missForRandomFolder(blockId: string, folder: string, slotSec: num
 }
 
 // The file this block would start, when that file is too long for the slot.
-async function missForBlock(block: ScheduleBlock, progress: Progress): Promise<SlotMiss | null> {
+async function missForBlock(
+  block: ScheduleBlock,
+  progress: Progress,
+): Promise<SlotMiss | null> {
   if (block.mode === "playlist") {
     for (const entry of block.items ?? []) {
       if (entry.mode !== "random-file" || !entry.lengthMin) continue;
@@ -200,7 +218,13 @@ async function missForBlock(block: ScheduleBlock, progress: Progress): Promise<S
     if (!file || !(await isVideoFile(file))) return null;
     const durationSec = await lengthOf(file);
     if (itemFits(durationSec, slotSec)) return null;
-    return { blockId: block.id, kind: "video", title: nameOf(file), durationSec, limitSec };
+    return {
+      blockId: block.id,
+      kind: "video",
+      title: nameOf(file),
+      durationSec,
+      limitSec,
+    };
   }
 
   const series = canonicalPlaylistUrl(block.folder) ?? block.folder;
@@ -211,14 +235,22 @@ async function missForBlock(block: ScheduleBlock, progress: Progress): Promise<S
     if (!file) return null;
     const durationSec = await lengthOf(file);
     if (itemFits(durationSec, slotSec)) return null;
-    return { blockId: block.id, kind: "episode", title: nameOf(file), durationSec, limitSec };
+    return {
+      blockId: block.id,
+      kind: "episode",
+      title: nameOf(file),
+      durationSec,
+      limitSec,
+    };
   }
 
   return missForRandomFolder(block.id, series, slotSec);
 }
 
 // Why a saved block cannot start a file, for blocks that were just added or edited.
-export async function missesForBlocks(blocks: ScheduleBlock[]): Promise<SlotMiss[]> {
+export async function missesForBlocks(
+  blocks: ScheduleBlock[],
+): Promise<SlotMiss[]> {
   const progress = await loadProgress();
   const misses: SlotMiss[] = [];
   for (const block of blocks) {

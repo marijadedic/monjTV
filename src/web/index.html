@@ -13,7 +13,10 @@
         }
         var lang = localStorage.getItem("monjtv-lang");
         if (lang !== "en" && lang !== "hr") {
-          lang = (navigator.language || "").toLowerCase().indexOf("hr") === 0 ? "hr" : "en";
+          lang =
+            (navigator.language || "").toLowerCase().indexOf("hr") === 0
+              ? "hr"
+              : "en";
         }
         document.documentElement.lang = lang;
       } catch (e) {}

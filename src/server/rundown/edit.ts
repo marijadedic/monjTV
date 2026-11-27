@@ -22,14 +22,22 @@ import { continueShowAfter, scheduledRandomPaths } from "./series.ts";
 
 // Refuse a date the TV week does not keep.
 function editableDay(date: string): void {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || dateOffset(dateKey(), date) > TV_AHEAD) {
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+    dateOffset(dateKey(), date) > TV_AHEAD
+  ) {
     throw new Error("Item not found");
   }
 }
 
 // A slot that has not aired can take a different file.
 function stillToAir(date: string, item: RundownItem): boolean {
-  if (item.status === "playing" || item.status === "done" || item.status === "skipped") return false;
+  if (
+    item.status === "playing" ||
+    item.status === "done" ||
+    item.status === "skipped"
+  )
+    return false;
   const offset = dateOffset(dateKey(), date);
   if (offset < 0) return false;
   if (offset === 0 && itemHasPassed(item, nowSec())) return false;
@@ -57,7 +65,8 @@ export function markItemDone(date: string, itemId: string): Promise<TvBoard> {
     if (item.mode !== "next-episode" && item.mode !== "random-file") {
       throw new Error("Only an episode or a random movie can be marked done");
     }
-    const playingMovie = item.status === "playing" && item.mode === "random-file";
+    const playingMovie =
+      item.status === "playing" && item.mode === "random-file";
     if (item.status === "playing" && !playingMovie) {
       throw new Error("A file that is on the air cannot be marked done");
     }
@@ -85,11 +94,15 @@ export function markItemDone(date: string, itemId: string): Promise<TvBoard> {
         const progress = await loadProgress();
         const recent = progress.recentRandom[folder] ?? [];
         const choice = takeRandom(files, recent, {
-          avoid: [...otherFolderPlays(progress.recentRandom, folder), ...scheduledRandomPaths(board.days, item.id)],
+          avoid: [
+            ...otherFolderPlays(progress.recentRandom, folder),
+            ...scheduledRandomPaths(board.days, item.id),
+          ],
           block: [...used, marked],
         });
         next = choice?.path ?? null;
-        if (playingMovie && (!next || next === marked)) throw new Error("No other files in this folder");
+        if (playingMovie && (!next || next === marked))
+          throw new Error("No other files in this folder");
       }
 
       await markRandomPlayed(folder, marked);
@@ -106,7 +119,8 @@ export function markItemDone(date: string, itemId: string): Promise<TvBoard> {
     }
 
     const files = await episodePaths(folder);
-    if (!files.includes(item.path)) throw new Error("Episode is no longer in this folder");
+    if (!files.includes(item.path))
+      throw new Error("Episode is no longer in this folder");
     await markEpisodeDone(folder, item.path);
 
     const live = date === dateKey();
@@ -145,7 +159,10 @@ export function markItemDone(date: string, itemId: string): Promise<TvBoard> {
 }
 
 // A done episode goes back to skipped, and a movie leaves recently played.
-export function markItemSkipped(date: string, itemId: string): Promise<TvBoard> {
+export function markItemSkipped(
+  date: string,
+  itemId: string,
+): Promise<TvBoard> {
   editableDay(date);
   return exclusive(async () => {
     const board = await syncBoard(true);
@@ -162,7 +179,8 @@ export function markItemSkipped(date: string, itemId: string): Promise<TvBoard> 
     const folder = sourceFolder(item, block);
     if (!folder) throw new Error("Block missing from schedule");
 
-    if (!alreadyAired(date, item)) throw new Error("Only a video that already aired can be marked skipped");
+    if (!alreadyAired(date, item))
+      throw new Error("Only a video that already aired can be marked skipped");
     if (item.mode === "next-episode" && item.status !== "done") {
       throw new Error("Only a finished episode can be marked skipped");
     }
@@ -209,8 +227,10 @@ export function shuffleItem(date: string, itemId: string): Promise<TvBoard> {
     const rundown = board.days.find((day) => day.date === date);
     const item = rundown?.items.find((entry) => entry.id === itemId);
     if (!rundown || !item) throw new Error("Item not found");
-    if (dateOffset(dateKey(), date) < 0) throw new Error("Cannot shuffle a playing or finished item");
-    if (item.mode !== "random-file") throw new Error("Only random items can be shuffled");
+    if (dateOffset(dateKey(), date) < 0)
+      throw new Error("Cannot shuffle a playing or finished item");
+    if (item.mode !== "random-file")
+      throw new Error("Only random items can be shuffled");
     const live = date === dateKey();
     const playing = item.status === "playing";
     if (item.status === "done" || item.status === "skipped") {
@@ -237,11 +257,15 @@ export function shuffleItem(date: string, itemId: string): Promise<TvBoard> {
     const progress = await loadProgress();
     const recent = progress.recentRandom[folder] ?? [];
     const choice = takeRandom(files, recent, {
-      avoid: [...otherFolderPlays(progress.recentRandom, folder), ...scheduledRandomPaths(board.days, item.id)],
+      avoid: [
+        ...otherFolderPlays(progress.recentRandom, folder),
+        ...scheduledRandomPaths(board.days, item.id),
+      ],
       block: [...used, item.path],
     });
     const next = choice?.path ?? null;
-    if (!next || next === item.path) throw new Error("No other files in this folder");
+    if (!next || next === item.path)
+      throw new Error("No other files in this folder");
 
     item.path = next;
     item.title = nameOf(next);
@@ -256,14 +280,19 @@ export function shuffleItem(date: string, itemId: string): Promise<TvBoard> {
 }
 
 // Move a next-episode item to the previous or next file, and keep later episodes in order.
-export function stepEpisode(date: string, itemId: string, direction: -1 | 1): Promise<TvBoard> {
+export function stepEpisode(
+  date: string,
+  itemId: string,
+  direction: -1 | 1,
+): Promise<TvBoard> {
   editableDay(date);
   return exclusive(async () => {
     const board = await syncBoard(true);
     const rundown = board.days.find((day) => day.date === date);
     const item = rundown?.items.find((entry) => entry.id === itemId);
     if (!rundown || !item) throw new Error("Item not found");
-    if (item.mode !== "next-episode") throw new Error("Only next-episode items can change episode");
+    if (item.mode !== "next-episode")
+      throw new Error("Only next-episode items can change episode");
     const live = date === dateKey();
     const now = nowSec();
     const finished =
@@ -286,7 +315,11 @@ export function stepEpisode(date: string, itemId: string, direction: -1 | 1): Pr
     if (startIndex >= files.length) throw new Error("No next episode");
 
     const tail = rundown.items.filter((row) => {
-      if (row.blockId !== item.blockId || Boolean(row.overnight) !== Boolean(item.overnight)) return false;
+      if (
+        row.blockId !== item.blockId ||
+        Boolean(row.overnight) !== Boolean(item.overnight)
+      )
+        return false;
       if (row.mode !== "next-episode") return false;
       if (sourceFolder(row, block) !== folder) return false;
       if (row.id === item.id) return true;
@@ -297,11 +330,15 @@ export function stepEpisode(date: string, itemId: string, direction: -1 | 1): Pr
     });
     const tailIds = new Set(tail.map((row) => row.id));
     const locked = new Set(
-      rundown.items.filter((row) => row.blockId === item.blockId && !tailIds.has(row.id)).map((row) => row.path),
+      rundown.items
+        .filter((row) => row.blockId === item.blockId && !tailIds.has(row.id))
+        .map((row) => row.path),
     );
     const startFile = files[startIndex];
     if (locked.has(startFile)) {
-      throw new Error(direction < 0 ? "No previous episode" : "No next episode");
+      throw new Error(
+        direction < 0 ? "No previous episode" : "No next episode",
+      );
     }
 
     const drop = new Set<string>();
@@ -323,7 +360,8 @@ export function stepEpisode(date: string, itemId: string, direction: -1 | 1): Pr
 
       cursor += 1;
     }
-    if (drop.size > 0) rundown.items = rundown.items.filter((row) => !drop.has(row.id));
+    if (drop.size > 0)
+      rundown.items = rundown.items.filter((row) => !drop.has(row.id));
 
     recomputeBlockTimes(rundown, block);
     const remaining = tail.filter((row) => !drop.has(row.id));

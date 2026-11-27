@@ -10,6 +10,18 @@ export {
   saveToday,
 } from "./board.ts";
 export { buildRundown } from "./compose.ts";
-export { coversNow, findBlock, itemFits, joinOffset, maxPlayableSec, onAirItem } from "./item.ts";
-export { markItemDone, markItemSkipped, shuffleItem, stepEpisode } from "./edit.ts";
+export {
+  coversNow,
+  findBlock,
+  itemFits,
+  joinOffset,
+  maxPlayableSec,
+  onAirItem,
+} from "./item.ts";
+export {
+  markItemDone,
+  markItemSkipped,
+  shuffleItem,
+  stepEpisode,
+} from "./edit.ts";
 export { missesForBlocks, slotLength, videoCount } from "./measure.ts";

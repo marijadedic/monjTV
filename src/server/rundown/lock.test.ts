@@ -47,7 +47,10 @@ describe("the week spinner and the fit warning", () => {
   it("shows a spinner while slots are still being timed", () => {
     markBuilding(["evening", "late"]);
     assert.equal(stillBuilding(), true);
-    assert.deepEqual(new Set(listedBuildingIds()), new Set(["evening", "late"]));
+    assert.deepEqual(
+      new Set(listedBuildingIds()),
+      new Set(["evening", "late"]),
+    );
     clearBuilding();
     assert.equal(stillBuilding(), false);
     assert.deepEqual(listedBuildingIds(), []);
@@ -61,7 +64,13 @@ describe("the week spinner and the fit warning", () => {
   it("replaces the fit warnings and marks the check finished, including an empty list", () => {
     const before = listedSaveMisses().missToken;
     noteSaveMisses([
-      { blockId: "film", kind: "video", title: "Night", durationSec: 3 * 3600, limitSec: 2 * 3600 },
+      {
+        blockId: "film",
+        kind: "video",
+        title: "Night",
+        durationSec: 3 * 3600,
+        limitSec: 2 * 3600,
+      },
     ]);
     const warned = listedSaveMisses();
     assert.equal(warned.missToken, before + 1);

@@ -2,8 +2,13 @@ import "./styles/ItemActions.css";
 import type { ItemMode, RundownItem } from "../../../shared/types.ts";
 import { useI18n } from "../../i18n.tsx";
 
-function markDoneTip(mode: ItemMode, upcoming: boolean, t: ReturnType<typeof useI18n>["t"]): string {
-  if (mode === "next-episode") return upcoming ? t.markDoneEpisode : t.markDoneEpisodeAired;
+function markDoneTip(
+  mode: ItemMode,
+  upcoming: boolean,
+  t: ReturnType<typeof useI18n>["t"],
+): string {
+  if (mode === "next-episode")
+    return upcoming ? t.markDoneEpisode : t.markDoneEpisodeAired;
   return upcoming ? t.markDoneMovie : t.markDoneMovieAired;
 }
 import { canStepEpisode } from "@utils/rundown/canStepEpisode.ts";
@@ -45,11 +50,15 @@ export function ItemActions({
   const done = rowWatched(item, played);
   const trackable = item.mode === "next-episode" || item.mode === "random-file";
   const canStep = canEdit && canStepEpisode(item, passed);
-  const onAirMovie = item.mode === "random-file" && (airing || item.status === "playing");
-  const canShuffle = canEdit && item.mode === "random-file" && (onAirMovie || !passed);
-  const canDone = onAirMovie || (trackable && !done && !airing && item.status !== "playing");
+  const onAirMovie =
+    item.mode === "random-file" && (airing || item.status === "playing");
+  const canShuffle =
+    canEdit && item.mode === "random-file" && (onAirMovie || !passed);
+  const canDone =
+    onAirMovie || (trackable && !done && !airing && item.status !== "playing");
   const earlier = passed || (live && item.status === "done");
-  const canSkip = trackable && done && !airing && item.status !== "playing" && earlier;
+  const canSkip =
+    trackable && done && !airing && item.status !== "playing" && earlier;
   const hasMenu = canShuffle || canDone || canSkip;
   if (!canStep && !hasMenu) return null;
   const key = `${place}:${item.id}`;
@@ -60,9 +69,11 @@ export function ItemActions({
     busy === `${item.id}:skipped` ||
     busy === `${item.id}:prev` ||
     busy === `${item.id}:next`;
-  const upcoming = !passed && item.status !== "done" && item.status !== "skipped";
+  const upcoming =
+    !passed && item.status !== "done" && item.status !== "skipped";
   const doneTip = markDoneTip(item.mode, upcoming, t);
-  const skipTip = item.mode === "next-episode" ? t.markSkippedEpisode : t.markSkippedMovie;
+  const skipTip =
+    item.mode === "next-episode" ? t.markSkippedEpisode : t.markSkippedMovie;
   function choose(action: () => void) {
     onMenu(null);
     action();
@@ -111,17 +122,32 @@ export function ItemActions({
           {open && (
             <div class="item-menu-list" role="menu">
               {canShuffle && (
-                <button type="button" role="menuitem" data-tip={t.shuffleHint} onClick={() => choose(() => onShuffle(item))}>
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-tip={t.shuffleHint}
+                  onClick={() => choose(() => onShuffle(item))}
+                >
                   {t.shuffle}
                 </button>
               )}
               {canDone && (
-                <button type="button" role="menuitem" data-tip={doneTip} onClick={() => choose(() => onDone(item))}>
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-tip={doneTip}
+                  onClick={() => choose(() => onDone(item))}
+                >
                   {t.markDone}
                 </button>
               )}
               {canSkip && (
-                <button type="button" role="menuitem" data-tip={skipTip} onClick={() => choose(() => onSkip(item))}>
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-tip={skipTip}
+                  onClick={() => choose(() => onSkip(item))}
+                >
                   {t.markSkipped}
                 </button>
               )}

@@ -130,7 +130,10 @@ async function saveWeek(blocks: ScheduleBlock[]): Promise<void> {
 
 describe("a week built from the files on disk", { concurrency: false }, () => {
   it("airs 2.mkv then 10.mkv when one show has two slots on the same day", async () => {
-    await saveWeek([episodeBlock("early", "18:00"), episodeBlock("late", "20:00")]);
+    await saveWeek([
+      episodeBlock("early", "18:00"),
+      episodeBlock("late", "20:00"),
+    ]);
     const built = await buildRundown(today);
     const own = built.items.filter((item) => !item.overnight);
     assert.deepEqual(
@@ -216,7 +219,9 @@ describe("a week built from the files on disk", { concurrency: false }, () => {
     const first = await syncBoard(true);
     const tomorrow = shiftDateKey(today, 1);
     const morning = first.days.find((entry) => entry.date === tomorrow);
-    const carried = morning?.items.find((item) => item.overnight && item.path === film);
+    const carried = morning?.items.find(
+      (item) => item.overnight && item.path === film,
+    );
     assert.ok(carried);
 
     const live = first.days.find((entry) => entry.date === today);

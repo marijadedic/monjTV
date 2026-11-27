@@ -25,7 +25,11 @@ export function placeCloud(event: { currentTarget: EventTarget | null }) {
   };
   sync();
   tipWatch = new MutationObserver(sync);
-  tipWatch.observe(source, { subtree: true, characterData: true, childList: true });
+  tipWatch.observe(source, {
+    subtree: true,
+    characterData: true,
+    childList: true,
+  });
   const frame = host.closest<HTMLElement>(".add-form");
   if (tipFrame !== frame) {
     tipFrame?.removeEventListener("scroll", onTipScroll);
@@ -39,16 +43,21 @@ export function placeCloud(event: { currentTarget: EventTarget | null }) {
   const height = tip.offsetHeight;
   const pad = 12;
   let left = hostRect.left;
-  if (left + width > window.innerWidth - pad) left = window.innerWidth - pad - width;
+  if (left + width > window.innerWidth - pad)
+    left = window.innerWidth - pad - width;
   if (left < pad) left = pad;
   let top = hostRect.top - height - 12;
   const below = top < pad;
-  if (below) top = Math.min(hostRect.bottom + 12, window.innerHeight - height - pad);
+  if (below)
+    top = Math.min(hostRect.bottom + 12, window.innerHeight - height - pad);
   tip.classList.toggle("below", below);
   tip.style.left = `${left}px`;
   tip.style.top = `${top}px`;
   const tail = hostRect.left + hostRect.width / 2 - left;
-  tip.style.setProperty("--tail", `${Math.min(Math.max(tail, 14), Math.max(14, width - 14))}px`);
+  tip.style.setProperty(
+    "--tail",
+    `${Math.min(Math.max(tail, 14), Math.max(14, width - 14))}px`,
+  );
   tip.style.visibility = "";
 }
 
@@ -75,7 +84,8 @@ export function showCloud(event: { currentTarget: EventTarget | null }) {
 
 export function hideCloud(event: { currentTarget: EventTarget | null }) {
   const host = event.currentTarget as HTMLElement | null;
-  if (!host || tipHost !== host || host.contains(document.activeElement)) return;
+  if (!host || tipHost !== host || host.contains(document.activeElement))
+    return;
   dismissTip();
 }
 

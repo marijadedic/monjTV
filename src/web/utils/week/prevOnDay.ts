@@ -16,7 +16,8 @@ export function prevOnDay(
     if (!block.days.includes(day)) continue;
     const placed = windowOn(block, day);
     if (toMin(placed.start) >= startMin) continue;
-    if (!prev || toMin(placed.start) > toMin(windowOn(prev, day).start)) prev = block;
+    if (!prev || toMin(placed.start) > toMin(windowOn(prev, day).start))
+      prev = block;
   }
   return prev;
 }

@@ -61,7 +61,10 @@ import { ErrorNote } from "../components/parts/ErrorNote.tsx";
 import { FitWarn } from "../components/parts/FitWarn.tsx";
 import { Scrim } from "../components/parts/Scrim.tsx";
 import { GapDialog } from "../components/sections/GapDialog.tsx";
-import { IntermissionChip, WeekHead } from "../components/sections/WeekHead.tsx";
+import {
+  IntermissionChip,
+  WeekHead,
+} from "../components/sections/WeekHead.tsx";
 import { IntermissionPanel } from "../components/sections/IntermissionPanel.tsx";
 import { SlotForm } from "../components/sections/SlotForm.tsx";
 import { WeekScale } from "../components/sections/WeekScale.tsx";
@@ -71,7 +74,9 @@ export function Admin() {
   const today = WEEKDAY[new Date().getDay()];
   const [schedule, setSchedule] = useState<Schedule>(emptySchedule);
   const [board, setBoard] = useState<TvBoard | null>(null);
-  const [youtubeTitles, setYoutubeTitles] = useState<Record<string, string>>({});
+  const [youtubeTitles, setYoutubeTitles] = useState<Record<string, string>>(
+    {},
+  );
   const [draft, setDraft] = useState<Draft | null>(null);
   const [slide, setSlide] = useState("");
   const [slideKey, setSlideKey] = useState(0);
@@ -96,7 +101,9 @@ export function Admin() {
     const dir = stepDir(draft, step);
     if (!dir) return;
     slideTo(dir);
-    setDraft((current) => (current ? { ...current, formStep: step, addPhase: "list" } : current));
+    setDraft((current) =>
+      current ? { ...current, formStep: step, addPhase: "list" } : current,
+    );
   }
 
   function editPart(step: "how" | "when" | "what" | "name") {
@@ -121,7 +128,9 @@ export function Admin() {
   const [intermissionOpen, setIntermissionOpen] = useState(false);
   const [addKind, setAddKind] = useState<IntermissionKind>("folder");
   const [addDraft, setAddDraft] = useState("");
-  const [intermissionError, setIntermissionError] = useState<string | null>(null);
+  const [intermissionError, setIntermissionError] = useState<string | null>(
+    null,
+  );
   const [intermissionSaving, setIntermissionSaving] = useState(false);
   const [panelToken, setPanelToken] = useState(0);
   const [measured, setMeasured] = useState<{
@@ -144,7 +153,10 @@ export function Admin() {
   addDraftRef.current = addDraft;
   const formRef = useRef<HTMLFormElement>(null);
   const draggingId = useRef<string | null>(null);
-  const [gapEdit, setGapEdit] = useState<{ itemId: string; minutes: string } | null>(null);
+  const [gapEdit, setGapEdit] = useState<{
+    itemId: string;
+    minutes: string;
+  } | null>(null);
   const [gapError, setGapError] = useState<string | null>(null);
   const gapEditRef = useRef(gapEdit);
   gapEditRef.current = gapEdit;
@@ -179,14 +191,20 @@ export function Admin() {
     else if (token !== missTokenSeen.current) {
       missTokenSeen.current = token;
       const id = savedBlockId.current;
-      setFitMiss(id ? (loaded.misses ?? []).find((miss) => miss.blockId === id) ?? null : null);
+      setFitMiss(
+        id
+          ? ((loaded.misses ?? []).find((miss) => miss.blockId === id) ?? null)
+          : null,
+      );
     }
     if (Array.isArray(loaded.building)) {
       setBuilding(loaded.building);
       return;
     }
     setBuilding((current) =>
-      current.filter((id) => occupancyOf(loaded, id) === occupancyRef.current[id]),
+      current.filter(
+        (id) => occupancyOf(loaded, id) === occupancyRef.current[id],
+      ),
     );
   }
 
@@ -208,7 +226,10 @@ export function Admin() {
     };
   }, [building.length]);
 
-  const titleKey = youtubeScheduleKey(schedule, draftTitleLines(draft, addKind, addDraft).join("\n"));
+  const titleKey = youtubeScheduleKey(
+    schedule,
+    draftTitleLines(draft, addKind, addDraft).join("\n"),
+  );
   useEffect(() => {
     const urls = titleKey ? titleKey.split("\n") : [];
     if (urls.length === 0) return;
@@ -216,7 +237,8 @@ export function Admin() {
     api
       .youtubeTitles(urls)
       .then((res) => {
-        if (!cancel) setYoutubeTitles((current) => ({ ...current, ...res.titles }));
+        if (!cancel)
+          setYoutubeTitles((current) => ({ ...current, ...res.titles }));
       })
       .catch(() => {});
     return () => {
@@ -241,7 +263,10 @@ export function Admin() {
       if (intermissionButtonRef.current?.contains(target)) return;
       if (intermissionPanelRef.current?.contains(target)) return;
       setIntermissionOpen(false);
-      if (target instanceof Element && target.closest(".week-scale, .intermission-dismiss")) {
+      if (
+        target instanceof Element &&
+        target.closest(".week-scale, .intermission-dismiss")
+      ) {
         event.preventDefault();
       }
     }
@@ -387,7 +412,10 @@ export function Admin() {
     panelToken,
   ]);
 
-  const stackKey = draft?.mode === "playlist" ? draft.items.map((item) => item.id).join("\n") : "";
+  const stackKey =
+    draft?.mode === "playlist"
+      ? draft.items.map((item) => item.id).join("\n")
+      : "";
 
   useEffect(() => {
     if (!draft || draft.mode !== "playlist") return;
@@ -406,7 +434,9 @@ export function Admin() {
           error = err instanceof Error ? err.message : String(err);
         }
         if (cancel) return;
-        setDraft((current) => (current ? withProbe(current, item.id, length, error) : current));
+        setDraft((current) =>
+          current ? withProbe(current, item.id, length, error) : current,
+        );
       }
     })();
     return () => {
@@ -445,7 +475,14 @@ export function Admin() {
 
   useEffect(() => {
     setDraft((current) => (current ? draftEnd(current, measured) : current));
-  }, [measured, draft?.start, draft?.lengthChoice, draft?.customMin, draft?.items, draft?.mode]);
+  }, [
+    measured,
+    draft?.start,
+    draft?.lengthChoice,
+    draft?.customMin,
+    draft?.items,
+    draft?.mode,
+  ]);
 
   function openPanel() {
     setPanelToken((token) => token + 1);
@@ -459,7 +496,9 @@ export function Admin() {
     setError(null);
     const ids = changedBlockIds(schedule.blocks, next.blocks);
     if (ids.length) {
-      occupancyRef.current = Object.fromEntries(ids.map((id) => [id, occupancyOf(board, id)]));
+      occupancyRef.current = Object.fromEntries(
+        ids.map((id) => [id, occupancyOf(board, id)]),
+      );
       setBuilding(ids);
     }
     const res = await api.saveSchedule(next);
@@ -503,7 +542,11 @@ export function Admin() {
     if (source === "youtube") return;
     const video = (adding ? draft.addMode : draft.mode) === "specific-file";
     setPicking("draft");
-    setFieldError((current) => ({ ...current, folder: undefined, form: undefined }));
+    setFieldError((current) => ({
+      ...current,
+      folder: undefined,
+      form: undefined,
+    }));
     try {
       const picked = video ? await api.pickFile() : await api.pickFolder();
       if (!picked.path) return;
@@ -523,7 +566,11 @@ export function Admin() {
     if (!next) return;
     slideTo("slide-back");
     setDraft(next);
-    setFieldError((current) => ({ ...current, folder: undefined, time: undefined }));
+    setFieldError((current) => ({
+      ...current,
+      folder: undefined,
+      time: undefined,
+    }));
   }
 
   function closeDraft() {
@@ -542,7 +589,10 @@ export function Admin() {
       setGapError(t.needMinutes);
       return;
     }
-    setDraft({ ...draft, items: withGap(draft.items, gapEdit.itemId, minutes) });
+    setDraft({
+      ...draft,
+      items: withGap(draft.items, gapEdit.itemId, minutes),
+    });
     setGapEdit(null);
     setGapError(null);
   }
@@ -633,7 +683,9 @@ export function Admin() {
     }).then((saved) => {
       if (saved) return;
       setSchedule((latest) =>
-        latest.intermissionRandomStart === on ? { ...latest, intermissionRandomStart: !on } : latest,
+        latest.intermissionRandomStart === on
+          ? { ...latest, intermissionRandomStart: !on }
+          : latest,
       );
     });
   }
@@ -641,14 +693,18 @@ export function Admin() {
   function selectIntermission(id: string) {
     const current = scheduleRef.current;
     if (current.activeIntermission === id) return;
-    void changeIntermission({ intermissions: current.intermissions, activeIntermission: id });
+    void changeIntermission({
+      intermissions: current.intermissions,
+      activeIntermission: id,
+    });
   }
 
   function removeIntermission(id: string) {
     const current = scheduleRef.current;
     void changeIntermission({
       intermissions: current.intermissions.filter((item) => item.id !== id),
-      activeIntermission: current.activeIntermission === id ? "" : current.activeIntermission,
+      activeIntermission:
+        current.activeIntermission === id ? "" : current.activeIntermission,
     });
   }
 
@@ -723,7 +779,9 @@ export function Admin() {
   }
 
   const selectedIntermission =
-    schedule.intermissions.find((item) => item.id === schedule.activeIntermission) ?? null;
+    schedule.intermissions.find(
+      (item) => item.id === schedule.activeIntermission,
+    ) ?? null;
   const fallbackName = selectedIntermission
     ? intermissionLabel(selectedIntermission, youtubeTitles)
     : "";
@@ -731,12 +789,20 @@ export function Admin() {
   const addPreview = pendingAdd.error
     ? ""
     : pendingAdd.source
-      ? intermissionLabel({ id: "", kind: addKind, source: pendingAdd.source }, youtubeTitles)
+      ? intermissionLabel(
+          { id: "", kind: addKind, source: pendingAdd.source },
+          youtubeTitles,
+        )
       : "";
-  const editingGap = draft && gapEdit ? draft.items.find((item) => item.id === gapEdit.itemId) : undefined;
+  const editingGap =
+    draft && gapEdit
+      ? draft.items.find((item) => item.id === gapEdit.itemId)
+      : undefined;
   const editingGapSet = editingGap ? gapOf(editingGap) > 0 : false;
   const ghostsByDay = draft
-    ? Object.fromEntries(DAYS.map((day) => [day, ghostsOn(draft, day, schedule.blocks, board)]))
+    ? Object.fromEntries(
+        DAYS.map((day) => [day, ghostsOn(draft, day, schedule.blocks, board)]),
+      )
     : null;
 
   return (
@@ -757,7 +823,11 @@ export function Admin() {
       {fitMiss && !draft && <FitWarn miss={fitMiss} />}
       <div class={draft ? "week-wrap drafting" : "week-wrap"}>
         {!draft && intermissionOpen && (
-          <Scrim className="intermission-dismiss" pointer onClose={() => setIntermissionOpen(false)} />
+          <Scrim
+            className="intermission-dismiss"
+            pointer
+            onClose={() => setIntermissionOpen(false)}
+          />
         )}
         {!draft && intermissionOpen && (
           <IntermissionPanel
@@ -772,14 +842,22 @@ export function Admin() {
             onKind={chooseAddKind}
             addDraft={addDraft}
             onDraft={editAddDraft}
-            youtubeInvalid={pendingAdd.error === "youtube" || Boolean(intermissionError)}
-            pathInvalid={pendingAdd.error === "youtube-in-path" || Boolean(intermissionError)}
+            youtubeInvalid={
+              pendingAdd.error === "youtube" || Boolean(intermissionError)
+            }
+            pathInvalid={
+              pendingAdd.error === "youtube-in-path" ||
+              Boolean(intermissionError)
+            }
             picking={picking === "fallback"}
             onBrowse={() => void chooseAddSource()}
             preview={addPreview}
             errorText={
               intermissionError || pendingAdd.error
-                ? intermissionErrorText(intermissionError || pendingAdd.error || "", t)
+                ? intermissionErrorText(
+                    intermissionError || pendingAdd.error || "",
+                    t,
+                  )
                 : null
             }
             canAdd={Boolean(pendingAdd.source) && !pendingAdd.error}

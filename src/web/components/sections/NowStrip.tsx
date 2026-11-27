@@ -54,15 +54,26 @@ export function NowStrip({
   const gapPath = gapFile && !missed[gapFile] ? gapFile : null;
   return (
     <div class={`now-strip${stripStill || gapPath ? " has-still" : ""}`}>
-      {stripStill && <StillFrame src={stillSrc(stripStill)} onError={() => onHideStill(stripStill.path)} />}
-      {gapPath && <StillFrame src={gapStillSrc(gapPath)} onError={() => onHideStill(gapPath)} />}
+      {stripStill && (
+        <StillFrame
+          src={stillSrc(stripStill)}
+          onError={() => onHideStill(stripStill.path)}
+        />
+      )}
+      {gapPath && (
+        <StillFrame
+          src={gapStillSrc(gapPath)}
+          onError={() => onHideStill(gapPath)}
+        />
+      )}
       <div>
         {air ? (
           <>
             <Pill tone="on-air">{t.onAir}</Pill>
             <h2 class="strip-title">{air.title}</h2>
             <div class="muted" title={air.path}>
-              {air.start}–{air.end} · {scheduleMode(air.mode, t)} · {scheduleSource(air, t)}
+              {air.start}–{air.end} · {scheduleMode(air.mode, t)} ·{" "}
+              {scheduleSource(air, t)}
             </div>
             <div
               class="track"

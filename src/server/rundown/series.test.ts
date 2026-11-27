@@ -10,10 +10,30 @@ describe("movies already on the week", () => {
       {
         date: "2026-11-26",
         items: [
-          row({ id: "keep", blockId: "movies", path: "/films/a.mkv", mode: "random-file" }),
-          row({ id: "swap", blockId: "movies", path: "/films/b.mkv", mode: "random-file" }),
-          row({ id: "show", blockId: "serial", path: "/shows/01.mkv", mode: "next-episode" }),
-          row({ id: "blank", blockId: "movies", path: "", mode: "random-file" }),
+          row({
+            id: "keep",
+            blockId: "movies",
+            path: "/films/a.mkv",
+            mode: "random-file",
+          }),
+          row({
+            id: "swap",
+            blockId: "movies",
+            path: "/films/b.mkv",
+            mode: "random-file",
+          }),
+          row({
+            id: "show",
+            blockId: "serial",
+            path: "/shows/01.mkv",
+            mode: "next-episode",
+          }),
+          row({
+            id: "blank",
+            blockId: "movies",
+            path: "",
+            mode: "random-file",
+          }),
         ],
       },
     ];

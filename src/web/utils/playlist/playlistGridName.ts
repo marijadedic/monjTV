@@ -7,6 +7,7 @@ export function playlistGridName(
   item: DraftItem,
   titles: Readonly<Record<string, string>>,
 ): string {
-  if (item.mode === "specific-file" || canonicalPlaylistUrl(item.folder)) return itemLabel(item, titles);
+  if (item.mode === "specific-file" || canonicalPlaylistUrl(item.folder))
+    return itemLabel(item, titles);
   return folderLabel(item.folder);
 }

@@ -55,7 +55,10 @@ export function playlistSliceLines(
       if (beginsNext) side = "next";
       else if (crosses) side = "cross";
       text = sliceCaption(name, side, spill, row.start, row.end, t);
-      cursor = (beginsNext ? DAY_MINUTES + startMin : startMin) + Math.ceil(row.durationSec / 60) + gap;
+      cursor =
+        (beginsNext ? DAY_MINUTES + startMin : startMin) +
+        Math.ceil(row.durationSec / 60) +
+        gap;
     } else {
       if (cursor == null) break;
       const begin: number = cursor;
@@ -71,13 +74,26 @@ export function playlistSliceLines(
       if (endMin <= DAY_MINUTES) side = "start";
       else if (begin >= DAY_MINUTES) side = "next";
       else side = "cross";
-      text = sliceCaption(name, side, spill, clockOf(begin), clockOf(endMin), t);
+      text = sliceCaption(
+        name,
+        side,
+        spill,
+        clockOf(begin),
+        clockOf(endMin),
+        t,
+      );
     }
     lines.push({ key: entry.id, text, side });
     if (gap > 0) {
       const gapSide: SliceSide = side === "start" ? "start" : "next";
-      lines.push({ key: `${entry.id}-gap`, text: t.playlistGapLine(gap), side: gapSide });
+      lines.push({
+        key: `${entry.id}-gap`,
+        text: t.playlistGapLine(gap),
+        side: gapSide,
+      });
     }
   }
-  return lines.filter((line) => (spill ? line.side !== "start" : line.side !== "next"));
+  return lines.filter((line) =>
+    spill ? line.side !== "start" : line.side !== "next",
+  );
 }

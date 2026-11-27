@@ -12,7 +12,10 @@ describe("a file's name", () => {
   });
 
   it("names an uncached YouTube video from its link", () => {
-    assert.equal(nameOf("https://www.youtube.com/watch?v=dQw4w9WgXcQ"), "YouTube · dQw4w9WgXcQ");
+    assert.equal(
+      nameOf("https://www.youtube.com/watch?v=dQw4w9WgXcQ"),
+      "YouTube · dQw4w9WgXcQ",
+    );
   });
 });
 

@@ -1,7 +1,11 @@
 // The next episode, or a random file that has not played.
 import { randomInt } from "node:crypto";
 import type { ItemMode } from "../../shared/types.ts";
-import { canonicalPlaylistUrl, parseYoutubePlaylist, parseYoutubeUrl } from "../../shared/youtube.ts";
+import {
+  canonicalPlaylistUrl,
+  parseYoutubePlaylist,
+  parseYoutubeUrl,
+} from "../../shared/youtube.ts";
 import { isVideoFile, listVideos } from "./files.ts";
 import { loadProgress, rememberRandom } from "../schedule/progress.ts";
 import { loadYoutubePlaylist } from "../youtube/youtube.ts";
@@ -19,7 +23,10 @@ export async function episodePaths(folder: string): Promise<string[]> {
 }
 
 // File after the last completed one, wrapping to the start.
-export function nextEpisode(files: string[], lastCompleted?: string): string | null {
+export function nextEpisode(
+  files: string[],
+  lastCompleted?: string,
+): string | null {
   if (files.length === 0) return null;
   if (!lastCompleted) return files[0];
   const idx = files.indexOf(lastCompleted);
@@ -28,7 +35,10 @@ export function nextEpisode(files: string[], lastCompleted?: string): string | n
 }
 
 // Plays remembered under other folders, so the same file is not chosen from two places.
-export function otherFolderPlays(recentRandom: Record<string, string[]>, folder: string): string[] {
+export function otherFolderPlays(
+  recentRandom: Record<string, string[]>,
+  folder: string,
+): string[] {
   const held: string[] = [];
   for (const [key, paths] of Object.entries(recentRandom)) {
     if (key === folder) continue;
@@ -55,7 +65,9 @@ export function takeRandom(
     return { path, recent: rememberRandom(liveRecent, path, universe) };
   };
 
-  const fresh = files.filter((file) => open(file) && !seen.has(file) && !avoided.has(file));
+  const fresh = files.filter(
+    (file) => open(file) && !seen.has(file) && !avoided.has(file),
+  );
   if (fresh.length > 0) return picked(fresh);
 
   const unseen = files.filter((file) => open(file) && !seen.has(file));
@@ -64,7 +76,9 @@ export function takeRandom(
   const reusable = files.filter((file) => open(file));
   if (reusable.length === 0) return null;
   const newest = liveRecent.find((file) => reusable.includes(file));
-  const withoutNewest = newest ? reusable.filter((file) => file !== newest) : reusable;
+  const withoutNewest = newest
+    ? reusable.filter((file) => file !== newest)
+    : reusable;
   const spread = withoutNewest.filter((file) => !avoided.has(file));
   let pool = reusable;
   if (spread.length > 0) pool = spread;
@@ -97,8 +111,10 @@ export async function pick(opts: {
   const series = canonicalPlaylistUrl(opts.folder) ?? opts.folder;
   const progress = await loadProgress();
   const recent = progress.recentRandom[series] ?? [];
-  return takeRandom(files, recent, {
-    avoid: otherFolderPlays(progress.recentRandom, series),
-    block: opts.exclude,
-  })?.path ?? null;
+  return (
+    takeRandom(files, recent, {
+      avoid: otherFolderPlays(progress.recentRandom, series),
+      block: opts.exclude,
+    })?.path ?? null
+  );
 }

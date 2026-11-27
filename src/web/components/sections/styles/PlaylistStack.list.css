@@ -84,7 +84,9 @@
   background: transparent;
   color: var(--muted);
 }
-.playlist-gap .gap-plus:hover, .playlist-gap .gap-plus:focus-visible, .playlist-gap .gap-plus.on {
+.playlist-gap .gap-plus:hover,
+.playlist-gap .gap-plus:focus-visible,
+.playlist-gap .gap-plus.on {
   color: var(--text);
   border-color: var(--accent);
 }

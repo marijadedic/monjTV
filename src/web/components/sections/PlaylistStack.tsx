@@ -42,7 +42,11 @@ export function PlaylistStack({
   onMove: (id: string, dir: -1 | 1) => void;
   onRemove: (id: string) => void;
   onGap: (item: DraftItem) => void;
-  onDragStart: (id: string, transfer: DataTransfer | null, element: HTMLElement) => void;
+  onDragStart: (
+    id: string,
+    transfer: DataTransfer | null,
+    element: HTMLElement,
+  ) => void;
   onDragEnd: () => void;
   onDragOver: (id: string, element: HTMLElement, after: boolean) => void;
   onDrop: (id: string, after: boolean) => void;
@@ -59,7 +63,9 @@ export function PlaylistStack({
       {items.length > 0 && (
         <p class="tally">
           {t.videoCount(items.length)}
-          {stackSec != null && <> · {t.slotDurationOf(Math.max(1, Math.ceil(stackSec / 60)))}</>}
+          {stackSec != null && (
+            <> · {t.slotDurationOf(Math.max(1, Math.ceil(stackSec / 60)))}</>
+          )}
           <span class="slash">/</span>
           {t.startsMark} · {start} - {t.endsMark} · {end}
         </p>
@@ -80,19 +86,32 @@ export function PlaylistStack({
                   class="playlist-item"
                   draggable
                   onDragStart={(event) => {
-                    onDragStart(item.id, event.dataTransfer, event.currentTarget);
+                    onDragStart(
+                      item.id,
+                      event.dataTransfer,
+                      event.currentTarget,
+                    );
                   }}
                   onDragEnd={onDragEnd}
                   onDragOver={(event) => {
                     event.preventDefault();
-                    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+                    if (event.dataTransfer)
+                      event.dataTransfer.dropEffect = "move";
                     if (draggingId.current === item.id) return;
-                    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-                    onDragOver(item.id, event.currentTarget, event.clientY > rect.top + rect.height / 2);
+                    const rect = (
+                      event.currentTarget as HTMLElement
+                    ).getBoundingClientRect();
+                    onDragOver(
+                      item.id,
+                      event.currentTarget,
+                      event.clientY > rect.top + rect.height / 2,
+                    );
                   }}
                   onDrop={(event) => {
                     event.preventDefault();
-                    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+                    const rect = (
+                      event.currentTarget as HTMLElement
+                    ).getBoundingClientRect();
                     onDrop(item.id, event.clientY > rect.top + rect.height / 2);
                   }}
                 >
@@ -101,7 +120,10 @@ export function PlaylistStack({
                     <b>{itemLabel(item, titles)}</b>
                     <span>{stackItemLine(item, t)}</span>
                   </div>
-                  <div class="playlist-tools" onMouseDown={(event) => event.stopPropagation()}>
+                  <div
+                    class="playlist-tools"
+                    onMouseDown={(event) => event.stopPropagation()}
+                  >
                     <button
                       type="button"
                       disabled={index === 0}
@@ -120,7 +142,11 @@ export function PlaylistStack({
                     >
                       ↓
                     </button>
-                    <CloseButton label={t.remove} title={t.remove} onClick={() => onRemove(item.id)} />
+                    <CloseButton
+                      label={t.remove}
+                      title={t.remove}
+                      onClick={() => onRemove(item.id)}
+                    />
                   </div>
                 </li>
                 {index < items.length - 1 && (
@@ -128,7 +154,8 @@ export function PlaylistStack({
                     class="playlist-gap"
                     onDragOver={(event) => {
                       event.preventDefault();
-                      if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+                      if (event.dataTransfer)
+                        event.dataTransfer.dropEffect = "move";
                       if (draggingId.current === item.id) return;
                       onDragOver(item.id, event.currentTarget, true);
                     }}
@@ -138,7 +165,9 @@ export function PlaylistStack({
                     }}
                   >
                     <hr />
-                    {gap > 0 ? <span class="gap-mins">{t.minutes(gap)}</span> : null}
+                    {gap > 0 ? (
+                      <span class="gap-mins">{t.minutes(gap)}</span>
+                    ) : null}
                     <CloudHost>
                       <button
                         type="button"

@@ -1,8 +1,14 @@
 // Fixtures for schedule rules. A test sets only the fields that rule cares about.
-import type { RundownItem, Schedule, ScheduleBlock } from "../../shared/types.ts";
+import type {
+  RundownItem,
+  Schedule,
+  ScheduleBlock,
+} from "../../shared/types.ts";
 
 // A schedule block. Days, clock, folder, and mode are filled in.
-export function block(partial: Partial<ScheduleBlock> & Pick<ScheduleBlock, "id">): ScheduleBlock {
+export function block(
+  partial: Partial<ScheduleBlock> & Pick<ScheduleBlock, "id">,
+): ScheduleBlock {
   return {
     days: ["mon"],
     start: "18:00",
@@ -14,7 +20,9 @@ export function block(partial: Partial<ScheduleBlock> & Pick<ScheduleBlock, "id"
 }
 
 // One rundown row. The test sets the file, the clock, and the status.
-export function row(partial: Partial<RundownItem> & Pick<RundownItem, "blockId" | "path">): RundownItem {
+export function row(
+  partial: Partial<RundownItem> & Pick<RundownItem, "blockId" | "path">,
+): RundownItem {
   return {
     id: partial.path,
     title: partial.path,

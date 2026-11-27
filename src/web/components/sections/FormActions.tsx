@@ -55,12 +55,22 @@ export function FormActions({
         </button>
       )}
       {showAdd && (
-        <button type="button" class="primary" disabled={addDisabled} onClick={onAdd}>
+        <button
+          type="button"
+          class="primary"
+          disabled={addDisabled}
+          onClick={onAdd}
+        >
           {t.add}
         </button>
       )}
       {showNext && (
-        <button type="button" class="primary" disabled={nextDisabled} onClick={onNext}>
+        <button
+          type="button"
+          class="primary"
+          disabled={nextDisabled}
+          onClick={onNext}
+        >
           {t.next}
         </button>
       )}

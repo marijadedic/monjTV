@@ -6,7 +6,8 @@ import type { Draft } from "../../types/Draft.ts";
 export function draftSpanMin(draft: Draft): number {
   const fixed = fixedMinutes(draft);
   if (fixed) return fixed;
-  if (!/^\d{2}:\d{2}$/.test(draft.start) || !/^\d{2}:\d{2}$/.test(draft.end)) return 0;
+  if (!/^\d{2}:\d{2}$/.test(draft.start) || !/^\d{2}:\d{2}$/.test(draft.end))
+    return 0;
   const start = toMin(draft.start);
   const end = toMin(draft.end);
   if (end > start) return end - start;

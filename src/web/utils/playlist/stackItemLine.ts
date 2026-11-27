@@ -13,6 +13,7 @@ export function stackItemLine(
   }
   if (item.error) return `${kind} · ${t.error(item.error)}`;
   if (stackItemNeedsProbe(item)) return `${kind} · ${t.measuring}`;
-  if (item.mode === "random-file" && item.lengthMin) return `${kind} · ${t.minutes(item.lengthMin)}`;
+  if (item.mode === "random-file" && item.lengthMin)
+    return `${kind} · ${t.minutes(item.lengthMin)}`;
   return kind;
 }

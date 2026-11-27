@@ -4,7 +4,10 @@ import { itemSeconds } from "@utils/length/itemSeconds.ts";
 import { minuteFace } from "@utils/clock/minuteFace.ts";
 import { toMin } from "@utils/clock/toMin.ts";
 
-export function stackClocks(start: string, items: DraftItem[]): { start: string; end: string }[] {
+export function stackClocks(
+  start: string,
+  items: DraftItem[],
+): { start: string; end: string }[] {
   let cursor: number | null = toMin(start);
   return items.map((item, index) => {
     if (cursor == null) return { start: "/", end: "/" };

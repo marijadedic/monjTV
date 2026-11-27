@@ -66,12 +66,19 @@ export function RailCard({
   const carriedRow = !past && Boolean(item.overnight);
   const started = carriedRow && beganPreviousDay(item);
   return (
-    <div class={`rail-item ${shown}${airing ? " playing" : ""}${passed ? " passed" : ""}${carriedRow ? " carry-row" : ""}`}>
+    <div
+      class={`rail-item ${shown}${airing ? " playing" : ""}${passed ? " passed" : ""}${carriedRow ? " carry-row" : ""}`}
+    >
       <i class="dot" />
       <article
         class={`card ${shown}${airing ? " playing" : ""}${passed ? " passed" : ""}${cardStill ? " has-still" : ""}${menuKey === `card:${item.id}` ? " menu-open" : ""}`}
       >
-        {cardStill && <StillFrame src={stillSrc(item)} onError={() => onHideStill(item.path)} />}
+        {cardStill && (
+          <StillFrame
+            src={stillSrc(item)}
+            onError={() => onHideStill(item.path)}
+          />
+        )}
         <div class="time">
           {item.start}–{item.end}
         </div>
@@ -80,7 +87,9 @@ export function RailCard({
             {coming && <span class="next-plain">{t.nextMark}</span>}
             <div class="title">{item.title}</div>
             {airing && <Pill tone="on-air">{t.onAir}</Pill>}
-            {shown !== "planned" && shown !== "playing" && !airing && <Pill tone={shown}>{statusPill(shown, t)}</Pill>}
+            {shown !== "planned" && shown !== "playing" && !airing && (
+              <Pill tone={shown}>{statusPill(shown, t)}</Pill>
+            )}
           </div>
           <div class="muted" title={item.path}>
             {scheduleMode(item.mode, t)} · {scheduleSource(item, t)}
@@ -129,7 +138,9 @@ export function Rail({
           {group.rows.map((item) => card(item))}
         </Fragment>
       ))}
-      {carried.length > 0 && ownItems.length > 0 ? <hr class="rail-split" /> : null}
+      {carried.length > 0 && ownItems.length > 0 ? (
+        <hr class="rail-split" />
+      ) : null}
       {ownItems.map((item) => card(item))}
     </div>
   );

@@ -1,12 +1,24 @@
 // Playback: join the rundown, seek to the clock, and cut for the next slot.
-import type { IntermissionItem, PlayerStatus, RundownItem, TodayRundown } from "../../shared/types.ts";
+import type {
+  IntermissionItem,
+  PlayerStatus,
+  RundownItem,
+  TodayRundown,
+} from "../../shared/types.ts";
 import { formatHm, msUntil, nowSec, parseHm, weekday } from "../clock/clock.ts";
 import { measureDuration } from "../files/duration.ts";
 import { titleFromPath } from "../files/files.ts";
 import { Mpv } from "./mpv.ts";
 import { pick } from "../files/picker.ts";
 import { markEpisodeDone, markRandomPlayed } from "../schedule/progress.ts";
-import { coversNow, ensureToday, joinOffset, loadToday, onAirItem, saveToday } from "../rundown/index.ts";
+import {
+  coversNow,
+  ensureToday,
+  joinOffset,
+  loadToday,
+  onAirItem,
+  saveToday,
+} from "../rundown/index.ts";
 import { DAY_SECONDS, windowOn } from "../../shared/window.ts";
 import {
   isYoutubeUrl,
@@ -16,8 +28,16 @@ import {
   youtubeLabel,
   type YoutubePlaylistRef,
 } from "../../shared/youtube.ts";
-import { blocksForDay, loadSchedule, playingIntermission } from "../schedule/schedule.ts";
-import { cachedYoutube, cachedYoutubeTitle, loadYoutubePlaylist } from "../youtube/youtube.ts";
+import {
+  blocksForDay,
+  loadSchedule,
+  playingIntermission,
+} from "../schedule/schedule.ts";
+import {
+  cachedYoutube,
+  cachedYoutubeTitle,
+  loadYoutubePlaylist,
+} from "../youtube/youtube.ts";
 
 const mpv = new Mpv();
 let waitingUntil: string | null = null;
@@ -77,7 +97,10 @@ async function revertQuit(): Promise<void> {
   const today = await loadToday();
   let changed = false;
   for (const item of today.items) {
-    if (item.status === "playing" || (item.status === "skipped" && undo.has(item.id))) {
+    if (
+      item.status === "playing" ||
+      (item.status === "skipped" && undo.has(item.id))
+    ) {
       item.status = "planned";
       changed = true;
     }
@@ -104,7 +127,8 @@ mpv.onExit = () => {
 };
 
 function selectedFillerTitle(item: IntermissionItem): string {
-  if (item.kind === "youtube") return cachedYoutubeTitle(item.source) ?? youtubeLabel(item.source);
+  if (item.kind === "youtube")
+    return cachedYoutubeTitle(item.source) ?? youtubeLabel(item.source);
   return titleFromPath(item.source);
 }
 
@@ -119,14 +143,16 @@ export async function getStatus(): Promise<PlayerStatus> {
   const current = today.items.find((i) => i.status === "playing");
   const filler = playingIntermission(await loadSchedule());
   let willStartItemId: string | null = null;
-  if (!current && !fallbackPlay) willStartItemId = onAirItem(today.items, nowSec())?.id ?? null;
+  if (!current && !fallbackPlay)
+    willStartItemId = onAirItem(today.items, nowSec())?.id ?? null;
   return {
     running: mpv.running,
     waitingUntil,
     error: lastError,
     currentItemId: current?.id ?? null,
     willStartItemId,
-    fallbackTitle: current || !fallbackPlay ? null : fallbackTitleOf(fallbackPlay.path),
+    fallbackTitle:
+      current || !fallbackPlay ? null : fallbackTitleOf(fallbackPlay.path),
     fallbackPath: current || !fallbackPlay ? null : fallbackPlay.path,
     intermissionTitle: filler ? selectedFillerTitle(filler) : null,
     intermissionKind: filler?.kind ?? null,
@@ -141,7 +167,9 @@ export function intermissionFile(): string | null {
 }
 
 // A gap file the still route may show: the one on screen, or the selected video while idle.
-export async function intermissionStillAllowed(filePath: string): Promise<boolean> {
+export async function intermissionStillAllowed(
+  filePath: string,
+): Promise<boolean> {
   if (!filePath) return false;
   if (intermissionFile() === filePath) return true;
   if (fallbackPlay?.path === filePath) return true;
@@ -266,7 +294,10 @@ function randomPoint(durationSec: number | null): number | string | undefined {
 }
 
 // Where this intermission video should open. A live stream stays at the live edge.
-async function intermissionStart(path: string, enabled: boolean): Promise<number | string | undefined> {
+async function intermissionStart(
+  path: string,
+  enabled: boolean,
+): Promise<number | string | undefined> {
   if (!enabled) return undefined;
   if (isYoutubeUrl(path)) {
     const meta = cachedYoutube(path);
@@ -317,7 +348,12 @@ async function playYoutubePlaylist(
   }
   index %= videos.length;
   const url = videos[index];
-  if (fallbackPlay?.folder === source && fallbackPlay.path === url && !fallbackPlay.queued) return;
+  if (
+    fallbackPlay?.folder === source &&
+    fallbackPlay.path === url &&
+    !fallbackPlay.queued
+  )
+    return;
 
   const epoch = ++playEpoch;
   fallbackPlay = {
@@ -361,7 +397,10 @@ async function playYoutubePlaylist(
 }
 
 // One video loops. A playlist walks the list, then starts again at the beginning.
-async function playYoutubeIntermission(source: string, randomStart: boolean): Promise<void> {
+async function playYoutubeIntermission(
+  source: string,
+  randomStart: boolean,
+): Promise<void> {
   const playlist = parseYoutubePlaylist(source);
   if (playlist) {
     await playYoutubePlaylist(source, playlist, randomStart);
@@ -369,7 +408,12 @@ async function playYoutubeIntermission(source: string, randomStart: boolean): Pr
   }
   const url = parseYoutubeUrl(source);
   if (!url) return;
-  if (fallbackPlay?.path === url && fallbackPlay.folder === url && !fallbackPlay.queued) return;
+  if (
+    fallbackPlay?.path === url &&
+    fallbackPlay.folder === url &&
+    !fallbackPlay.queued
+  )
+    return;
   const epoch = ++playEpoch;
   try {
     fallbackPlay = { kind: "youtube", folder: url, path: url };
@@ -404,7 +448,10 @@ async function playYoutubeIntermission(source: string, randomStart: boolean): Pr
 }
 
 // Play the selected YouTube video or playlist, a video file, or the next episode from a folder.
-async function playFallback(item: IntermissionItem, randomStart: boolean): Promise<void> {
+async function playFallback(
+  item: IntermissionItem,
+  randomStart: boolean,
+): Promise<void> {
   if (item.kind === "youtube") {
     await playYoutubeIntermission(item.source, randomStart);
     return;
@@ -415,7 +462,8 @@ async function playFallback(item: IntermissionItem, randomStart: boolean): Promi
         ? await pick({ folder: "", mode: "specific-file", file: item.source })
         : await pick({ folder: item.source, mode: "next-episode" });
     if (!file) {
-      lastError = item.kind === "video" ? `Video does not exist: ${item.source}` : null;
+      lastError =
+        item.kind === "video" ? `Video does not exist: ${item.source}` : null;
       if (fallbackPlay) {
         fallbackPlay = null;
         replacing = true;
@@ -425,7 +473,11 @@ async function playFallback(item: IntermissionItem, randomStart: boolean): Promi
     }
     if (fallbackPlay?.path === file && fallbackPlay.kind === item.kind) return;
     const epoch = ++playEpoch;
-    fallbackPlay = { kind: item.kind, folder: item.kind === "folder" ? item.source : file, path: file };
+    fallbackPlay = {
+      kind: item.kind,
+      folder: item.kind === "folder" ? item.source : file,
+      path: file,
+    };
     const start = await intermissionStart(file, randomStart);
     if (epoch !== playEpoch) {
       await restoreCurrentLoad();
@@ -493,7 +545,8 @@ async function playItem(item: RundownItem, offsetSec: number): Promise<void> {
         break;
       } catch (err) {
         lastError = err instanceof Error ? err.message : String(err);
-        if (attempt + 1 < tries) await new Promise((resolve) => setTimeout(resolve, 1500));
+        if (attempt + 1 < tries)
+          await new Promise((resolve) => setTimeout(resolve, 1500));
       }
     }
 
@@ -551,7 +604,9 @@ async function playNow(): Promise<void> {
   const day = weekday();
   const dayBlocks = blocksForDay(schedule, day);
   const now = nowSec();
-  const playing = today.items.find((item) => item.status === "playing" && coversNow(item, now));
+  const playing = today.items.find(
+    (item) => item.status === "playing" && coversNow(item, now),
+  );
   const air = playing ?? onAirItem(today.items, now);
 
   let changed = false;
@@ -577,7 +632,9 @@ async function playNow(): Promise<void> {
   if (wake != null) {
     armWaitUntil(wake);
   } else {
-    const next = dayBlocks.find((block) => parseHm(windowOn(block, day).start) > now);
+    const next = dayBlocks.find(
+      (block) => parseHm(windowOn(block, day).start) > now,
+    );
     if (next) armWaitUntil(parseHm(windowOn(next, day).start));
   }
 
@@ -611,7 +668,9 @@ function nextPlaylistItem(
   if (block?.mode !== "playlist") return null;
   const siblings = today.items
     .filter(
-      (item) => item.blockId === current.blockId && Boolean(item.overnight) === Boolean(current.overnight),
+      (item) =>
+        item.blockId === current.blockId &&
+        Boolean(item.overnight) === Boolean(current.overnight),
     )
     .sort((a, b) => parseHm(a.start) - parseHm(b.start));
   const index = siblings.findIndex((item) => item.id === current.id);
@@ -724,7 +783,10 @@ async function onEndFile(reason: string): Promise<void> {
       }
     } else if (finishedIntermission) {
       if (finishedIntermission.kind === "folder") {
-        await markEpisodeDone(finishedIntermission.folder, finishedIntermission.path);
+        await markEpisodeDone(
+          finishedIntermission.folder,
+          finishedIntermission.path,
+        );
       }
       if (finishedIntermission.playlist) {
         if (!queuePlaylist(finishedIntermission, false)) fallbackPlay = null;
@@ -765,4 +827,3 @@ export async function replayItem(itemId: string): Promise<void> {
   if (!item || item.status !== "playing") return;
   await playItem(item, 0);
 }
-

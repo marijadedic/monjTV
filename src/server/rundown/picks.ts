@@ -8,7 +8,10 @@ export function cloneProgress(progress: Progress): Progress {
   return {
     lastCompleted: { ...progress.lastCompleted },
     recentRandom: Object.fromEntries(
-      Object.entries(progress.recentRandom).map(([folder, files]) => [folder, [...files]]),
+      Object.entries(progress.recentRandom).map(([folder, files]) => [
+        folder,
+        [...files],
+      ]),
     ),
   };
 }

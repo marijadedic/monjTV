@@ -83,7 +83,8 @@
 .intermission-kind button {
   text-align: center;
 }
-.intermission-open .path-field, .intermission-open .field {
+.intermission-open .path-field,
+.intermission-open .field {
   width: 100%;
   min-width: 0;
 }

@@ -32,7 +32,8 @@
   border: 1px solid var(--line);
   border-radius: 10px;
 }
-.prefs .seg, .prefs .themes {
+.prefs .seg,
+.prefs .themes {
   width: max-content;
   flex-wrap: nowrap;
 }
@@ -43,7 +44,9 @@
 .prefs-recent {
   width: 100%;
   margin-top: 2px;
-  font: 650 0.92rem/1.45 system-ui, sans-serif;
+  font:
+    650 0.92rem/1.45 system-ui,
+    sans-serif;
   text-align: center;
   padding: 4px 12px;
   border-radius: 999px;
@@ -57,7 +60,9 @@
 .prefs-quit {
   width: 100%;
   margin-top: 2px;
-  font: 650 0.92rem/1.45 system-ui, sans-serif;
+  font:
+    650 0.92rem/1.45 system-ui,
+    sans-serif;
   text-align: center;
   padding: 4px 12px;
   border-radius: 999px;

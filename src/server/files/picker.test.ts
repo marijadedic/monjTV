@@ -5,7 +5,14 @@ import os from "node:os";
 import path from "node:path";
 import { after, before, describe, it } from "node:test";
 import { noteRandom } from "../schedule/progress.ts";
-import { episodePaths, nextEpisode, otherFolderPlays, pick, takeRandom, videosIn } from "./picker.ts";
+import {
+  episodePaths,
+  nextEpisode,
+  otherFolderPlays,
+  pick,
+  takeRandom,
+  videosIn,
+} from "./picker.ts";
 
 const episode = (name: string) => `/shows/serial/${name}.mkv`;
 const movie = (name: string) => `/films/${name}.mkv`;
@@ -15,7 +22,10 @@ describe("next episode walks the folder", () => {
 
   it("starts at the first file when nothing in the folder has finished", () => {
     assert.equal(nextEpisode(files), episode("01"));
-    assert.equal(nextEpisode(files, "/shows/serial/missing.mkv"), episode("01"));
+    assert.equal(
+      nextEpisode(files, "/shows/serial/missing.mkv"),
+      episode("01"),
+    );
   });
 
   it("plays the file after the last completed one", () => {
@@ -61,7 +71,8 @@ describe("a random folder plays each file once", () => {
 
   it("starts again and leaves out the file just used", () => {
     let recent: string[] = [];
-    for (const name of ["c", "b", "a"]) recent = noteRandom(recent, movie(name));
+    for (const name of ["c", "b", "a"])
+      recent = noteRandom(recent, movie(name));
     const pick = takeRandom(files, recent, { block: [movie("c")] });
     assert.equal(pick?.path, movie("b"));
     assert.deepEqual(pick?.recent, [movie("b")]);
@@ -71,7 +82,9 @@ describe("a random folder plays each file once", () => {
     let recent: string[] = [];
     recent = noteRandom(recent, movie("b"));
     recent = noteRandom(recent, movie("a"));
-    const pick = takeRandom([movie("a"), movie("b")], recent, { avoid: [movie("a"), movie("b")] });
+    const pick = takeRandom([movie("a"), movie("b")], recent, {
+      avoid: [movie("a"), movie("b")],
+    });
     assert.equal(pick?.path, movie("b"));
   });
 
@@ -116,10 +129,24 @@ describe("a chosen local file", () => {
   it("plays that file, or one YouTube video", async () => {
     const file = path.join(dir, "Night.mkv");
     await writeFile(file, "");
-    assert.equal(await pick({ folder: dir, mode: "specific-file", file }), file);
-    assert.equal(await pick({ folder: dir, mode: "specific-file", file: path.join(dir, "missing.mkv") }), null);
     assert.equal(
-      await pick({ folder: "", mode: "specific-file", file: "https://youtu.be/dQw4w9WgXcQ" }),
+      await pick({ folder: dir, mode: "specific-file", file }),
+      file,
+    );
+    assert.equal(
+      await pick({
+        folder: dir,
+        mode: "specific-file",
+        file: path.join(dir, "missing.mkv"),
+      }),
+      null,
+    );
+    assert.equal(
+      await pick({
+        folder: "",
+        mode: "specific-file",
+        file: "https://youtu.be/dQw4w9WgXcQ",
+      }),
       "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
     );
   });

@@ -3,7 +3,8 @@
   color: #c45c5c;
   font-size: 0.85rem;
 }
-.add-form .k, .add-form label {
+.add-form .k,
+.add-form label {
   color: var(--muted);
   font-size: 0.82rem;
   text-transform: uppercase;

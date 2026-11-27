@@ -33,10 +33,13 @@ export const api = {
   tv: () => req<TvBoard>("/api/tv"),
   schedule: () => req<Schedule>("/api/schedule"),
   saveSchedule: (schedule: Schedule) =>
-    req<{ schedule: Schedule; today: TodayRundown; misses: SlotMiss[] }>("/api/schedule", {
-      method: "PUT",
-      body: JSON.stringify(schedule),
-    }),
+    req<{ schedule: Schedule; today: TodayRundown; misses: SlotMiss[] }>(
+      "/api/schedule",
+      {
+        method: "PUT",
+        body: JSON.stringify(schedule),
+      },
+    ),
   shuffle: (date: string, id: string) =>
     req<TvBoard>(`/api/tv/${date}/items/${id}/shuffle`, { method: "POST" }),
   markDone: (date: string, id: string) =>
@@ -49,13 +52,17 @@ export const api = {
       body: JSON.stringify({ direction }),
     }),
   browse: (path?: string) =>
-    req<BrowseResult>(`/api/browse${path ? `?path=${encodeURIComponent(path)}` : ""}`),
+    req<BrowseResult>(
+      `/api/browse${path ? `?path=${encodeURIComponent(path)}` : ""}`,
+    ),
   suggestPaths: (path: string, kind: "folder" | "video" = "folder") =>
     req<{ dirs: BrowseResult["dirs"]; videos: BrowseResult["videos"] }>(
       `/api/browse/suggest?path=${encodeURIComponent(path)}&kind=${kind}`,
     ),
-  pickFolder: () => req<{ path: string | null }>("/api/browse/pick", { method: "POST" }),
-  pickFile: () => req<{ path: string | null }>("/api/browse/pick-file", { method: "POST" }),
+  pickFolder: () =>
+    req<{ path: string | null }>("/api/browse/pick", { method: "POST" }),
+  pickFile: () =>
+    req<{ path: string | null }>("/api/browse/pick-file", { method: "POST" }),
   videoCount: (folder: string, file = "") =>
     req<{ count: number; exists: boolean }>(
       `/api/video-count?folder=${encodeURIComponent(folder)}&file=${encodeURIComponent(file)}`,

@@ -12,7 +12,11 @@ export function inWindow(today: string, date: string): boolean {
 }
 
 // True when the saved week already covers the dates this read needs.
-export function windowReady(board: BoardFile, today: string, fillAhead: boolean): boolean {
+export function windowReady(
+  board: BoardFile,
+  today: string,
+  fillAhead: boolean,
+): boolean {
   if (board.carriedInto !== today) return false;
   const dates = new Set(board.days.map((day) => day.date));
   if (!dates.has(today)) return false;

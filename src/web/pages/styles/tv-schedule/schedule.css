@@ -57,10 +57,14 @@
 .card.playing .time {
   color: var(--text);
 }
-.card.done, .card.skipped, .card.passed {
+.card.done,
+.card.skipped,
+.card.passed {
   opacity: 0.45;
 }
-.card.done .still, .card.skipped .still, .card.passed .still {
+.card.done .still,
+.card.skipped .still,
+.card.passed .still {
   filter: grayscale(1);
 }
 .card.skipped .title {
@@ -96,7 +100,8 @@
   color: var(--text);
   background: color-mix(in srgb, var(--accent) 28%, var(--panel));
 }
-.now-strip .pill.playing, .pill.on-air {
+.now-strip .pill.playing,
+.pill.on-air {
   color: var(--ok);
   background: var(--pill-air);
   letter-spacing: 0.01em;

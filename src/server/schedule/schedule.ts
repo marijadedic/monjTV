@@ -16,7 +16,12 @@ import {
   type ScheduleBlock,
   type TvBoard,
 } from "../../shared/types.ts";
-import { DAY_MINUTES, clockOf, minutesOf, windowOn } from "../../shared/window.ts";
+import {
+  DAY_MINUTES,
+  clockOf,
+  minutesOf,
+  windowOn,
+} from "../../shared/window.ts";
 import {
   canonicalPlaylistUrl,
   canonicalYoutubeIntermission,
@@ -60,7 +65,8 @@ async function peekTvBoard(): Promise<TvBoard | null> {
         Array.isArray((day as DayRundown).items),
     );
     if (days.length === 0) return null;
-    const today = typeof data.today === "string" && data.today ? data.today : dateKey();
+    const today =
+      typeof data.today === "string" && data.today ? data.today : dateKey();
     return { today, days };
   } catch {
     return null;
@@ -68,13 +74,22 @@ async function peekTvBoard(): Promise<TvBoard | null> {
 }
 
 // The intermission the player should fill gaps with.
-export function playingIntermission(schedule: Schedule): IntermissionItem | null {
+export function playingIntermission(
+  schedule: Schedule,
+): IntermissionItem | null {
   if (!schedule.activeIntermission) return null;
-  return schedule.intermissions.find((item) => item.id === schedule.activeIntermission) ?? null;
+  return (
+    schedule.intermissions.find(
+      (item) => item.id === schedule.activeIntermission,
+    ) ?? null
+  );
 }
 
 // True when both stacks name the same videos in the same order.
-function sameEntries(a: PlaylistEntry[] | undefined, b: PlaylistEntry[] | undefined): boolean {
+function sameEntries(
+  a: PlaylistEntry[] | undefined,
+  b: PlaylistEntry[] | undefined,
+): boolean {
   const left = a ?? [];
   const right = b ?? [];
   if (left.length !== right.length) return false;
@@ -94,7 +109,10 @@ function sameEntries(a: PlaylistEntry[] | undefined, b: PlaylistEntry[] | undefi
 // True when this block is new, or its folder, file, or mode changed.
 // A slot whose show was deleted can stay until it is removed, and can be removed
 // without the missing folder blocking the save.
-export function sourceChanged(before: ScheduleBlock[], block: ScheduleBlock): boolean {
+export function sourceChanged(
+  before: ScheduleBlock[],
+  block: ScheduleBlock,
+): boolean {
   const old = before.find((item) => item.id === block.id);
   if (!old) return true;
   return (
@@ -110,7 +128,10 @@ function sameStarts(
   a: ScheduleBlock["starts"],
   b: ScheduleBlock["starts"],
 ): boolean {
-  const days = new Set<string>([...Object.keys(a ?? {}), ...Object.keys(b ?? {})]);
+  const days = new Set<string>([
+    ...Object.keys(a ?? {}),
+    ...Object.keys(b ?? {}),
+  ]);
   for (const day of days) {
     if ((a?.[day as Day] ?? "") !== (b?.[day as Day] ?? "")) return false;
   }
@@ -123,7 +144,10 @@ function sameDays(a: Day[], b: Day[]): boolean {
 }
 
 // Blocks that were added or whose window, folder, file, or mode changed.
-export function changedBlocks(before: ScheduleBlock[], after: ScheduleBlock[]): ScheduleBlock[] {
+export function changedBlocks(
+  before: ScheduleBlock[],
+  after: ScheduleBlock[],
+): ScheduleBlock[] {
   return after.filter((block) => {
     const old = before.find((item) => item.id === block.id);
     if (!old) return true;
@@ -143,22 +167,38 @@ export function changedBlocks(before: ScheduleBlock[], after: ScheduleBlock[]): 
 }
 
 // True when the weekly grid is the same, even if Intermission changed.
-export function sameBlocks(before: ScheduleBlock[], after: ScheduleBlock[]): boolean {
-  return before.length === after.length && changedBlocks(before, after).length === 0;
+export function sameBlocks(
+  before: ScheduleBlock[],
+  after: ScheduleBlock[],
+): boolean {
+  return (
+    before.length === after.length && changedBlocks(before, after).length === 0
+  );
 }
 
 // Blocks that air on a day, ordered by start time.
 export function blocksForDay(schedule: Schedule, day: Day): ScheduleBlock[] {
   return schedule.blocks
     .filter((b) => b.days.includes(day))
-    .sort((a, b) => parseHm(windowOn(a, day).start) - parseHm(windowOn(b, day).start));
+    .sort(
+      (a, b) =>
+        parseHm(windowOn(a, day).start) - parseHm(windowOn(b, day).start),
+    );
 }
 
 // Name shown when two slots overlap.
 function blockLabel(block: ScheduleBlock): string {
   if (block.mode === "playlist") return (block.name ?? "").trim() || "Playlist";
-  if (block.mode === "specific-file" && block.file && parseYoutubeUrl(block.file)) return youtubeLabel(block.file);
-  if ((block.mode === "next-episode" || block.mode === "random-file") && parseYoutubePlaylist(block.folder)) {
+  if (
+    block.mode === "specific-file" &&
+    block.file &&
+    parseYoutubeUrl(block.file)
+  )
+    return youtubeLabel(block.file);
+  if (
+    (block.mode === "next-episode" || block.mode === "random-file") &&
+    parseYoutubePlaylist(block.folder)
+  ) {
     return youtubeLabel(block.folder);
   }
   if (block.file) return path.basename(block.file);
@@ -169,10 +209,18 @@ function blockLabel(block: ScheduleBlock): string {
 function migrateStoredBlock(block: ScheduleBlock): ScheduleBlock {
   const mode = (block as { mode?: string }).mode;
   if (mode === "youtube") {
-    const file = parseYoutubeUrl(block.file ?? "") ?? (block.file ?? "");
-    return { ...block, mode: "specific-file", folder: "", ...(file ? { file } : {}) };
+    const file = parseYoutubeUrl(block.file ?? "") ?? block.file ?? "";
+    return {
+      ...block,
+      mode: "specific-file",
+      folder: "",
+      ...(file ? { file } : {}),
+    };
   }
-  if (block.mode !== "playlist" || !block.items?.some((item) => (item.mode as string) === "youtube")) {
+  if (
+    block.mode !== "playlist" ||
+    !block.items?.some((item) => (item.mode as string) === "youtube")
+  ) {
     return block;
   }
   return {
@@ -180,7 +228,12 @@ function migrateStoredBlock(block: ScheduleBlock): ScheduleBlock {
     items: block.items.map((item) => {
       if ((item.mode as string) !== "youtube") return item;
       const file = parseYoutubeUrl(item.file ?? "") ?? item.file;
-      return { ...item, mode: "specific-file", folder: "", ...(file ? { file } : {}) };
+      return {
+        ...item,
+        mode: "specific-file",
+        folder: "",
+        ...(file ? { file } : {}),
+      };
     }),
   };
 }
@@ -188,7 +241,9 @@ function migrateStoredBlock(block: ScheduleBlock): ScheduleBlock {
 // Blocks plus the intermission list, without rejecting a saved block.
 function scheduleFrom(data: StoredSchedule): Schedule {
   return {
-    blocks: Array.isArray(data.blocks) ? data.blocks.map(migrateStoredBlock) : [],
+    blocks: Array.isArray(data.blocks)
+      ? data.blocks.map(migrateStoredBlock)
+      : [],
     ...intermissionsFrom(data, false),
     intermissionRandomStart: data.intermissionRandomStart === true,
   };
@@ -198,7 +253,8 @@ function scheduleFrom(data: StoredSchedule): Schedule {
 export async function loadSchedule(): Promise<Schedule> {
   const data = await readJson<StoredSchedule>(schedulePath, empty);
   const schedule = scheduleFrom(data);
-  if (!Array.isArray(data.intermissions)) await writeJson(schedulePath, schedule);
+  if (!Array.isArray(data.intermissions))
+    await writeJson(schedulePath, schedule);
   return schedule;
 }
 
@@ -218,13 +274,18 @@ function freshId(id: unknown, seen: Set<string>): string {
 
 // Why a folder or video intermission was rejected.
 function intermissionProblem(kind: string, source: string): string {
-  if (isYoutubeLink(source)) return "That is a YouTube link. Choose YouTube, then add it.";
+  if (isYoutubeLink(source))
+    return "That is a YouTube link. Choose YouTube, then add it.";
   if (kind === "video") return "Type the video path.";
   return "Type the folder path.";
 }
 
 // Keep a usable list entry. Saving rejects a bad one; loading skips it.
-function normalizeIntermission(raw: unknown, seen: Set<string>, strict: boolean): IntermissionItem | null {
+function normalizeIntermission(
+  raw: unknown,
+  seen: Set<string>,
+  strict: boolean,
+): IntermissionItem | null {
   const fail = (message: string): null => {
     if (strict) throw new Error(message);
     return null;
@@ -232,14 +293,18 @@ function normalizeIntermission(raw: unknown, seen: Set<string>, strict: boolean)
   if (!raw || typeof raw !== "object") return fail("Invalid intermission");
   const item = raw as { id?: unknown; kind?: unknown; source?: unknown };
   const source = typeof item.source === "string" ? item.source.trim() : "";
-  const kind = typeof item.kind === "string" && isIntermissionKind(item.kind) ? item.kind : "";
+  const kind =
+    typeof item.kind === "string" && isIntermissionKind(item.kind)
+      ? item.kind
+      : "";
   if (!kind) return fail("Invalid intermission");
   if (kind === "youtube") {
     const url = canonicalYoutubeIntermission(source);
     if (!url) return fail("Not a YouTube video or playlist URL");
     return { id: freshId(item.id, seen), kind, source: url };
   }
-  if (!source || isYoutubeLink(source)) return fail(intermissionProblem(kind, source));
+  if (!source || isYoutubeLink(source))
+    return fail(intermissionProblem(kind, source));
   return { id: freshId(item.id, seen), kind, source };
 }
 
@@ -254,8 +319,13 @@ function intermissionsFrom(
       const item = normalizeIntermission(raw, seen, strict);
       return item ? [item] : [];
     });
-    const wanted = typeof data.activeIntermission === "string" ? data.activeIntermission : "";
-    const activeIntermission = intermissions.some((item) => item.id === wanted) ? wanted : "";
+    const wanted =
+      typeof data.activeIntermission === "string"
+        ? data.activeIntermission
+        : "";
+    const activeIntermission = intermissions.some((item) => item.id === wanted)
+      ? wanted
+      : "";
     return { intermissions, activeIntermission };
   }
   const source = fallbackFolderOf(data.fallbackFolder);
@@ -281,7 +351,9 @@ export function validateSchedule(
   }
 
   const blocks = input.blocks.map(normalizeBlock);
-  const touched = before ? new Set(changedBlocks(before, blocks).map((block) => block.id)) : null;
+  const touched = before
+    ? new Set(changedBlocks(before, blocks).map((block) => block.id))
+    : null;
 
   for (const day of DAYS) {
     const ofDay = blocks
@@ -301,7 +373,9 @@ export function validateSchedule(
       const cur = ofDay[i];
       if (cur.start >= prev.end) continue;
       if (touched && !touched.has(prev.id) && !touched.has(cur.id)) continue;
-      throw new Error(`Overlapping blocks on ${day}: ${prev.label} and ${cur.label}`);
+      throw new Error(
+        `Overlapping blocks on ${day}: ${prev.label} and ${cur.label}`,
+      );
     }
   }
 
@@ -322,7 +396,9 @@ export async function assertFolder(folder: string): Promise<void> {
 }
 
 // Each list entry is a folder, a video file, or a YouTube video or playlist. Live streams are allowed.
-export async function assertIntermissions(items: IntermissionItem[]): Promise<void> {
+export async function assertIntermissions(
+  items: IntermissionItem[],
+): Promise<void> {
   for (const item of items) {
     if (item.kind === "youtube") continue;
     if (item.kind === "video") await assertVideo(item.source);
@@ -331,9 +407,15 @@ export async function assertIntermissions(items: IntermissionItem[]): Promise<vo
 }
 
 // Validate the schedule and write it to disk.
-export async function saveSchedule(schedule: StoredSchedule): Promise<Schedule> {
+export async function saveSchedule(
+  schedule: StoredSchedule,
+): Promise<Schedule> {
   const previous = await loadSchedule();
-  const normalized = validateSchedule(schedule, await peekTvBoard(), previous.blocks);
+  const normalized = validateSchedule(
+    schedule,
+    await peekTvBoard(),
+    previous.blocks,
+  );
   await assertIntermissions(normalized.intermissions);
   await writeJson(schedulePath, normalized);
   return normalized;
@@ -342,7 +424,11 @@ export async function saveSchedule(schedule: StoredSchedule): Promise<Schedule> 
 // Folders a block uses for episode or random progress.
 export function foldersOf(block: ScheduleBlock): string[] {
   if (block.mode === "playlist") {
-    return [...new Set((block.items ?? []).map((item) => item.folder.trim()).filter(Boolean))];
+    return [
+      ...new Set(
+        (block.items ?? []).map((item) => item.folder.trim()).filter(Boolean),
+      ),
+    ];
   }
   const folder = (block.folder ?? "").trim();
   return folder ? [folder] : [];
@@ -358,7 +444,8 @@ function cleanStarts(
   for (const day of days) {
     const value = raw[day];
     if (value == null || value === "") continue;
-    if (typeof value !== "string" || !isHm(value)) throw new Error("start and end must be HH:mm");
+    if (typeof value !== "string" || !isHm(value))
+      throw new Error("start and end must be HH:mm");
     starts[day] = value;
   }
   return Object.keys(starts).length ? starts : undefined;
@@ -367,10 +454,15 @@ function cleanStarts(
 // Whole minutes, when the block stores its length.
 function cleanLength(raw: { lengthMin?: number }): number | undefined {
   if (raw.lengthMin == null) return undefined;
-  if (typeof raw.lengthMin !== "number" || !Number.isInteger(raw.lengthMin) || raw.lengthMin < 1) {
+  if (
+    typeof raw.lengthMin !== "number" ||
+    !Number.isInteger(raw.lengthMin) ||
+    raw.lengthMin < 1
+  ) {
     throw new Error("start and end must be HH:mm");
   }
-  if (raw.lengthMin >= DAY_MINUTES) throw new Error("Block must be shorter than 24 hours");
+  if (raw.lengthMin >= DAY_MINUTES)
+    throw new Error("Block must be shorter than 24 hours");
   return raw.lengthMin;
 }
 
@@ -378,7 +470,9 @@ function cleanLength(raw: { lengthMin?: number }): number | undefined {
 function normalizeBlock(raw: ScheduleBlock): ScheduleBlock {
   if (!raw || typeof raw !== "object") throw new Error("Invalid block");
   const id = raw.id?.trim() || randomUUID();
-  const days = [...new Set((raw.days ?? []).filter((d): d is Day => DAYS.includes(d)))];
+  const days = [
+    ...new Set((raw.days ?? []).filter((d): d is Day => DAYS.includes(d))),
+  ];
   if (days.length === 0) throw new Error("Each block needs at least one day");
   if (!isHm(raw.start)) throw new Error("start and end must be HH:mm");
   const lengthMin = cleanLength(raw);
@@ -388,15 +482,19 @@ function normalizeBlock(raw: ScheduleBlock): ScheduleBlock {
   if (!lengthMin && minutesOf(end) === minutesOf(raw.start)) {
     throw new Error("Block must be shorter than 24 hours");
   }
-  const mode = (raw as { mode?: string }).mode === "youtube" ? "specific-file" : raw.mode;
+  const mode =
+    (raw as { mode?: string }).mode === "youtube" ? "specific-file" : raw.mode;
   if (!isBlockMode(mode)) {
-    throw new Error("mode must be next-episode, random-file, specific-file, or playlist");
+    throw new Error(
+      "mode must be next-episode, random-file, specific-file, or playlist",
+    );
   }
   if (mode === "playlist") {
     const name = (raw.name ?? "").trim();
     if (!name) throw new Error("Each playlist needs a name");
     const items = (raw.items ?? []).map(normalizeEntry);
-    if (items.length === 0) throw new Error("Each playlist needs at least one video");
+    if (items.length === 0)
+      throw new Error("Each playlist needs at least one video");
     return {
       id,
       days,
@@ -427,7 +525,11 @@ function normalizeBlock(raw: ScheduleBlock): ScheduleBlock {
     }
     const file = (raw.file ?? "").trim();
     if (!file || isYoutubeLink(file)) {
-      throw new Error(file ? "Not a YouTube video URL" : "Each specific-file block needs a video");
+      throw new Error(
+        file
+          ? "Not a YouTube video URL"
+          : "Each specific-file block needs a video",
+      );
     }
     return {
       id,
@@ -442,7 +544,9 @@ function normalizeBlock(raw: ScheduleBlock): ScheduleBlock {
     };
   }
   if (mode === "next-episode" || mode === "random-file") {
-    const playlist = canonicalPlaylistUrl(raw.folder ?? "") ?? canonicalPlaylistUrl(raw.file ?? "");
+    const playlist =
+      canonicalPlaylistUrl(raw.folder ?? "") ??
+      canonicalPlaylistUrl(raw.file ?? "");
     if (playlist) {
       return {
         id,
@@ -480,10 +584,17 @@ function normalizeBlock(raw: ScheduleBlock): ScheduleBlock {
 // Whole minutes of intermission after a stacked video.
 function cleanGap(raw: { gapAfterMin?: number }): number | undefined {
   if (raw.gapAfterMin == null) return undefined;
-  if (typeof raw.gapAfterMin !== "number" || !Number.isInteger(raw.gapAfterMin) || raw.gapAfterMin < 1) {
-    throw new Error("Intermission between videos must be a whole number of minutes");
+  if (
+    typeof raw.gapAfterMin !== "number" ||
+    !Number.isInteger(raw.gapAfterMin) ||
+    raw.gapAfterMin < 1
+  ) {
+    throw new Error(
+      "Intermission between videos must be a whole number of minutes",
+    );
   }
-  if (raw.gapAfterMin >= DAY_MINUTES) throw new Error("Block must be shorter than 24 hours");
+  if (raw.gapAfterMin >= DAY_MINUTES)
+    throw new Error("Block must be shorter than 24 hours");
   return raw.gapAfterMin;
 }
 
@@ -491,9 +602,12 @@ function cleanGap(raw: { gapAfterMin?: number }): number | undefined {
 function normalizeEntry(raw: PlaylistEntry): PlaylistEntry {
   if (!raw || typeof raw !== "object") throw new Error("Invalid playlist item");
   const id = raw.id?.trim() || randomUUID();
-  const mode = (raw as { mode?: string }).mode === "youtube" ? "specific-file" : raw.mode;
+  const mode =
+    (raw as { mode?: string }).mode === "youtube" ? "specific-file" : raw.mode;
   if (!isItemMode(mode)) {
-    throw new Error("playlist items must be next-episode, random-file, or specific-file");
+    throw new Error(
+      "playlist items must be next-episode, random-file, or specific-file",
+    );
   }
   const gapAfterMin = cleanGap(raw);
   const gap = gapAfterMin ? { gapAfterMin } : {};
@@ -502,15 +616,27 @@ function normalizeEntry(raw: PlaylistEntry): PlaylistEntry {
     if (youtube) return { id, mode, folder: "", file: youtube, ...gap };
     const file = (raw.file ?? "").trim();
     if (!file || isYoutubeLink(file)) {
-      throw new Error(file ? "Not a YouTube video URL" : "Each specific-file block needs a video");
+      throw new Error(
+        file
+          ? "Not a YouTube video URL"
+          : "Each specific-file block needs a video",
+      );
     }
     return { id, mode, folder: path.dirname(file), file, ...gap };
   }
   if (mode === "next-episode" || mode === "random-file") {
-    const playlist = canonicalPlaylistUrl(raw.folder ?? "") ?? canonicalPlaylistUrl(raw.file ?? "");
+    const playlist =
+      canonicalPlaylistUrl(raw.folder ?? "") ??
+      canonicalPlaylistUrl(raw.file ?? "");
     if (playlist) {
       const lengthMin = mode === "random-file" ? cleanLength(raw) : undefined;
-      return { id, mode, folder: playlist, ...(lengthMin ? { lengthMin } : {}), ...gap };
+      return {
+        id,
+        mode,
+        folder: playlist,
+        ...(lengthMin ? { lengthMin } : {}),
+        ...gap,
+      };
     }
   }
   const folder = (raw.folder ?? "").trim();
@@ -525,4 +651,3 @@ function normalizeEntry(raw: PlaylistEntry): PlaylistEntry {
   const lengthMin = mode === "random-file" ? cleanLength(raw) : undefined;
   return { id, mode, folder, ...(lengthMin ? { lengthMin } : {}), ...gap };
 }
-

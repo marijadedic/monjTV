@@ -1,12 +1,22 @@
 // Keep next-episode slots in order across the week.
 import { shiftDateKey } from "../../shared/dates.ts";
-import type { DayRundown, Progress, RundownItem, Schedule } from "../../shared/types.ts";
+import type {
+  DayRundown,
+  Progress,
+  RundownItem,
+  Schedule,
+} from "../../shared/types.ts";
 import { DAY_SECONDS, itemHasPassed } from "../../shared/window.ts";
 import { dateKey, nowSec, parseHm } from "../clock/clock.ts";
 import { loadProgress } from "../schedule/progress.ts";
 import { loadSchedule } from "../schedule/schedule.ts";
 import type { BoardFile } from "./boardFile.ts";
-import { nextFrom, recomputeBlockTimes, seriesFolder, sortRundown } from "./item.ts";
+import {
+  nextFrom,
+  recomputeBlockTimes,
+  seriesFolder,
+  sortRundown,
+} from "./item.ts";
 import { lengthOf, nameOf, seriesFiles } from "./media.ts";
 import { inWindow } from "./range.ts";
 
@@ -39,7 +49,12 @@ function holdChosenEpisode(
   cursor.day = day;
 }
 
-function firstUpcomingPath(days: DayRundown[], folder: string, schedule: Schedule, today: string): string | undefined {
+function firstUpcomingPath(
+  days: DayRundown[],
+  folder: string,
+  schedule: Schedule,
+  today: string,
+): string | undefined {
   for (const day of days) {
     if (day.date < today) continue;
     for (const item of sortRundown(day.items)) {
@@ -80,7 +95,8 @@ async function mirrorYesterdaySkips(
     const previous = skippedCursor.get(folder);
     const episode = previous
       ? nextFrom(files, previous)
-      : (firstUpcomingPath(days, folder, schedule, today) ?? nextFrom(files, progress.lastCompleted[folder]));
+      : (firstUpcomingPath(days, folder, schedule, today) ??
+        nextFrom(files, progress.lastCompleted[folder]));
     if (!episode) continue;
 
     if (item.path !== episode) {
@@ -107,19 +123,27 @@ function syncOvernightCopies(
 ): boolean {
   let changed = false;
   for (const day of days) {
-    const prev = days.find((entry) => entry.date === shiftDateKey(day.date, -1));
+    const prev = days.find(
+      (entry) => entry.date === shiftDateKey(day.date, -1),
+    );
     if (!prev) continue;
     const sources = sortRundown(prev.items).filter((item) => {
       if (item.overnight || item.mode !== "next-episode") return false;
       return parseHm(item.start) + item.durationSec > DAY_SECONDS;
     });
-    const targets = sortRundown(day.items).filter((item) => item.overnight && item.mode === "next-episode");
+    const targets = sortRundown(day.items).filter(
+      (item) => item.overnight && item.mode === "next-episode",
+    );
     const count = Math.min(sources.length, targets.length);
     for (let index = 0; index < count; index++) {
       const source = sources[index];
       const target = targets[index];
       if (target.status === "playing") continue;
-      if (target.path !== source.path || target.durationSec !== source.durationSec || target.title !== source.title) {
+      if (
+        target.path !== source.path ||
+        target.durationSec !== source.durationSec ||
+        target.title !== source.title
+      ) {
         target.path = source.path;
         target.title = source.title;
         target.durationSec = source.durationSec;
@@ -135,7 +159,11 @@ function syncOvernightCopies(
   return changed;
 }
 
-function applyTouched(days: DayRundown[], schedule: Schedule, touched: Set<string>): void {
+function applyTouched(
+  days: DayRundown[],
+  schedule: Schedule,
+  touched: Set<string>,
+): void {
   for (const key of touched) {
     const split = key.indexOf("|");
     const date = key.slice(0, split);
@@ -156,7 +184,9 @@ export async function reflowSeries(board: BoardFile): Promise<boolean> {
   const progress = await loadProgress();
   const today = dateKey();
   const now = nowSec();
-  const days = board.days.filter((day) => inWindow(today, day.date)).sort((a, b) => a.date.localeCompare(b.date));
+  const days = board.days
+    .filter((day) => inWindow(today, day.date))
+    .sort((a, b) => a.date.localeCompare(b.date));
   const cursors = new Map<string, SeriesCursor>();
   const filesCache = new Map<string, string[]>();
   const touched = new Set<string>();
@@ -170,7 +200,12 @@ export async function reflowSeries(board: BoardFile): Promise<boolean> {
     return files;
   }
 
-  async function place(item: RundownItem, file: string, date: string, blockId: string): Promise<void> {
+  async function place(
+    item: RundownItem,
+    file: string,
+    date: string,
+    blockId: string,
+  ): Promise<void> {
     if (item.path === file) return;
     delete item.chosen;
     item.path = file;
@@ -196,7 +231,8 @@ export async function reflowSeries(board: BoardFile): Promise<boolean> {
 
       const played = item.status === "done" || item.status === "playing";
       const missed =
-        item.status === "skipped" || (day.date === today && !played && itemHasPassed(item, now));
+        item.status === "skipped" ||
+        (day.date === today && !played && itemHasPassed(item, now));
 
       if (played) {
         cursor.last = item.path;
@@ -249,18 +285,23 @@ export async function reflowSeries(board: BoardFile): Promise<boolean> {
     }
   }
 
-  if (await mirrorYesterdaySkips(days, schedule, progress, filesIn, touched)) changed = true;
+  if (await mirrorYesterdaySkips(days, schedule, progress, filesIn, touched))
+    changed = true;
   if (syncOvernightCopies(days, schedule, touched)) changed = true;
   applyTouched(days, schedule, touched);
   return changed;
 }
 
 // Random movies already on the week, so a new pick does not land on one of them.
-export function scheduledRandomPaths(days: DayRundown[], exceptId: string): string[] {
+export function scheduledRandomPaths(
+  days: DayRundown[],
+  exceptId: string,
+): string[] {
   const paths: string[] = [];
   for (const day of days) {
     for (const entry of day.items) {
-      if (entry.id === exceptId || entry.mode !== "random-file" || !entry.path) continue;
+      if (entry.id === exceptId || entry.mode !== "random-file" || !entry.path)
+        continue;
       paths.push(entry.path);
     }
   }
@@ -293,7 +334,9 @@ export async function continueShowAfter(
 ): Promise<void> {
   const today = dateKey();
   const now = nowSec();
-  const days = board.days.filter((day) => inWindow(today, day.date)).sort((a, b) => a.date.localeCompare(b.date));
+  const days = board.days
+    .filter((day) => inWindow(today, day.date))
+    .sort((a, b) => a.date.localeCompare(b.date));
   const touched = new Set<string>();
   let cursor = origin.path;
 
@@ -307,7 +350,8 @@ export async function continueShowAfter(
       delete item.chosen;
       const played = item.status === "done" || item.status === "playing";
       const missed =
-        item.status === "skipped" || (day.date === today && !played && itemHasPassed(item, now));
+        item.status === "skipped" ||
+        (day.date === today && !played && itemHasPassed(item, now));
 
       if (played) {
         cursor = item.path;
@@ -332,6 +376,13 @@ export async function continueShowAfter(
   }
 
   syncOvernightCopies(days, schedule, touched);
-  await mirrorYesterdaySkips(days, schedule, await loadProgress(), () => Promise.resolve(files), touched, folder);
+  await mirrorYesterdaySkips(
+    days,
+    schedule,
+    await loadProgress(),
+    () => Promise.resolve(files),
+    touched,
+    folder,
+  );
   applyTouched(days, schedule, touched);
 }

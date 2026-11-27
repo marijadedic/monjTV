@@ -30,7 +30,11 @@ html[data-theme="meadow"] body {
   pointer-events: none;
   background: #e4edf2 url("/sunrise.jpg") center 68% / cover no-repeat;
 }
-html[data-theme="meadow"] .card, html[data-theme="meadow"] .add-form, html[data-theme="meadow"] .recent-window, html[data-theme="meadow"] .now-strip, html[data-theme="meadow"] .empty {
+html[data-theme="meadow"] .card,
+html[data-theme="meadow"] .add-form,
+html[data-theme="meadow"] .recent-window,
+html[data-theme="meadow"] .now-strip,
+html[data-theme="meadow"] .empty {
   border-radius: 18px;
 }
 html[data-theme="meadow"] .card.playing {
@@ -39,7 +43,8 @@ html[data-theme="meadow"] .card.playing {
 html[data-theme="meadow"] .pill.playing {
   background: color-mix(in srgb, #8ea384 28%, var(--panel));
 }
-html[data-theme="meadow"] .prefs .seg button.on, html[data-theme="meadow"] .prefs .themes button.on {
+html[data-theme="meadow"] .prefs .seg button.on,
+html[data-theme="meadow"] .prefs .themes button.on {
   background: #5a6e4a;
   color: #fff;
 }
@@ -60,7 +65,10 @@ html[data-theme="meadow"] .rail-item.playing .dot {
 html[data-theme="meadow"] .now-strip .track > i {
   background: #8ea384;
 }
-html[data-theme="meadow"] .tv .time, html[data-theme="meadow"] .tv .pill, html[data-theme="meadow"] .tv button, html[data-theme="meadow"] .tv .muted {
+html[data-theme="meadow"] .tv .time,
+html[data-theme="meadow"] .tv .pill,
+html[data-theme="meadow"] .tv button,
+html[data-theme="meadow"] .tv .muted {
   font-family: Palatino, "Palatino Linotype", "Iowan Old Style", Georgia, serif;
 }
 html[data-theme="meadow"] .tv button.primary {
@@ -74,7 +82,8 @@ html[data-theme="meadow"] .week-scale .track {
 html[data-theme="meadow"] .week-scale button.gap:hover {
   background: rgba(196, 180, 138, 0.28);
 }
-html[data-theme="meadow"] .week-scale button.slot.stack, html[data-theme="meadow"] .week-scale .ghost.stack {
+html[data-theme="meadow"] .week-scale button.slot.stack,
+html[data-theme="meadow"] .week-scale .ghost.stack {
   background: #7eb8a8;
   color: #142824;
 }
@@ -117,16 +126,31 @@ html[data-theme="meadow"] .add-form .mode.on.tube {
   border-color: #b45448;
   background: color-mix(in srgb, #b45448 28%, var(--panel));
 }
-html[data-theme="meadow"] .add-form .day-name, html[data-theme="meadow"] .add-form .day-start .note, html[data-theme="meadow"] .add-form .picked, html[data-theme="meadow"] .add-form .k, html[data-theme="meadow"] .add-form label, html[data-theme="meadow"] .add-form input, html[data-theme="meadow"] .add-form .mode, html[data-theme="meadow"] .add-form select, html[data-theme="meadow"] .add-form .measure-label, html[data-theme="meadow"] .add-form .chip, html[data-theme="meadow"] .add-form .actions button, html[data-theme="meadow"] .week-scale button.slot i {
+html[data-theme="meadow"] .add-form .day-name,
+html[data-theme="meadow"] .add-form .day-start .note,
+html[data-theme="meadow"] .add-form .picked,
+html[data-theme="meadow"] .add-form .k,
+html[data-theme="meadow"] .add-form label,
+html[data-theme="meadow"] .add-form input,
+html[data-theme="meadow"] .add-form .mode,
+html[data-theme="meadow"] .add-form select,
+html[data-theme="meadow"] .add-form .measure-label,
+html[data-theme="meadow"] .add-form .chip,
+html[data-theme="meadow"] .add-form .actions button,
+html[data-theme="meadow"] .week-scale button.slot i {
   font-family: Palatino, "Palatino Linotype", "Iowan Old Style", Georgia, serif;
 }
-html[data-theme="meadow"] .week-scale button.slot.stack .stack-lines, html[data-theme="meadow"] .week-scale button.slot .slot-calc {
+html[data-theme="meadow"] .week-scale button.slot.stack .stack-lines,
+html[data-theme="meadow"] .week-scale button.slot .slot-calc {
   font-family: system-ui, sans-serif;
 }
-html[data-theme="meadow"] .playlist-tools button, html[data-theme="meadow"] .playlist-gap .gap-plus, html[data-theme="meadow"] .playlist-gap .gap-mins {
+html[data-theme="meadow"] .playlist-tools button,
+html[data-theme="meadow"] .playlist-gap .gap-plus,
+html[data-theme="meadow"] .playlist-gap .gap-mins {
   font-family: system-ui, sans-serif;
 }
-html[data-theme="meadow"] .add-form .chip.on, html[data-theme="meadow"] .add-form button.primary {
+html[data-theme="meadow"] .add-form .chip.on,
+html[data-theme="meadow"] .add-form button.primary {
   background: linear-gradient(180deg, #c5d3b6 0%, #8ea384 100%);
   border-color: #8ea384;
   color: #243024;

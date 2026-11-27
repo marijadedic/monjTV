@@ -44,13 +44,21 @@ export function SlotBlock({
   const span = end - start;
   const placed = placedOn(block, origin, board);
   const draftTime = draft ? startOnDraft(draft, origin) : "";
-  const picked = draft?.id === block.id && draft.origin === origin && draftTime === placed.start;
+  const picked =
+    draft?.id === block.id &&
+    draft.origin === origin &&
+    draftTime === placed.start;
   const spill = origin !== day;
   const crosses = placed.endMin > DAY_MINUTES;
   const calculating = slotIsBuilding(board, block.id, building);
   const sliceLines =
-    block.mode === "playlist" && crosses ? playlistSliceLines(block, origin, board, spill, t, titles) : null;
-  const stackLines = sliceLines == null && block.mode === "playlist" ? fromPlaylist(block, origin, board) : [];
+    block.mode === "playlist" && crosses
+      ? playlistSliceLines(block, origin, board, spill, t, titles)
+      : null;
+  const stackLines =
+    sliceLines == null && block.mode === "playlist"
+      ? fromPlaylist(block, origin, board)
+      : [];
   const endClock = clockOf(placed.endMin);
   return (
     <button
@@ -86,15 +94,21 @@ export function SlotBlock({
           {stackLines.map((item, index) => (
             <Fragment key={item.id}>
               <span>{playlistGridLine(item, t, titles)}</span>
-              {index < stackLines.length - 1 && gapOf(item) > 0 ? <span>{t.playlistGapLine(gapOf(item))}</span> : null}
+              {index < stackLines.length - 1 && gapOf(item) > 0 ? (
+                <span>{t.playlistGapLine(gapOf(item))}</span>
+              ) : null}
             </Fragment>
           ))}
         </span>
       ) : null}
       {!sliceLines && crosses && block.mode !== "playlist" ? (
-        <span class="more">{spill ? t.sliceFrom(placed.start) : t.sliceEnds(endClock)}</span>
+        <span class="more">
+          {spill ? t.sliceFrom(placed.start) : t.sliceEnds(endClock)}
+        </span>
       ) : null}
-      {crosses && !spill ? <span class="more">{t.sliceContinues(t.dayName[nextDay(origin)])}</span> : null}
+      {crosses && !spill ? (
+        <span class="more">{t.sliceContinues(t.dayName[nextDay(origin)])}</span>
+      ) : null}
       <i>{t.lengthOf(span)}</i>
     </button>
   );

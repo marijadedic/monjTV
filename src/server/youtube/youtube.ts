@@ -72,10 +72,15 @@ export function cachedYoutube(raw: string): YoutubeMeta | undefined {
 // Title for a video or playlist, including names learned while listing a playlist.
 export function cachedYoutubeTitle(raw: string): string | undefined {
   const video = parseYoutubeUrl(raw);
-  if (video) return cache.get(video)?.title || extraTitles.get(video) || undefined;
+  if (video)
+    return cache.get(video)?.title || extraTitles.get(video) || undefined;
   const playlist = parseYoutubePlaylist(raw);
   if (!playlist) return undefined;
-  return playlists.get(playlist.id)?.title || extraTitles.get(playlist.url) || undefined;
+  return (
+    playlists.get(playlist.id)?.title ||
+    extraTitles.get(playlist.url) ||
+    undefined
+  );
 }
 
 type YoutubePrint = {
@@ -145,7 +150,11 @@ export async function probeYoutube(
     stdout = result.stdout;
     stderr = result.stderr;
   } catch (err) {
-    const record = err as { message?: string; stderr?: string; stdout?: string };
+    const record = err as {
+      message?: string;
+      stderr?: string;
+      stdout?: string;
+    };
     stdout = record.stdout ?? "";
     stderr = `${record.stderr ?? ""}\n${record.message ?? ""}`;
     if (/ENOENT|not found/i.test(stderr)) {
@@ -165,7 +174,8 @@ export async function probeYoutube(
   const meta: YoutubeMeta = {
     url,
     title,
-    durationSec: Number.isFinite(durationSec) && durationSec > 0 ? durationSec : 0,
+    durationSec:
+      Number.isFinite(durationSec) && durationSec > 0 ? durationSec : 0,
     isLive,
   };
   cache.set(url, meta);
@@ -205,7 +215,11 @@ export async function youtubeStreamUrls(raw: string): Promise<YoutubeStream> {
     stdout = result.stdout;
     stderr = result.stderr;
   } catch (err) {
-    const record = err as { message?: string; stderr?: string; stdout?: string };
+    const record = err as {
+      message?: string;
+      stderr?: string;
+      stdout?: string;
+    };
     stdout = record.stdout ?? "";
     stderr = `${record.stderr ?? ""}\n${record.message ?? ""}`;
     if (/ENOENT|not found/i.test(stderr)) {
@@ -261,7 +275,11 @@ async function runYtdlp(
     stdout = result.stdout;
     stderr = result.stderr;
   } catch (err) {
-    const record = err as { message?: string; stderr?: string; stdout?: string };
+    const record = err as {
+      message?: string;
+      stderr?: string;
+      stdout?: string;
+    };
     stdout = record.stdout ?? "";
     stderr = `${record.stderr ?? ""}\n${record.message ?? ""}`;
     if (!stdout.trim()) throw playlistReadError(stderr);
@@ -309,7 +327,9 @@ export async function youtubePlaylistTitle(raw: string): Promise<string> {
 }
 
 // Titles for timetable labels. A failed lookup is omitted so the id can stay.
-export async function youtubeTitles(raws: string[]): Promise<Record<string, string>> {
+export async function youtubeTitles(
+  raws: string[],
+): Promise<Record<string, string>> {
   const urls = [...new Set(raws.map((raw) => raw.trim()).filter(Boolean))];
   const titles: Record<string, string> = {};
   await Promise.all(
@@ -335,7 +355,9 @@ export async function youtubeTitles(raws: string[]): Promise<Record<string, stri
 function videoIdFromEntry(entry: { id?: string; url?: string }): string | null {
   if (entry.id && /^[\w-]{11}$/.test(entry.id)) return entry.id;
   if (!entry.url) return null;
-  return youtubeId(entry.url) ?? (/^[\w-]{11}$/.test(entry.url) ? entry.url : null);
+  return (
+    youtubeId(entry.url) ?? (/^[\w-]{11}$/.test(entry.url) ? entry.url : null)
+  );
 }
 
 // Seconds from a playlist dump entry. Missing or live lengths stay 0.
@@ -348,7 +370,12 @@ function listedDurationSec(row: {
   const raw = row.duration_string?.trim() ?? "";
   if (!raw || raw === "NA") return 0;
   const parts = raw.split(":").map((part) => Number(part));
-  if (parts.length < 2 || parts.length > 3 || parts.some((part) => !Number.isFinite(part))) return 0;
+  if (
+    parts.length < 2 ||
+    parts.length > 3 ||
+    parts.some((part) => !Number.isFinite(part))
+  )
+    return 0;
   const [first, second, third] = parts;
   if (third != null) return Math.round(first * 3600 + second * 60 + third);
   return Math.round(first * 60 + second);
@@ -375,7 +402,9 @@ function playlistVideos(entries: unknown): YoutubePlaylistVideo[] {
     const title = row.title?.trim() ?? "";
     const durationSec = listedDurationSec(row);
     const isLive =
-      row.is_live === true || row.live_status === "is_live" || row.live_status === "is_upcoming";
+      row.is_live === true ||
+      row.live_status === "is_live" ||
+      row.live_status === "is_upcoming";
     videos.push({
       id,
       url: `https://www.youtube.com/watch?v=${id}`,
@@ -465,7 +494,8 @@ async function readPlaylist(ref: YoutubePlaylistRef): Promise<YoutubePlaylist> {
   const videos = playlistVideos(dump?.entries);
   const queued = videos.length > 0 ? videos : fallback;
   if (!queued.length) {
-    if (stderr.trim() || stdout.trim().startsWith("ERROR")) throw playlistReadError(stderr || stdout);
+    if (stderr.trim() || stdout.trim().startsWith("ERROR"))
+      throw playlistReadError(stderr || stdout);
     throw new Error("This YouTube playlist has no videos");
   }
   return storePlaylist(ref, queued, (dump?.title ?? "").trim());
@@ -493,7 +523,11 @@ export async function youtubePlaylistTimed(
   const playlist = await loadYoutubePlaylist(raw);
   return playlist.videos
     .filter((video) => !video.isLive && video.durationSec > 0)
-    .map((video) => ({ url: video.url, title: video.title, durationSec: video.durationSec }));
+    .map((video) => ({
+      url: video.url,
+      title: video.title,
+      durationSec: video.durationSec,
+    }));
 }
 
 // Throw unless this playlist can be listed.
@@ -517,4 +551,3 @@ export function assertYoutubeUrl(raw: string): string {
   if (!url) throw new Error("Not a YouTube video URL");
   return url;
 }
-

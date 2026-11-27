@@ -27,7 +27,9 @@ export function GapBlock({
       title={long && fallbackName ? fallbackName : undefined}
       onClick={(event) => {
         const rect = event.currentTarget.getBoundingClientRect();
-        const ratio = rect.height ? Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)) : 0;
+        const ratio = rect.height
+          ? Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height))
+          : 0;
         onOpen(start + ratio * (end - start));
       }}
     >
@@ -36,10 +38,18 @@ export function GapBlock({
           <b>
             {clockFace(start)}–{clockFace(end)}
           </b>
-          {fallbackName ? <i>{fallbackName}</i> : emptyDay ? <i>{t.clickFirst}</i> : null}
+          {fallbackName ? (
+            <i>{fallbackName}</i>
+          ) : emptyDay ? (
+            <i>{t.clickFirst}</i>
+          ) : null}
         </>
       ) : (
-        <i>{tight ? `+ ${t.lengthOf(span)}` : `${clockFace(start)}–${clockFace(end)}`}</i>
+        <i>
+          {tight
+            ? `+ ${t.lengthOf(span)}`
+            : `${clockFace(start)}–${clockFace(end)}`}
+        </i>
       )}
     </button>
   );

@@ -3,7 +3,15 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ScheduleBlock, TvBoard } from "../../shared/types.ts";
 import { block, row, week } from "../test/block.ts";
-import { blocksForDay, changedBlocks, foldersOf, playingIntermission, sameBlocks, sourceChanged, validateSchedule } from "./schedule.ts";
+import {
+  blocksForDay,
+  changedBlocks,
+  foldersOf,
+  playingIntermission,
+  sameBlocks,
+  sourceChanged,
+  validateSchedule,
+} from "./schedule.ts";
 
 const film = "/films/night.mkv";
 
@@ -12,7 +20,13 @@ function input(blocks: ScheduleBlock[]) {
 }
 
 describe("saving refuses a new overlap", () => {
-  const evening = block({ id: "evening", days: ["mon"], start: "18:00", end: "20:00", lengthMin: 120 });
+  const evening = block({
+    id: "evening",
+    days: ["mon"],
+    start: "18:00",
+    end: "20:00",
+    lengthMin: 120,
+  });
   const next = block({
     id: "next",
     days: ["mon"],
@@ -39,7 +53,9 @@ describe("saving refuses a new overlap", () => {
   });
 
   it("refuses a slot this save adds when it overlaps another slot", () => {
-    assert.throws(() => validateSchedule(input([evening, next]), null, [evening]));
+    assert.throws(() =>
+      validateSchedule(input([evening, next]), null, [evening]),
+    );
   });
 
   it("refuses a leftover that runs past midnight into the next slot", () => {
@@ -83,8 +99,18 @@ describe("saving refuses a new overlap", () => {
       lengthMin: 60,
       folder: "/shows/morning",
     });
-    const other = block({ id: "other", days: ["mon"], start: "10:00", end: "11:00", folder: "/shows/day" });
-    const saved = validateSchedule(input([late, early]), null, [late, early, other]);
+    const other = block({
+      id: "other",
+      days: ["mon"],
+      start: "10:00",
+      end: "11:00",
+      folder: "/shows/day",
+    });
+    const saved = validateSchedule(input([late, early]), null, [
+      late,
+      early,
+      other,
+    ]);
     assert.deepEqual(
       saved.blocks.map((item) => item.id),
       ["late", "early"],
@@ -111,7 +137,9 @@ describe("saving refuses a new overlap", () => {
       folder: "/shows/morning",
     });
     const edited = block({ ...early, folder: "/shows/renamed" });
-    assert.throws(() => validateSchedule(input([late, edited]), null, [late, early]));
+    assert.throws(() =>
+      validateSchedule(input([late, edited]), null, [late, early]),
+    );
   });
 
   it("allows the save once the edited slot no longer overlaps", () => {
@@ -135,7 +163,10 @@ describe("saving refuses a new overlap", () => {
     });
     const cleared = block({ ...early, start: "02:00", end: "03:00" });
     const saved = validateSchedule(input([late, cleared]), null, [late, early]);
-    assert.equal(saved.blocks.find((item) => item.id === "early")?.start, "02:00");
+    assert.equal(
+      saved.blocks.find((item) => item.id === "early")?.start,
+      "02:00",
+    );
   });
 });
 
@@ -149,7 +180,14 @@ describe("a playlist occupies the files on the TV schedule", () => {
     start: "18:00",
     end: "20:00",
     lengthMin: 120,
-    items: [{ id: "v1", mode: "specific-file", folder: "/films", file: "/films/a.mkv" }],
+    items: [
+      {
+        id: "v1",
+        mode: "specific-file",
+        folder: "/films",
+        file: "/films/a.mkv",
+      },
+    ],
   });
   const board: TvBoard = {
     today: "2026-11-23",
@@ -195,7 +233,9 @@ describe("a playlist occupies the files on the TV schedule", () => {
       lengthMin: 30,
       folder: "/shows/other",
     });
-    assert.throws(() => validateSchedule(input([playlist, onTop]), board, [playlist]));
+    assert.throws(() =>
+      validateSchedule(input([playlist, onTop]), board, [playlist]),
+    );
   });
 
   it("uses the stored length when the TV schedule has not placed the playlist", () => {
@@ -207,7 +247,9 @@ describe("a playlist occupies the files on the TV schedule", () => {
       lengthMin: 60,
       folder: "/shows/other",
     });
-    assert.throws(() => validateSchedule(input([playlist, later]), null, [playlist]));
+    assert.throws(() =>
+      validateSchedule(input([playlist, later]), null, [playlist]),
+    );
   });
 });
 
@@ -222,17 +264,40 @@ describe("intermission and the slot source", () => {
 
   it("notices a new folder, file, mode, or playlist stack", () => {
     const show = block({ id: "show", folder: "/shows/a" });
-    assert.equal(sourceChanged([show], block({ id: "show", folder: "/shows/b" })), true);
+    assert.equal(
+      sourceChanged([show], block({ id: "show", folder: "/shows/b" })),
+      true,
+    );
     assert.equal(
       sourceChanged(
-        [block({ id: "film", mode: "specific-file", folder: "/films", file: "/films/a.mkv" })],
-        block({ id: "film", mode: "specific-file", folder: "/films", file: "/films/b.mkv" }),
+        [
+          block({
+            id: "film",
+            mode: "specific-file",
+            folder: "/films",
+            file: "/films/a.mkv",
+          }),
+        ],
+        block({
+          id: "film",
+          mode: "specific-file",
+          folder: "/films",
+          file: "/films/b.mkv",
+        }),
       ),
       true,
     );
-    assert.equal(sourceChanged([show], block({ id: "show", mode: "random-file" })), true);
+    assert.equal(
+      sourceChanged([show], block({ id: "show", mode: "random-file" })),
+      true,
+    );
 
-    const entry = { id: "v", mode: "specific-file" as const, folder: "/films", file: "/films/a.mkv" };
+    const entry = {
+      id: "v",
+      mode: "specific-file" as const,
+      folder: "/films",
+      file: "/films/a.mkv",
+    };
     const stack = block({
       id: "pl",
       mode: "playlist",
@@ -277,7 +342,12 @@ describe("a stored youtube mode", () => {
 
 describe("the day and the gap filler", () => {
   it("orders a day's slots by the start that day uses", () => {
-    const early = block({ id: "early", days: ["wed"], start: "18:00", end: "19:00" });
+    const early = block({
+      id: "early",
+      days: ["wed"],
+      start: "18:00",
+      end: "19:00",
+    });
     const moved = block({
       id: "moved",
       days: ["mon", "wed"],
@@ -285,7 +355,12 @@ describe("the day and the gap filler", () => {
       end: "21:00",
       starts: { wed: "09:00" },
     });
-    const other = block({ id: "other", days: ["mon"], start: "10:00", end: "11:00" });
+    const other = block({
+      id: "other",
+      days: ["mon"],
+      start: "10:00",
+      end: "11:00",
+    });
     const schedule = week([early, moved, other]);
     assert.deepEqual(
       blocksForDay(schedule, "wed").map((item) => item.id),
@@ -298,15 +373,31 @@ describe("the day and the gap filler", () => {
   });
 
   it("plays the selected intermission, and nothing when none is selected", () => {
-    const filler = { id: "pause", kind: "folder" as const, source: "/intermission" };
-    const selected = { ...week([]), intermissions: [filler], activeIntermission: "pause" };
+    const filler = {
+      id: "pause",
+      kind: "folder" as const,
+      source: "/intermission",
+    };
+    const selected = {
+      ...week([]),
+      intermissions: [filler],
+      activeIntermission: "pause",
+    };
     assert.deepEqual(playingIntermission(selected), filler);
-    assert.equal(playingIntermission({ ...selected, activeIntermission: "" }), null);
-    assert.equal(playingIntermission({ ...selected, activeIntermission: "missing" }), null);
+    assert.equal(
+      playingIntermission({ ...selected, activeIntermission: "" }),
+      null,
+    );
+    assert.equal(
+      playingIntermission({ ...selected, activeIntermission: "missing" }),
+      null,
+    );
   });
 
   it("names the folders a slot uses for episode and random history", () => {
-    assert.deepEqual(foldersOf(block({ id: "show", folder: "/shows/a" })), ["/shows/a"]);
+    assert.deepEqual(foldersOf(block({ id: "show", folder: "/shows/a" })), [
+      "/shows/a",
+    ]);
     assert.deepEqual(
       foldersOf(
         block({
@@ -318,7 +409,12 @@ describe("the day and the gap filler", () => {
             { id: "a", mode: "next-episode", folder: "/shows/a" },
             { id: "b", mode: "random-file", folder: "/films" },
             { id: "c", mode: "next-episode", folder: "/shows/a" },
-            { id: "d", mode: "specific-file", folder: "", file: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
+            {
+              id: "d",
+              mode: "specific-file",
+              folder: "",
+              file: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            },
           ],
         }),
       ),
@@ -335,15 +431,35 @@ describe("a save keeps a usable week", () => {
   });
 
   it("refuses a slot with no day, no clock, or no length", () => {
-    assert.throws(() => validateSchedule(input([block({ id: "show", days: [] })])));
-    assert.throws(() => validateSchedule(input([block({ id: "show", start: "24:00" })])));
-    assert.throws(() => validateSchedule(input([block({ id: "show", start: "18:00", end: "18:00" })])));
-    assert.throws(() => validateSchedule(input([block({ id: "show", lengthMin: 24 * 60 })])));
+    assert.throws(() =>
+      validateSchedule(input([block({ id: "show", days: [] })])),
+    );
+    assert.throws(() =>
+      validateSchedule(input([block({ id: "show", start: "24:00" })])),
+    );
+    assert.throws(() =>
+      validateSchedule(
+        input([block({ id: "show", start: "18:00", end: "18:00" })]),
+      ),
+    );
+    assert.throws(() =>
+      validateSchedule(input([block({ id: "show", lengthMin: 24 * 60 })])),
+    );
   });
 
   it("refuses a playlist with no name or no videos, and a video slot with no file", () => {
     assert.throws(() =>
-      validateSchedule(input([block({ id: "pl", mode: "playlist", name: "", folder: "", items: [] })])),
+      validateSchedule(
+        input([
+          block({
+            id: "pl",
+            mode: "playlist",
+            name: "",
+            folder: "",
+            items: [],
+          }),
+        ]),
+      ),
     );
     assert.throws(() =>
       validateSchedule(
@@ -359,7 +475,16 @@ describe("a save keeps a usable week", () => {
       ),
     );
     assert.throws(() =>
-      validateSchedule(input([block({ id: "film", mode: "specific-file", folder: "/films", file: "" })])),
+      validateSchedule(
+        input([
+          block({
+            id: "film",
+            mode: "specific-file",
+            folder: "/films",
+            file: "",
+          }),
+        ]),
+      ),
     );
   });
 
@@ -369,38 +494,59 @@ describe("a save keeps a usable week", () => {
         block({
           id: "show",
           mode: "next-episode",
-          folder: "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLmonjtvtest",
+          folder:
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLmonjtvtest",
         }),
       ]),
     );
-    assert.equal(list.blocks[0]?.folder, "https://www.youtube.com/playlist?list=PLmonjtvtest");
+    assert.equal(
+      list.blocks[0]?.folder,
+      "https://www.youtube.com/playlist?list=PLmonjtvtest",
+    );
     assert.equal(list.blocks[0]?.mode, "next-episode");
 
-    const queued = "https://www.youtube.com/watch_videos?video_ids=dQw4w9WgXcQ,abcdefghijk";
-    const queue = validateSchedule(input([block({ id: "show", mode: "random-file", folder: queued })]));
+    const queued =
+      "https://www.youtube.com/watch_videos?video_ids=dQw4w9WgXcQ,abcdefghijk";
+    const queue = validateSchedule(
+      input([block({ id: "show", mode: "random-file", folder: queued })]),
+    );
     assert.equal(queue.blocks[0]?.folder, queued);
   });
 
   it("keeps a YouTube intermission and rejects a YouTube link typed as a folder", () => {
     const saved = validateSchedule({
       blocks: [show()],
-      intermissions: [{ id: "gap", kind: "youtube", source: "https://youtu.be/dQw4w9WgXcQ" }],
+      intermissions: [
+        { id: "gap", kind: "youtube", source: "https://youtu.be/dQw4w9WgXcQ" },
+      ],
       activeIntermission: "gap",
       intermissionRandomStart: true,
     });
-    assert.equal(saved.intermissions[0]?.source, "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+    assert.equal(
+      saved.intermissions[0]?.source,
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    );
     assert.equal(saved.activeIntermission, "gap");
     assert.equal(saved.intermissionRandomStart, true);
     assert.throws(() =>
       validateSchedule({
         blocks: [show()],
-        intermissions: [{ id: "gap", kind: "folder", source: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" }],
+        intermissions: [
+          {
+            id: "gap",
+            kind: "folder",
+            source: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+          },
+        ],
       }),
     );
   });
 
   it("turns an older fallback folder into the selected intermission", () => {
-    const saved = validateSchedule({ blocks: [show()], fallbackFolder: "/intermission" });
+    const saved = validateSchedule({
+      blocks: [show()],
+      fallbackFolder: "/intermission",
+    });
     assert.equal(saved.intermissions[0]?.kind, "folder");
     assert.equal(saved.intermissions[0]?.source, "/intermission");
     assert.equal(saved.activeIntermission, saved.intermissions[0]?.id);
@@ -416,10 +562,25 @@ describe("a save keeps a usable week", () => {
   });
 
   it("treats a new start as a change of the slot, not of its videos", () => {
-    const before = block({ id: "show", days: ["mon", "wed"], start: "20:00", starts: { wed: "09:00" } });
-    const after = block({ id: "show", days: ["mon", "wed"], start: "20:00", starts: { wed: "10:00" } });
+    const before = block({
+      id: "show",
+      days: ["mon", "wed"],
+      start: "20:00",
+      starts: { wed: "09:00" },
+    });
+    const after = block({
+      id: "show",
+      days: ["mon", "wed"],
+      start: "20:00",
+      starts: { wed: "10:00" },
+    });
     assert.equal(sameBlocks([before], [after]), false);
-    assert.equal(changedBlocks([before], [after]).map((item) => item.id).includes("show"), true);
+    assert.equal(
+      changedBlocks([before], [after])
+        .map((item) => item.id)
+        .includes("show"),
+      true,
+    );
     assert.equal(sourceChanged([before], after), false);
   });
 });

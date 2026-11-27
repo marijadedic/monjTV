@@ -12,7 +12,8 @@ export function draftEnd(
   if (current.mode === "playlist") {
     const sec = stackSeconds(current.items);
     if (!sec) {
-      if (current.items.length > 0 && !current.items.some((item) => item.error)) return current;
+      if (current.items.length > 0 && !current.items.some((item) => item.error))
+        return current;
       return current.end === "" ? current : { ...current, end: "" };
     }
     const end = endFromDuration(current.start, sec);

@@ -3,7 +3,10 @@ import { itemSeconds } from "@utils/length/itemSeconds.ts";
 import { toMin } from "@utils/clock/toMin.ts";
 import type { DraftItem } from "../../types/DraftItem.ts";
 
-export function nextItemMinute(start: string, items: DraftItem[]): number | null {
+export function nextItemMinute(
+  start: string,
+  items: DraftItem[],
+): number | null {
   let cursor = toMin(start);
   for (let index = 0; index < items.length; index++) {
     const sec = itemSeconds(items[index]);

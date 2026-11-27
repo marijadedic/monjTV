@@ -1,5 +1,10 @@
 // Choose the file a slot plays.
-import type { PlaylistEntry, Progress, RundownItem, ScheduleBlock } from "../../shared/types.ts";
+import type {
+  PlaylistEntry,
+  Progress,
+  RundownItem,
+  ScheduleBlock,
+} from "../../shared/types.ts";
 import { canonicalPlaylistUrl, parseYoutubeUrl } from "../../shared/youtube.ts";
 import { formatHm } from "../clock/clock.ts";
 import { isVideoFile } from "../files/files.ts";
@@ -11,12 +16,16 @@ import { lengthOf, nameOf, seriesFiles, tryLength } from "./media.ts";
 import { cloneProgress } from "./picks.ts";
 
 // Pull the saved row for this stacked video, if this day already had it.
-function takeKeptEntry(unused: RundownItem[], entry: PlaylistEntry): RundownItem | undefined {
+function takeKeptEntry(
+  unused: RundownItem[],
+  entry: PlaylistEntry,
+): RundownItem | undefined {
   const byId = unused.findIndex((item) => item.entryId === entry.id);
   if (byId >= 0) return unused.splice(byId, 1)[0];
   const byShape = unused.findIndex((item) => {
     if (item.entryId) return false;
-    const itemMode = (item.mode as string) === "youtube" ? "specific-file" : item.mode;
+    const itemMode =
+      (item.mode as string) === "youtube" ? "specific-file" : item.mode;
     if (itemMode !== entry.mode) return false;
     if (entry.mode === "specific-file") {
       const url = parseYoutubeUrl(entry.file ?? "");
@@ -37,11 +46,15 @@ async function randomPickStillValid(
   if (item.mode !== "random-file" || !item.path) return false;
   if (used.includes(item.path)) return false;
 
-  const files = await seriesFiles(canonicalPlaylistUrl(entry.folder) ?? entry.folder);
+  const files = await seriesFiles(
+    canonicalPlaylistUrl(entry.folder) ?? entry.folder,
+  );
   if (!files.includes(item.path)) return false;
 
-  const durationSec = item.durationSec > 0 ? item.durationSec : await lengthOf(item.path);
-  if (entry.lengthMin && !itemFits(durationSec, entry.lengthMin * 60)) return false;
+  const durationSec =
+    item.durationSec > 0 ? item.durationSec : await lengthOf(item.path);
+  if (entry.lengthMin && !itemFits(durationSec, entry.lengthMin * 60))
+    return false;
 
   return true;
 }
@@ -89,7 +102,11 @@ async function pickEntry(
     if (youtube) {
       try {
         const meta = await probeYoutube(youtube);
-        return { path: meta.url, durationSec: meta.durationSec, title: meta.title };
+        return {
+          path: meta.url,
+          durationSec: meta.durationSec,
+          title: meta.title,
+        };
       } catch {
         return null;
       }
@@ -97,7 +114,11 @@ async function pickEntry(
     const file = entry.file;
     if (!file || !(await isVideoFile(file))) return null;
 
-    return { path: file, durationSec: await lengthOf(file), title: nameOf(file) };
+    return {
+      path: file,
+      durationSec: await lengthOf(file),
+      title: nameOf(file),
+    };
   }
 
   if (entry.mode === "next-episode") {
@@ -119,7 +140,9 @@ async function pickEntry(
   const passed = new Set<string>();
 
   while (true) {
-    const pool = files.filter((candidate) => !passed.has(candidate) && !used.includes(candidate));
+    const pool = files.filter(
+      (candidate) => !passed.has(candidate) && !used.includes(candidate),
+    );
     if (pool.length === 0) return null;
 
     const choice = takeRandom(pool, recent, {
@@ -130,7 +153,10 @@ async function pickEntry(
     if (!choice) return null;
 
     const durationSec = await tryLength(choice.path);
-    if (durationSec != null && (remaining == null || itemFits(durationSec, remaining))) {
+    if (
+      durationSec != null &&
+      (remaining == null || itemFits(durationSec, remaining))
+    ) {
       progress.recentRandom[series] = choice.recent;
       return { path: choice.path, durationSec, title: nameOf(choice.path) };
     }
@@ -161,10 +187,22 @@ async function itemsForPlaylist(
     const prev = takeKeptEntry(unused, entry);
     let picked: { path: string; durationSec: number; title: string } | null;
 
-    if (entry.mode === "random-file" && prev && (await randomPickStillValid(entry, prev, used))) {
-      picked = { path: prev.path, durationSec: prev.durationSec, title: prev.title };
+    if (
+      entry.mode === "random-file" &&
+      prev &&
+      (await randomPickStillValid(entry, prev, used))
+    ) {
+      picked = {
+        path: prev.path,
+        durationSec: prev.durationSec,
+        title: prev.title,
+      };
     } else if (entry.mode === "next-episode" && prev?.chosen) {
-      picked = { path: prev.path, durationSec: prev.durationSec, title: prev.title };
+      picked = {
+        path: prev.path,
+        durationSec: prev.durationSec,
+        title: prev.title,
+      };
     } else {
       picked = await pickEntry(entry, shadow, used, reserved);
     }
@@ -173,7 +211,8 @@ async function itemsForPlaylist(
     pickedList.push({ entry, prev, picked });
     if (entry.folder) {
       usedByFolder.set(entry.folder, [...used, picked.path]);
-      if (entry.mode === "next-episode") shadow.lastCompleted[entry.folder] = picked.path;
+      if (entry.mode === "next-episode")
+        shadow.lastCompleted[entry.folder] = picked.path;
       else if (entry.mode === "random-file") {
         const recent = shadow.recentRandom[entry.folder] ?? [];
         shadow.recentRandom[entry.folder] = noteRandom(recent, picked.path);
@@ -217,7 +256,11 @@ export async function itemsForWindow(
         const meta = await probeYoutube(youtube);
         if (!itemFits(meta.durationSec, blockEnd - cursorStart)) return items;
 
-        items.push(makeItem(block, meta.url, cursorStart, meta.durationSec, { title: meta.title }));
+        items.push(
+          makeItem(block, meta.url, cursorStart, meta.durationSec, {
+            title: meta.title,
+          }),
+        );
       } catch {
         return items;
       }
@@ -258,11 +301,16 @@ export async function itemsForWindow(
       picked = file;
     } else {
       const recent = progress.recentRandom[series] ?? [];
-      const pool = files.filter((candidate) => !passed.has(candidate) && !used.includes(candidate));
+      const pool = files.filter(
+        (candidate) => !passed.has(candidate) && !used.includes(candidate),
+      );
       if (pool.length === 0) break;
 
       const choice = takeRandom(pool, recent, {
-        avoid: [...otherFolderPlays(progress.recentRandom, series), ...reserved],
+        avoid: [
+          ...otherFolderPlays(progress.recentRandom, series),
+          ...reserved,
+        ],
         block: used,
         all: files,
       });

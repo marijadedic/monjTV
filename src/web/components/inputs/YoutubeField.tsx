@@ -19,7 +19,9 @@ export function YoutubeField({
           value={value}
           placeholder={placeholder}
           aria-invalid={invalid ? "true" : undefined}
-          onInput={(event) => onChange((event.target as HTMLInputElement).value)}
+          onInput={(event) =>
+            onChange((event.target as HTMLInputElement).value)
+          }
           onKeyDown={
             onEnter
               ? (event) => {

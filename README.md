@@ -8,15 +8,13 @@ You have to provide your own local movie library. 😁
 
 ## What you need
 
-
-| Tool                              | Why                                                                                                                                                     |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Node.js `^20.19.0` or `>=22.12.0` | Vite 8 will not start on older Node. `node -v` should print v20.19+ or v22.12+.                                                                         |
-| mpv on `PATH`                     | The picture. `mpv --version` should print a version.                                                                                                    |
-| ffprobe on `PATH`                 | Comes with FFmpeg. Used to measure each file when the day's rundown is built. `ffprobe -version` should print a version.                                |
+| Tool                              | Why                                                                                                                                                                                       |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Node.js `^20.19.0` or `>=22.12.0` | Vite 8 will not start on older Node. `node -v` should print v20.19+ or v22.12+.                                                                                                           |
+| mpv on `PATH`                     | The picture. `mpv --version` should print a version.                                                                                                                                      |
+| ffprobe on `PATH`                 | Comes with FFmpeg. Used to measure each file when the day's rundown is built. `ffprobe -version` should print a version.                                                                  |
 | yt-dlp (optional)                 | Needed only for YouTube slots and YouTube intermission. monjTV keeps a current binary in `tools/yt-dlp` and downloads one on first YouTube use. Distro packages are often too old for HD. |
-| A graphical session               | mpv opens a fullscreen window on the machine running the server. A headless SSH session with no display will start the API and then fail to show video. |
-
+| A graphical session               | mpv opens a fullscreen window on the machine running the server. A headless SSH session with no display will start the API and then fail to show video.                                   |
 
 Install the system tools, then clone.
 
@@ -63,8 +61,6 @@ yt-dlp --version
 
 A current `yt-dlp` is only required if you will schedule YouTube videos or use a YouTube URL for intermission. You do not have to install it yourself: the first YouTube save or play downloads it into `tools/yt-dlp`. Apt and Homebrew copies are often too old to get more than 360p.
 
-
-
 ## Get the code
 
 ```bash
@@ -100,8 +96,6 @@ The dev server does not start mpv by itself. Use **Start TV** on Today, or:
 curl -X POST http://127.0.0.1:3000/api/player/start
 ```
 
-
-
 ## Run it for the TV
 
 `npm start` builds the UI, then starts the API. Port 3000 serves `dist/client` and the API. This is the process that should run on the machine.
@@ -123,8 +117,6 @@ Open [http://127.0.0.1:3000](http://127.0.0.1:3000). From another device on the 
 ```bash
 PORT=3001 npm start
 ```
-
-
 
 ### Launcher script
 
@@ -153,19 +145,15 @@ echo "$DISPLAY"          # X11, often :0
 echo "$WAYLAND_DISPLAY"  # Wayland
 ```
 
-
-
 ### Desktop icon
 
 `node scripts/install-desktop.mjs` checks the operating system and installs an icon for this checkout:
-
 
 | System                          | What appears                                        |
 | ------------------------------- | --------------------------------------------------- |
 | Raspberry Pi OS and other Linux | `monjTV` on the desktop and in the application menu |
 | macOS                           | `monjTV.app` on the Desktop                         |
 | Windows                         | a Desktop shortcut                                  |
-
 
 Linux and the Pi use the same `.desktop` file. The icon runs `scripts/start.sh` on macOS and Linux, and `scripts/start.ps1` on Windows. Both start the server and open the remote. On macOS the icon asks Terminal to do that, because a Desktop app cannot read the project folder. Run the installer from the graphical session. Run it again after you move the folder. The icon stores this checkout's path and the Node that ran the installer.
 
@@ -217,13 +205,11 @@ If `ffprobe` is missing or cannot read a file, that file is treated as 45 minute
 
 `data/` is local state and is gitignored. A missing or empty file is created from an empty fallback on read. Invalid JSON is left on disk; the process uses the empty fallback in memory.
 
-
-| File                 | Contents                                                                 |
-| -------------------- | ------------------------------------------------------------------------ |
+| File                 | Contents                                                                                  |
+| -------------------- | ----------------------------------------------------------------------------------------- |
 | `data/schedule.json` | The week: `blocks`, `intermissions`, `activeIntermission`, and `intermissionRandomStart`. |
-| `data/today.json`    | Today's rundown. Rebuilt when the date changes or the schedule is saved. |
-| `data/progress.json` | `lastCompleted` (last finished path per folder) and `recentRandom`.      |
-
+| `data/today.json`    | Today's rundown. Rebuilt when the date changes or the schedule is saved.                  |
+| `data/progress.json` | `lastCompleted` (last finished path per folder) and `recentRandom`.                       |
 
 A schedule with one weekday block looks like this:
 
@@ -255,19 +241,17 @@ Days are `mon` `tue` `wed` `thu` `fri` `sat` `sun`. Times are `HH:mm`. An interm
 
 ## Commands
 
-
-| Command                            | What it does                                                                 |
-| ---------------------------------- | ---------------------------------------------------------------------------- |
-| `npm install`                      | Install JavaScript dependencies.                                             |
-| `npm run dev`                      | Vite on port 5173 and the API on port 3000, with reload.                     |
-| `npm run build`                    | Write the UI to `dist/client`. `npm start` does this.                        |
-| `npm start`                        | Build the UI, then serve it and the API on port 3000.                        |
-| `npm run start:server`             | Start the API on port 3000 when `dist/client` already exists.                |
-| `npm run typecheck`                | `tsc --noEmit`.                                                              |
-| `npm run lint`                     | ESLint over `src` and `vite.config.ts`.                                      |
+| Command                            | What it does                                                                   |
+| ---------------------------------- | ------------------------------------------------------------------------------ |
+| `npm install`                      | Install JavaScript dependencies.                                               |
+| `npm run dev`                      | Vite on port 5173 and the API on port 3000, with reload.                       |
+| `npm run build`                    | Write the UI to `dist/client`. `npm start` does this.                          |
+| `npm start`                        | Build the UI, then serve it and the API on port 3000.                          |
+| `npm run start:server`             | Start the API on port 3000 when `dist/client` already exists.                  |
+| `npm run typecheck`                | `tsc --noEmit`.                                                                |
+| `npm run lint`                     | ESLint over `src` and `vite.config.ts`.                                        |
 | `./scripts/start.sh`               | Build the UI, restart the server, and open the UI. The desktop icon does this. |
-| `node scripts/install-desktop.mjs` | Install a desktop icon for this operating system.                            |
-
+| `node scripts/install-desktop.mjs` | Install a desktop icon for this operating system.                              |
 
 Health check:
 
@@ -298,6 +282,5 @@ A healthy server returns `{"ok":true}`.
 **A YouTube slot will not save a live URL.** Live streams belong in Intermission. Use a finished video for a scheduled YouTube slot. That mode also needs the internet at play time.
 
 **Another computer cannot open the UI.** Use `npm start`, then `http://<machine-ip>:3000`. Port 5173 is the dev UI on the machine. If the page does not load, allow inbound TCP 3000 on the machine's firewall.
-
 
 **Durations are all about 45 minutes.** `ffprobe` is missing or could not read the files. Install FFmpeg, delete `data/today.json`, and save the schedule again so the rundown is probed once more.

@@ -28,7 +28,12 @@ export function GapDialog({
   return (
     <>
       <Scrim className="scrim gap-scrim" onClose={onDismiss} />
-      <div class="add-form gap-form" role="dialog" aria-labelledby="gap-title" aria-modal="true">
+      <div
+        class="add-form gap-form"
+        role="dialog"
+        aria-labelledby="gap-title"
+        aria-modal="true"
+      >
         <header>
           <b id="gap-title">{t.playlistGapTitle}</b>
         </header>
@@ -43,7 +48,9 @@ export function GapDialog({
             value={minutes}
             placeholder="5"
             aria-label={t.playlistGapTitle}
-            onInput={(event) => onMinutes((event.target as HTMLInputElement).value)}
+            onInput={(event) =>
+              onMinutes((event.target as HTMLInputElement).value)
+            }
             onKeyDown={(event) => {
               if (event.key === "Enter") {
                 event.preventDefault();

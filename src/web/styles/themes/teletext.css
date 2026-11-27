@@ -19,7 +19,10 @@
   --pill-wait: transparent;
   --pill-skip: transparent;
 }
-html[data-theme="teletext"] .item-menu-list, html[data-theme="teletext"] .item-menu-toggle i, html[data-theme="teletext"] .item-actions [data-tip]:hover::after, html[data-theme="teletext"] .item-actions [data-tip]:focus-visible::after {
+html[data-theme="teletext"] .item-menu-list,
+html[data-theme="teletext"] .item-menu-toggle i,
+html[data-theme="teletext"] .item-actions [data-tip]:hover::after,
+html[data-theme="teletext"] .item-actions [data-tip]:focus-visible::after {
   border-radius: 0;
   box-shadow: none;
 }
@@ -27,19 +30,68 @@ html[data-theme="teletext"] .card.playing {
   box-shadow: inset 5px 0 0 #00ff00;
   background: #000;
 }
-html[data-theme="teletext"] .card.done, html[data-theme="teletext"] .card.skipped, html[data-theme="teletext"] .card.passed {
+html[data-theme="teletext"] .card.done,
+html[data-theme="teletext"] .card.skipped,
+html[data-theme="teletext"] .card.passed {
   opacity: 0.55;
 }
-html[data-theme="teletext"] body, html[data-theme="teletext"] .prefs, html[data-theme="teletext"] .themes button, html[data-theme="teletext"] .prefs-quit, html[data-theme="teletext"] .prefs-recent, html[data-theme="teletext"] .recent-window, html[data-theme="teletext"] .fit-warn, html[data-theme="teletext"] .week-head h1, html[data-theme="teletext"] .intermission, html[data-theme="teletext"] .intermission-open {
-  font-family: "Courier New", Courier, "Liberation Mono", "DejaVu Sans Mono", monospace;
+html[data-theme="teletext"] body,
+html[data-theme="teletext"] .prefs,
+html[data-theme="teletext"] .themes button,
+html[data-theme="teletext"] .prefs-quit,
+html[data-theme="teletext"] .prefs-recent,
+html[data-theme="teletext"] .recent-window,
+html[data-theme="teletext"] .fit-warn,
+html[data-theme="teletext"] .week-head h1,
+html[data-theme="teletext"] .intermission,
+html[data-theme="teletext"] .intermission-open {
+  font-family:
+    "Courier New", Courier, "Liberation Mono", "DejaVu Sans Mono", monospace;
 }
-html[data-theme="teletext"] .card, html[data-theme="teletext"] .now-strip, html[data-theme="teletext"] .empty, html[data-theme="teletext"] .add-form, html[data-theme="teletext"] .prefs summary, html[data-theme="teletext"] .prefs-body, html[data-theme="teletext"] .folders a, html[data-theme="teletext"] .day-tabs button, html[data-theme="teletext"] .seg, html[data-theme="teletext"] .themes, html[data-theme="teletext"] .themes button, html[data-theme="teletext"] .prefs-quit, html[data-theme="teletext"] .prefs-recent, html[data-theme="teletext"] .recent-window, html[data-theme="teletext"] .recent-list li, html[data-theme="teletext"] button, html[data-theme="teletext"] input, html[data-theme="teletext"] .pill, html[data-theme="teletext"] .track, html[data-theme="teletext"] .dot, html[data-theme="teletext"] .still, html[data-theme="teletext"] .week-scale .track, html[data-theme="teletext"] .intermission, html[data-theme="teletext"] .intermission-open, html[data-theme="teletext"] .chip, html[data-theme="teletext"] .field, html[data-theme="teletext"] .browse, html[data-theme="teletext"] .path-suggest, html[data-theme="teletext"] .block-form, html[data-theme="teletext"] .add-form .mode, html[data-theme="teletext"] .playlist-item, html[data-theme="teletext"] .playlist-gap .gap-plus, html[data-theme="teletext"] .add-form.gap-form, html[data-theme="teletext"] .week-scale .ghost {
+html[data-theme="teletext"] .card,
+html[data-theme="teletext"] .now-strip,
+html[data-theme="teletext"] .empty,
+html[data-theme="teletext"] .add-form,
+html[data-theme="teletext"] .prefs summary,
+html[data-theme="teletext"] .prefs-body,
+html[data-theme="teletext"] .folders a,
+html[data-theme="teletext"] .day-tabs button,
+html[data-theme="teletext"] .seg,
+html[data-theme="teletext"] .themes,
+html[data-theme="teletext"] .themes button,
+html[data-theme="teletext"] .prefs-quit,
+html[data-theme="teletext"] .prefs-recent,
+html[data-theme="teletext"] .recent-window,
+html[data-theme="teletext"] .recent-list li,
+html[data-theme="teletext"] button,
+html[data-theme="teletext"] input,
+html[data-theme="teletext"] .pill,
+html[data-theme="teletext"] .track,
+html[data-theme="teletext"] .dot,
+html[data-theme="teletext"] .still,
+html[data-theme="teletext"] .week-scale .track,
+html[data-theme="teletext"] .intermission,
+html[data-theme="teletext"] .intermission-open,
+html[data-theme="teletext"] .chip,
+html[data-theme="teletext"] .field,
+html[data-theme="teletext"] .browse,
+html[data-theme="teletext"] .path-suggest,
+html[data-theme="teletext"] .block-form,
+html[data-theme="teletext"] .add-form .mode,
+html[data-theme="teletext"] .playlist-item,
+html[data-theme="teletext"] .playlist-gap .gap-plus,
+html[data-theme="teletext"] .add-form.gap-form,
+html[data-theme="teletext"] .week-scale .ghost {
   border-radius: 0;
 }
-html[data-theme="teletext"] .add-form, html[data-theme="teletext"] .recent-window, html[data-theme="teletext"] .intermission-open {
+html[data-theme="teletext"] .add-form,
+html[data-theme="teletext"] .recent-window,
+html[data-theme="teletext"] .intermission-open {
   box-shadow: none;
 }
-html[data-theme="teletext"] .brand, html[data-theme="teletext"] .strip-title, html[data-theme="teletext"] .day.on .name {
+html[data-theme="teletext"] .brand,
+html[data-theme="teletext"] .strip-title,
+html[data-theme="teletext"] .day.on .name {
   color: #ffff00;
   letter-spacing: 0;
 }
@@ -49,7 +101,8 @@ html[data-theme="teletext"] .clock {
 html[data-theme="teletext"] a {
   color: #00ffff;
 }
-html[data-theme="teletext"] .folders a.on, html[data-theme="teletext"] .day-tabs button.on {
+html[data-theme="teletext"] .folders a.on,
+html[data-theme="teletext"] .day-tabs button.on {
   color: #ffff00;
   background: #0000ff;
   border-color: #0000ff;
@@ -58,7 +111,9 @@ html[data-theme="teletext"] .pill {
   background: transparent;
   color: #00ffff;
 }
-html[data-theme="teletext"] .pill.playing, html[data-theme="teletext"] .pill.on-air, html[data-theme="teletext"] .now-strip .pill.playing {
+html[data-theme="teletext"] .pill.playing,
+html[data-theme="teletext"] .pill.on-air,
+html[data-theme="teletext"] .now-strip .pill.playing {
   background: #00ff00;
   color: #000;
 }
@@ -74,7 +129,8 @@ html[data-theme="teletext"] .pill.skipped {
   background: #ff00ff;
   color: #000;
 }
-html[data-theme="teletext"] .pill.next, html[data-theme="teletext"] .now-strip .pill.next {
+html[data-theme="teletext"] .pill.next,
+html[data-theme="teletext"] .now-strip .pill.next {
   background: #00ffff;
   color: #000;
 }
@@ -96,30 +152,37 @@ html[data-theme="teletext"] .rail-item.carry-row:not(.playing) .card {
 html[data-theme="teletext"] .now-strip .track > i {
   background: #ffff00;
 }
-html[data-theme="teletext"] .error, html[data-theme="teletext"] .field-error {
+html[data-theme="teletext"] .error,
+html[data-theme="teletext"] .field-error {
   color: #ff0000;
 }
-html[data-theme="teletext"] .week-scale button.slot, html[data-theme="teletext"] .week-scale .ghost {
+html[data-theme="teletext"] .week-scale button.slot,
+html[data-theme="teletext"] .week-scale .ghost {
   background: #0000ff;
   color: #ffff00;
 }
-html[data-theme="teletext"] .week-scale button.slot.shows, html[data-theme="teletext"] .week-scale .ghost.shows {
+html[data-theme="teletext"] .week-scale button.slot.shows,
+html[data-theme="teletext"] .week-scale .ghost.shows {
   background: #ff00ff;
   color: #000;
 }
-html[data-theme="teletext"] .week-scale button.slot.film, html[data-theme="teletext"] .week-scale .ghost.film {
+html[data-theme="teletext"] .week-scale button.slot.film,
+html[data-theme="teletext"] .week-scale .ghost.film {
   background: #ffff00;
   color: #000;
 }
-html[data-theme="teletext"] .week-scale button.slot.tube, html[data-theme="teletext"] .week-scale .ghost.tube {
+html[data-theme="teletext"] .week-scale button.slot.tube,
+html[data-theme="teletext"] .week-scale .ghost.tube {
   background: #00ffff;
   color: #000;
 }
-html[data-theme="teletext"] .week-scale button.slot.stack, html[data-theme="teletext"] .week-scale .ghost.stack {
+html[data-theme="teletext"] .week-scale button.slot.stack,
+html[data-theme="teletext"] .week-scale .ghost.stack {
   background: #00ff00;
   color: #000;
 }
-html[data-theme="teletext"] .week-scale button.slot.pick, html[data-theme="teletext"] .week-scale button.gap.pick {
+html[data-theme="teletext"] .week-scale button.slot.pick,
+html[data-theme="teletext"] .week-scale button.gap.pick {
   box-shadow: inset 0 0 0 2px #fff;
 }
 html[data-theme="teletext"] .week-scale button.gap:hover {
@@ -143,10 +206,10 @@ html[data-theme="teletext"] .add-form .mode.on.movie {
   color: #ffff00;
 }
 html[data-theme="teletext"] .add-form .mode span {
-  font-size: 0.80rem;
+  font-size: 0.8rem;
 }
 html[data-theme="teletext"] .add-form .mode b {
-  font-size: 0.90rem;
+  font-size: 0.9rem;
 }
 html[data-theme="teletext"] .add-form .mode.on.shows {
   border-color: #ff00ff;
@@ -182,7 +245,7 @@ html[data-theme="teletext"] .prefs-quit {
   color: #fff;
 }
 html[data-theme="teletext"] .day-start .note {
-  font-size: 0.80rem;
+  font-size: 0.8rem;
 }
 html[data-theme="teletext"] .prefs-quit:hover:not(:disabled) {
   background: #ff0000;
@@ -194,7 +257,9 @@ html[data-theme="teletext"] .prefs-recent:hover {
   border-color: #ffff00;
   color: #ffff00;
 }
-html[data-theme="teletext"] .browse button:hover, html[data-theme="teletext"] .path-suggest button:hover, html[data-theme="teletext"] .path-suggest button.on {
+html[data-theme="teletext"] .browse button:hover,
+html[data-theme="teletext"] .path-suggest button:hover,
+html[data-theme="teletext"] .path-suggest button.on {
   background: #0000ff;
   color: #ffff00;
 }
@@ -219,7 +284,8 @@ html[data-theme="teletext"] .intermission-random.on {
   color: #ffff00;
   border-color: #ffff00;
 }
-html[data-theme="teletext"] .intermission-random i, html[data-theme="teletext"] .intermission-random i::after {
+html[data-theme="teletext"] .intermission-random i,
+html[data-theme="teletext"] .intermission-random i::after {
   border-radius: 0;
 }
 html[data-theme="teletext"] .intermission-random i {

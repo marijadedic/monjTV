@@ -2,7 +2,10 @@ import { endFromDuration } from "@utils/clock/endFromDuration.ts";
 import type { Draft } from "../../../../types/Draft.ts";
 import type { PlaySource } from "../../../../types/PlaySource.ts";
 
-export function playSourceDraft(current: Draft | null, source: PlaySource): Draft | null {
+export function playSourceDraft(
+  current: Draft | null,
+  source: PlaySource,
+): Draft | null {
   if (!current) return current;
   if (current.mode === "playlist") {
     if (current.addSource === source) return current;
@@ -14,7 +17,11 @@ export function playSourceDraft(current: Draft | null, source: PlaySource): Draf
     return { ...next, lengthChoice: "longest", end: "" };
   }
   if (current.mode === "specific-file" && current.source === "youtube") {
-    return { ...next, lengthChoice: 60, end: endFromDuration(current.start, 60 * 60) };
+    return {
+      ...next,
+      lengthChoice: 60,
+      end: endFromDuration(current.start, 60 * 60),
+    };
   }
   return next;
 }

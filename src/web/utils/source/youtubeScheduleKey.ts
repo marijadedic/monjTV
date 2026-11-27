@@ -1,4 +1,7 @@
-import { canonicalYoutubeIntermission, parseYoutubeUrl } from "../../../shared/youtube.ts";
+import {
+  canonicalYoutubeIntermission,
+  parseYoutubeUrl,
+} from "../../../shared/youtube.ts";
 import { youtubeRefsOf } from "@utils/source/youtubeRefsOf.ts";
 import type { Schedule } from "../../../shared/types.ts";
 
@@ -16,7 +19,9 @@ export function youtubeScheduleKey(schedule: Schedule, extra = ""): string {
   for (const block of schedule.blocks) {
     const files =
       block.mode === "playlist"
-        ? (block.items ?? []).flatMap((item) => youtubeRefsOf(item.mode, item.folder, item.file))
+        ? (block.items ?? []).flatMap((item) =>
+            youtubeRefsOf(item.mode, item.folder, item.file),
+          )
         : youtubeRefsOf(block.mode, block.folder, block.file);
     for (const file of files) urls.add(file);
   }

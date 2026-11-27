@@ -2,7 +2,10 @@ import { itemCoversNow } from "../../../shared/window.ts";
 import { onNowPlanned } from "@utils/rundown/onNowPlanned.ts";
 import type { RundownItem } from "../../../shared/types.ts";
 
-export function heldItem(items: RundownItem[], sec: number): RundownItem | null {
+export function heldItem(
+  items: RundownItem[],
+  sec: number,
+): RundownItem | null {
   const winner = onNowPlanned(items, sec);
   if (!winner) return null;
   for (const item of items) {

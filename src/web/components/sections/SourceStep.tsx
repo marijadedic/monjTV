@@ -1,6 +1,9 @@
 import type { StateUpdater } from "preact/hooks";
 import type { SlotLength } from "../../../shared/types.ts";
-import { canonicalPlaylistUrl, parseYoutubeUrl } from "../../../shared/youtube.ts";
+import {
+  canonicalPlaylistUrl,
+  parseYoutubeUrl,
+} from "../../../shared/youtube.ts";
 import { useI18n } from "../../i18n.tsx";
 import { MANY_FILES } from "../../constants/manyFiles.ts";
 import type { Draft } from "../../types/Draft.ts";
@@ -82,11 +85,17 @@ export function SourceStep({
     setDraft((current) => {
       if (!current) return current;
       if (source === "longest") {
-        return current.lengthChoice === "longest" ? current : { ...current, lengthChoice: "longest", end: "" };
+        return current.lengthChoice === "longest"
+          ? current
+          : { ...current, lengthChoice: "longest", end: "" };
       }
       if (current.lengthChoice !== "longest") return current;
       const mins = 60;
-      return { ...current, lengthChoice: mins, end: endFromDuration(current.start, mins * 60) };
+      return {
+        ...current,
+        lengthChoice: mins,
+        end: endFromDuration(current.start, mins * 60),
+      };
     });
     setFieldError((current) => ({ ...current, time: undefined }));
   }
@@ -94,16 +103,24 @@ export function SourceStep({
   if (draft.mode === "playlist") return null;
   return (
     <div class="folder-block">
-      {(draft.mode === "specific-file" || draft.mode === "next-episode" || draft.mode === "random-file") && (
-        <SourcePick mode={draft.mode} source={draft.source} onPick={onPickSource} />
+      {(draft.mode === "specific-file" ||
+        draft.mode === "next-episode" ||
+        draft.mode === "random-file") && (
+        <SourcePick
+          mode={draft.mode}
+          source={draft.source}
+          onPick={onPickSource}
+        />
       )}
-      <span class="k">
-        {sourcePrompt(draft.mode, draft.source, t)}
-      </span>
+      <span class="k">{sourcePrompt(draft.mode, draft.source, t)}</span>
       {draft.source === "youtube" ? (
         <YoutubeField
           value={draft.mode === "specific-file" ? draft.file : draft.folder}
-          placeholder={draft.mode === "specific-file" ? t.youtubePlaceholder : t.youtubePlaylistPlaceholder}
+          placeholder={
+            draft.mode === "specific-file"
+              ? t.youtubePlaceholder
+              : t.youtubePlaylistPlaceholder
+          }
           invalid={Boolean(folderError)}
           onChange={changeYoutube}
         />
@@ -112,7 +129,11 @@ export function SourceStep({
           key={`${draft.mode}:${draft.source}`}
           kind={draft.mode === "specific-file" ? "video" : "folder"}
           value={draft.mode === "specific-file" ? draft.file : draft.folder}
-          placeholder={draft.mode === "specific-file" ? t.videoPlaceholder : t.folderPlaceholder}
+          placeholder={
+            draft.mode === "specific-file"
+              ? t.videoPlaceholder
+              : t.folderPlaceholder
+          }
           invalid={sourceMissing || Boolean(folderError)}
           actionLabel={picking ? t.choosing : t.browse}
           actionBusy={picking}
@@ -134,29 +155,41 @@ export function SourceStep({
         draft.mode === "specific-file" &&
         draft.file.trim() &&
         !parseYoutubeUrl(draft.file) &&
-        !folderError && <FieldNote>{t.error("Not a YouTube video URL")}</FieldNote>}
+        !folderError && (
+          <FieldNote>{t.error("Not a YouTube video URL")}</FieldNote>
+        )}
       {draft.source === "youtube" &&
         draft.mode !== "specific-file" &&
         draft.folder.trim() &&
         !canonicalPlaylistUrl(draft.folder) &&
-        !folderError && <FieldNote>{t.error("Not a YouTube playlist URL")}</FieldNote>}
+        !folderError && (
+          <FieldNote>{t.error("Not a YouTube playlist URL")}</FieldNote>
+        )}
       {sourceMissing && (
-        <FieldNote>{draft.mode === "specific-file" ? t.sourceMissingVideo : t.sourceMissingFolder}</FieldNote>
+        <FieldNote>
+          {draft.mode === "specific-file"
+            ? t.sourceMissingVideo
+            : t.sourceMissingFolder}
+        </FieldNote>
       )}
-      {!sourceMissing && folderError && <FieldNote>{t.error(folderError)}</FieldNote>}
+      {!sourceMissing && folderError && (
+        <FieldNote>{t.error(folderError)}</FieldNote>
+      )}
       {pathChosen && (
         <>
-          {draft.mode !== "next-episode" && !(draft.mode === "specific-file" && draft.source === "youtube") && (
-            <LengthMode
-              legend={t.slotDuration}
-              fixedOn={draft.lengthChoice !== "longest"}
-              longestOn={draft.lengthChoice === "longest"}
-              longestHint={t.findLongest}
-              onFixed={() => chooseLength("fixed")}
-              onLongest={() => chooseLength("longest")}
-            />
-          )}
-          {(draft.mode === "specific-file" && draft.source === "youtube") || draft.lengthChoice === "longest" ? (
+          {draft.mode !== "next-episode" &&
+            !(draft.mode === "specific-file" && draft.source === "youtube") && (
+              <LengthMode
+                legend={t.slotDuration}
+                fixedOn={draft.lengthChoice !== "longest"}
+                longestOn={draft.lengthChoice === "longest"}
+                longestHint={t.findLongest}
+                onFixed={() => chooseLength("fixed")}
+                onLongest={() => chooseLength("longest")}
+              />
+            )}
+          {(draft.mode === "specific-file" && draft.source === "youtube") ||
+          draft.lengthChoice === "longest" ? (
             measuring && pathChosen ? (
               <MeasureWait
                 label={
@@ -169,11 +202,19 @@ export function SourceStep({
                     </CloudHost>
                     <InfoButton
                       label={t.whySlow}
-                      tip={draft.source === "youtube" ? t.youtubeProbeCache : t.probeCache}
+                      tip={
+                        draft.source === "youtube"
+                          ? t.youtubeProbeCache
+                          : t.probeCache
+                      }
                     />
                   </>
                 }
-                note={draft.mode === "random-file" && fileCount > MANY_FILES ? t.manyFiles : undefined}
+                note={
+                  draft.mode === "random-file" && fileCount > MANY_FILES
+                    ? t.manyFiles
+                    : undefined
+                }
               />
             ) : length ? (
               <div class="picked">
@@ -181,12 +222,13 @@ export function SourceStep({
                   <span class="k">{t.slotDuration}</span>
                   <span class="value">{t.slotDurationOf(lengthMins)}</span>
                 </div>
-                {draft.source === "youtube" && draft.mode === "specific-file" && (
-                  <div>
-                    <span class="k">{t.youtube}</span>
-                    <span class="value">{length.title}</span>
-                  </div>
-                )}
+                {draft.source === "youtube" &&
+                  draft.mode === "specific-file" && (
+                    <div>
+                      <span class="k">{t.youtube}</span>
+                      <span class="value">{length.title}</span>
+                    </div>
+                  )}
                 {length.kind === "random" && (
                   <div>
                     <span class="k">{t.longestVideo}</span>
@@ -195,15 +237,22 @@ export function SourceStep({
                     </span>
                   </div>
                 )}
-                {length.kind === "random" && length.shortest && length.shortest.path !== length.path && (
-                  <div>
-                    <span class="k">{t.shortestVideo}</span>
-                    <span class="value">
-                      {length.shortest.title} ·{" "}
-                      {t.slotDurationOf(Math.max(1, Math.ceil(length.shortest.durationSec / 60)))}
-                    </span>
-                  </div>
-                )}
+                {length.kind === "random" &&
+                  length.shortest &&
+                  length.shortest.path !== length.path && (
+                    <div>
+                      <span class="k">{t.shortestVideo}</span>
+                      <span class="value">
+                        {length.shortest.title} ·{" "}
+                        {t.slotDurationOf(
+                          Math.max(
+                            1,
+                            Math.ceil(length.shortest.durationSec / 60),
+                          ),
+                        )}
+                      </span>
+                    </div>
+                  )}
               </div>
             ) : null
           ) : (
@@ -214,15 +263,19 @@ export function SourceStep({
                 customMin={draft.customMin}
                 lengthCh={lengthCh}
                 onChoice={(value) =>
-                  setDraft((current) => (current ? { ...current, lengthChoice: value } : current))
+                  setDraft((current) =>
+                    current ? { ...current, lengthChoice: value } : current,
+                  )
                 }
                 onCustom={(value) =>
-                  setDraft((current) => (current ? { ...current, customMin: value } : current))
+                  setDraft((current) =>
+                    current ? { ...current, customMin: value } : current,
+                  )
                 }
               />
-              {draft.lengthChoice === "custom" && draft.customMin.trim() !== "" && fixedMin === null && (
-                <FieldNote>{t.needMinutes}</FieldNote>
-              )}
+              {draft.lengthChoice === "custom" &&
+                draft.customMin.trim() !== "" &&
+                fixedMin === null && <FieldNote>{t.needMinutes}</FieldNote>}
             </div>
           )}
         </>

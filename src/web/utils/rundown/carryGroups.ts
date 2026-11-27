@@ -2,7 +2,9 @@ import type { RundownItem } from "../../../shared/types.ts";
 import { secondsOf } from "../../../shared/window.ts";
 
 // Overnight rows of one slot, with the latest real end.
-export function carryGroups(items: RundownItem[]): { id: string; until: string; rows: RundownItem[] }[] {
+export function carryGroups(
+  items: RundownItem[],
+): { id: string; until: string; rows: RundownItem[] }[] {
   const order: string[] = [];
   const map = new Map<string, RundownItem[]>();
   for (const item of items) {

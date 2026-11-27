@@ -1,6 +1,11 @@
 import { playlistMinutesOn } from "../../../shared/placed.ts";
 import type { Day, ScheduleBlock, TvBoard } from "../../../shared/types.ts";
-import { DAY_MINUTES, lengthMinutes, nextDay, windowOn } from "../../../shared/window.ts";
+import {
+  DAY_MINUTES,
+  lengthMinutes,
+  nextDay,
+  windowOn,
+} from "../../../shared/window.ts";
 import type { Draft } from "../../types/Draft.ts";
 import { draftSpanMin } from "@utils/length/draftSpanMin.ts";
 import { startOnDraft } from "@utils/week/startOnDraft.ts";
@@ -14,12 +19,25 @@ export function ghostsOn(
 ): { start: number; end: number; continues: boolean; spill: boolean }[] {
   const span = draftSpanMin(draft);
   if (span < 1) return [];
-  const saved = draft.id ? blocks.find((block) => block.id === draft.id) : undefined;
-  const shown = saved ? (playlistMinutesOn(saved, draft.origin, board) ?? lengthMinutes(saved)) : 0;
-  if (saved && windowOn(saved, draft.origin).start === draft.start && shown === span) {
+  const saved = draft.id
+    ? blocks.find((block) => block.id === draft.id)
+    : undefined;
+  const shown = saved
+    ? (playlistMinutesOn(saved, draft.origin, board) ?? lengthMinutes(saved))
+    : 0;
+  if (
+    saved &&
+    windowOn(saved, draft.origin).start === draft.start &&
+    shown === span
+  ) {
     return [];
   }
-  const out: { start: number; end: number; continues: boolean; spill: boolean }[] = [];
+  const out: {
+    start: number;
+    end: number;
+    continues: boolean;
+    spill: boolean;
+  }[] = [];
   for (const air of draft.days) {
     const start = toMin(startOnDraft(draft, air));
     if (day === air) {
@@ -32,7 +50,8 @@ export function ghostsOn(
     }
     if (day === nextDay(air)) {
       const leftover = start + span - DAY_MINUTES;
-      if (leftover > 0) out.push({ start: 0, end: leftover, continues: false, spill: true });
+      if (leftover > 0)
+        out.push({ start: 0, end: leftover, continues: false, spill: true });
     }
   }
   return out;

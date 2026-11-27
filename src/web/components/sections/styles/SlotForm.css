@@ -20,7 +20,8 @@
   z-index: 23;
   width: min(22rem, calc(100% - 48px));
 }
-.add-form.gap-form .custom, .add-form.gap-form .actions {
+.add-form.gap-form .custom,
+.add-form.gap-form .actions {
   width: 100%;
 }
 .add-form header {
@@ -91,7 +92,8 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .step-body.slide-next, .step-body.slide-back {
+  .step-body.slide-next,
+  .step-body.slide-back {
     animation: none;
   }
 }

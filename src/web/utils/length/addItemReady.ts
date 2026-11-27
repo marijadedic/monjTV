@@ -12,7 +12,9 @@ export function addItemReady(
 
   if (draft.addMode === "random-file" && draft.addLengthChoice !== "longest") {
     const folder =
-      draft.addSource === "youtube" ? canonicalPlaylistUrl(draft.addFolder) : draft.addFolder.trim();
+      draft.addSource === "youtube"
+        ? canonicalPlaylistUrl(draft.addFolder)
+        : draft.addFolder.trim();
     return Boolean(folder) && addFixedMinutes(draft) != null;
   }
 

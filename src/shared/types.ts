@@ -1,7 +1,11 @@
 export const DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 export type Day = (typeof DAYS)[number];
 
-export const ITEM_MODES = ["next-episode", "random-file", "specific-file"] as const;
+export const ITEM_MODES = [
+  "next-episode",
+  "random-file",
+  "specific-file",
+] as const;
 export type ItemMode = (typeof ITEM_MODES)[number];
 
 export const BLOCK_MODES = [...ITEM_MODES, "playlist"] as const;
@@ -49,7 +53,9 @@ export interface ScheduleBlock {
 export const INTERMISSION_KINDS = ["folder", "video", "youtube"] as const;
 export type IntermissionKind = (typeof INTERMISSION_KINDS)[number];
 
-export function isIntermissionKind(value: string | undefined): value is IntermissionKind {
+export function isIntermissionKind(
+  value: string | undefined,
+): value is IntermissionKind {
   return INTERMISSION_KINDS.includes(value as IntermissionKind);
 }
 

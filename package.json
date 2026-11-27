@@ -10,6 +10,8 @@
     "start": "npm run build && npm run start:server",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "desktop": "node scripts/install-desktop.mjs"
   },
@@ -18,7 +20,9 @@
     "@types/node": "^26.6.5",
     "concurrently": "^10.0.6",
     "eslint": "^10.15.0",
+    "eslint-config-prettier": "^10.1.9",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "prettier": "^3.10.1",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.74.0"
   },

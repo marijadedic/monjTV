@@ -48,7 +48,8 @@ function isRunning(name: string): boolean {
 function run(file: string, args: string[], timeout: number): Promise<void> {
   return new Promise((resolve) => {
     execFile(file, args, { timeout }, (err, _stdout, stderr) => {
-      if (err) console.error(`close tab: ${err.message} ${stderr ?? ""}`.trim());
+      if (err)
+        console.error(`close tab: ${err.message} ${stderr ?? ""}`.trim());
       resolve();
     });
   });
@@ -91,7 +92,11 @@ public class MonjTabs {
   return run(powershell, ["-NoProfile", "-STA", "-Command", script], 8000);
 }
 
-function output(file: string, args: string[], timeout: number): Promise<string> {
+function output(
+  file: string,
+  args: string[],
+  timeout: number,
+): Promise<string> {
   return new Promise((resolve) => {
     execFile(file, args, { timeout, encoding: "utf8" }, (err, stdout) => {
       resolve(err ? "" : String(stdout ?? "").trim());
@@ -115,7 +120,14 @@ end tell`,
   );
   const [app = "", title = ""] = info.split("\n");
   if (!focusedMonjTab(app, title)) return;
-  await run("osascript", ["-e", 'tell application "System Events" to keystroke "w" using command down'], 3000);
+  await run(
+    "osascript",
+    [
+      "-e",
+      'tell application "System Events" to keystroke "w" using command down',
+    ],
+    3000,
+  );
 }
 
 // Ask each running Mac browser to close tabs pointed at this app.

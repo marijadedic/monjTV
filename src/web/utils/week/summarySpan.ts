@@ -13,7 +13,12 @@ export function summaryEnd(
   if (draft.mode === "playlist") {
     if (stackSec != null) return endFace(draft.start, stackSec);
     if (draft.end) return draft.end;
-    if (painted && startOnDraft(draft, draft.origin) === painted.start && painted.end) return painted.end;
+    if (
+      painted &&
+      startOnDraft(draft, draft.origin) === painted.start &&
+      painted.end
+    )
+      return painted.end;
     return "/";
   }
 
@@ -27,7 +32,8 @@ export function summaryMinutes(
   activeSec: number,
   fixedMin: number | null,
 ): number | null {
-  if (draft.mode === "playlist" && stackSec != null) return Math.max(1, Math.ceil(stackSec / 60));
+  if (draft.mode === "playlist" && stackSec != null)
+    return Math.max(1, Math.ceil(stackSec / 60));
   if (activeSec) return Math.max(1, Math.ceil(activeSec / 60));
   return fixedMin;
 }
@@ -39,6 +45,7 @@ export function summaryLength(
   label: (mins: number) => string,
 ): string {
   if (minutes != null && minutes > 0) return label(minutes);
-  if (end && end !== "/") return label(Math.max(1, toMin(end) - toMin(draft.start)));
+  if (end && end !== "/")
+    return label(Math.max(1, toMin(end) - toMin(draft.start)));
   return "";
 }

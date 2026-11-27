@@ -33,6 +33,7 @@
   color: var(--text);
   font-weight: 500;
 }
-.path-suggest button:hover, .path-suggest button.on {
+.path-suggest button:hover,
+.path-suggest button.on {
   background: var(--browse-hover);
 }

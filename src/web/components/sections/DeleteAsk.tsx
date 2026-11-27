@@ -17,14 +17,25 @@ export function DeleteAsk({
 }) {
   const { t } = useI18n();
   return (
-    <div class="ask" role="alertdialog" aria-modal="true" aria-labelledby="delete-ask">
+    <div
+      class="ask"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="delete-ask"
+    >
       <div class="ask-card">
         <p id="delete-ask">{t.deleteAsk}</p>
         <div class="actions">
           <button type="button" onClick={onKeep}>
             {t.keepSlot}
           </button>
-          <ActionButton className="danger" working={working} busy={busy} disabled={disabled} onClick={onDelete}>
+          <ActionButton
+            className="danger"
+            working={working}
+            busy={busy}
+            disabled={disabled}
+            onClick={onDelete}
+          >
             {t.deleteSlot}
           </ActionButton>
         </div>

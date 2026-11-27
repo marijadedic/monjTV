@@ -13,6 +13,8 @@ export function playlistGridLine(
   const kind = modeLabel(item.mode, t);
   const name = playlistGridName(item, titles);
   const shown =
-    item.mode === "specific-file" || canonicalPlaylistUrl(item.folder) ? clipLabel(name) : name;
+    item.mode === "specific-file" || canonicalPlaylistUrl(item.folder)
+      ? clipLabel(name)
+      : name;
   return `${kind} - ${shown}`;
 }

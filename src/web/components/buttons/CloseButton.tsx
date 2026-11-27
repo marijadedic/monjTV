@@ -14,7 +14,14 @@ export function CloseButton({
   onClick: () => void;
 }) {
   return (
-    <button type="button" class="x" aria-label={label} title={title} disabled={disabled} onClick={onClick}>
+    <button
+      type="button"
+      class="x"
+      aria-label={label}
+      title={title}
+      disabled={disabled}
+      onClick={onClick}
+    >
       {children}
     </button>
   );

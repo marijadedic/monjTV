@@ -11,6 +11,7 @@ export function addSeconds(
     const mins = addFixedMinutes(draft);
     return mins ? mins * 60 : null;
   }
-  if (measured?.key === measureKey(draft) && measured.length) return measured.length.durationSec;
+  if (measured?.key === measureKey(draft) && measured.length)
+    return measured.length.durationSec;
   return null;
 }

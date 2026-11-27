@@ -21,7 +21,15 @@ describe("later airings follow the episode this day used", () => {
     const saved = structuredClone(progress);
     notePicks(
       progress,
-      [row({ blockId: "serial", path: episode("01"), mode: "next-episode", folder, start: "18:00" })],
+      [
+        row({
+          blockId: "serial",
+          path: episode("01"),
+          mode: "next-episode",
+          folder,
+          start: "18:00",
+        }),
+      ],
       week([show]),
     );
     assert.deepEqual(progress, saved);
@@ -30,23 +38,49 @@ describe("later airings follow the episode this day used", () => {
   it("gives the next slot the following episode", () => {
     const noted = notePicks(
       emptyProgress(),
-      [row({ blockId: "serial", path: episode("01"), mode: "next-episode", folder, start: "18:00" })],
+      [
+        row({
+          blockId: "serial",
+          path: episode("01"),
+          mode: "next-episode",
+          folder,
+          start: "18:00",
+        }),
+      ],
       week([show]),
     );
-    assert.equal(nextEpisode(files, noted.lastCompleted[folder]), episode("02"));
+    assert.equal(
+      nextEpisode(files, noted.lastCompleted[folder]),
+      episode("02"),
+    );
   });
 
   it("plays two slots of the same show on one day as consecutive episodes", () => {
     const noted = notePicks(
       emptyProgress(),
       [
-        row({ blockId: "serial", path: episode("01"), mode: "next-episode", folder, start: "18:00" }),
-        row({ blockId: "serial", path: episode("02"), mode: "next-episode", folder, start: "20:00" }),
+        row({
+          blockId: "serial",
+          path: episode("01"),
+          mode: "next-episode",
+          folder,
+          start: "18:00",
+        }),
+        row({
+          blockId: "serial",
+          path: episode("02"),
+          mode: "next-episode",
+          folder,
+          start: "20:00",
+        }),
       ],
       week([show]),
     );
     assert.equal(noted.lastCompleted[folder], episode("02"));
-    assert.equal(nextEpisode(files, noted.lastCompleted[folder]), episode("03"));
+    assert.equal(
+      nextEpisode(files, noted.lastCompleted[folder]),
+      episode("03"),
+    );
   });
 
   it("does not use up an episode that was skipped", () => {
@@ -65,7 +99,10 @@ describe("later airings follow the episode this day used", () => {
       week([show]),
     );
     assert.equal(noted.lastCompleted[folder], undefined);
-    assert.equal(nextEpisode(files, noted.lastCompleted[folder]), episode("01"));
+    assert.equal(
+      nextEpisode(files, noted.lastCompleted[folder]),
+      episode("01"),
+    );
   });
 
   it("leaves yesterday's leftover out of the episode this day completed", () => {
@@ -82,7 +119,10 @@ describe("later airings follow the episode this day used", () => {
 
     const counted = notePicks(emptyProgress(), [leftover], week([show]), true);
     assert.equal(counted.lastCompleted[folder], episode("01"));
-    assert.equal(nextEpisode(files, counted.lastCompleted[folder]), episode("02"));
+    assert.equal(
+      nextEpisode(files, counted.lastCompleted[folder]),
+      episode("02"),
+    );
   });
 
   it("remembers a random movie that was placed, and not one that was skipped", () => {
@@ -90,7 +130,14 @@ describe("later airings follow the episode this day used", () => {
     const movie = block({ id: "movie", folder: films, mode: "random-file" });
     const placed = notePicks(
       emptyProgress(),
-      [row({ blockId: "movie", path: `${films}/a.mkv`, mode: "random-file", folder: films })],
+      [
+        row({
+          blockId: "movie",
+          path: `${films}/a.mkv`,
+          mode: "random-file",
+          folder: films,
+        }),
+      ],
       week([movie]),
     );
     assert.deepEqual(placed.recentRandom[films], [`${films}/a.mkv`]);

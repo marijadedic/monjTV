@@ -2,7 +2,14 @@
 import { randomUUID } from "node:crypto";
 import { GRACE_SEC, MIN_REMAINING_SEC } from "../../shared/constants.ts";
 import { weekdayOfKey } from "../../shared/dates.ts";
-import type { Day, DayRundown, ItemMode, RundownItem, Schedule, ScheduleBlock } from "../../shared/types.ts";
+import type {
+  Day,
+  DayRundown,
+  ItemMode,
+  RundownItem,
+  Schedule,
+  ScheduleBlock,
+} from "../../shared/types.ts";
 import {
   DAY_SECONDS,
   itemCoversNow,
@@ -16,7 +23,10 @@ import { formatHm, parseHm } from "../clock/clock.ts";
 import { nameOf } from "./media.ts";
 
 // Folder a next-episode row walks, from the row or its slot.
-export function seriesFolder(item: RundownItem, schedule: Schedule): string | undefined {
+export function seriesFolder(
+  item: RundownItem,
+  schedule: Schedule,
+): string | undefined {
   if (item.mode !== "next-episode") return undefined;
   if (item.folder) return item.folder;
   const block = schedule.blocks.find((entry) => entry.id === item.blockId);
@@ -30,19 +40,30 @@ export function sourceFolder(item: RundownItem, block: ScheduleBlock): string {
 }
 
 // Seconds after midnight this block still occupies, from its files or its window.
-export function blockLeftoverSec(block: ScheduleBlock, day: Day, items: RundownItem[]): number {
+export function blockLeftoverSec(
+  block: ScheduleBlock,
+  day: Day,
+  items: RundownItem[],
+): number {
   const placed = windowOn(block, day);
   if (block.mode !== "playlist") return leftoverMin(placed) * 60;
   let leftover = 0;
   for (const item of items) {
     if (item.blockId !== block.id || item.overnight) continue;
-    leftover = Math.max(leftover, parseHm(item.start) + item.durationSec - DAY_SECONDS);
+    leftover = Math.max(
+      leftover,
+      parseHm(item.start) + item.durationSec - DAY_SECONDS,
+    );
   }
   return Math.max(0, leftover);
 }
 
 // True when this leftover is on now, or still starts later tonight.
-export function leftoverStillActive(item: RundownItem, now: number, leftoverEndSec: number): boolean {
+export function leftoverStillActive(
+  item: RundownItem,
+  now: number,
+  leftoverEndSec: number,
+): boolean {
   if (itemCoversNow(item, now)) return true;
   const start = parseHm(item.start);
   return start < leftoverEndSec && start > now;
@@ -63,7 +84,10 @@ export function leftoverCarry(
     const leftoverSec = blockLeftoverSec(block, yesterday, items);
     if (leftoverSec <= 0) continue;
     const leftover = { ...item, overnight: true };
-    if (item.status === "playing" || leftoverStillActive(leftover, now, leftoverSec)) {
+    if (
+      item.status === "playing" ||
+      leftoverStillActive(leftover, now, leftoverSec)
+    ) {
       out.push(leftover);
     }
   }
@@ -86,23 +110,36 @@ export function sortRundown(items: RundownItem[]): RundownItem[] {
 }
 
 // Saved rows for this slot on this day, not the leftover from yesterday.
-export function keptForBlock(existing: DayRundown | undefined, blockId: string): RundownItem[] {
+export function keptForBlock(
+  existing: DayRundown | undefined,
+  blockId: string,
+): RundownItem[] {
   if (!existing) return [];
-  return sortRundown(existing.items).filter((item) => item.blockId === blockId && !item.overnight);
+  return sortRundown(existing.items).filter(
+    (item) => item.blockId === blockId && !item.overnight,
+  );
 }
 
 // Put yesterday's leftover ahead of today's own rows for those slots.
-export function mergeOvernight(built: RundownItem[], carry: RundownItem[]): RundownItem[] {
+export function mergeOvernight(
+  built: RundownItem[],
+  carry: RundownItem[],
+): RundownItem[] {
   if (carry.length === 0) return built;
   const carriedBlocks = new Set(carry.map((item) => item.blockId));
   return sortRundown([
     ...carry,
-    ...built.filter((item) => !item.overnight || !carriedBlocks.has(item.blockId)),
+    ...built.filter(
+      (item) => !item.overnight || !carriedBlocks.has(item.blockId),
+    ),
   ]);
 }
 
 // Next file after the last completed one, wrapping to the start.
-export function nextFrom(files: string[], lastCompleted?: string): string | null {
+export function nextFrom(
+  files: string[],
+  lastCompleted?: string,
+): string | null {
   if (files.length === 0) return null;
   if (!lastCompleted) return files[0];
   const idx = files.indexOf(lastCompleted);
@@ -116,9 +153,15 @@ export function makeItem(
   file: string,
   startSec: number,
   durationSec: number,
-  extra?: { title?: string; mode?: ItemMode; folder?: string; entryId?: string },
+  extra?: {
+    title?: string;
+    mode?: ItemMode;
+    folder?: string;
+    entryId?: string;
+  },
 ): RundownItem {
-  const mode = extra?.mode ?? (block.mode === "playlist" ? "specific-file" : block.mode);
+  const mode =
+    extra?.mode ?? (block.mode === "playlist" ? "specific-file" : block.mode);
   return {
     id: randomUUID(),
     blockId: block.id,
@@ -140,7 +183,10 @@ export function coversNow(item: RundownItem, now: number): boolean {
 }
 
 // Planned file the clock is inside. A later start wins when two windows overlap.
-export function onAirItem(items: RundownItem[], now: number): RundownItem | null {
+export function onAirItem(
+  items: RundownItem[],
+  now: number,
+): RundownItem | null {
   let chosen: RundownItem | null = null;
   for (const item of items) {
     if (item.status !== "planned") continue;
@@ -171,11 +217,15 @@ export function maxPlayableSec(slotSec: number): number {
 }
 
 // The part of the previous day that is still on after midnight.
-export function plannedSpill(previous: DayRundown, schedule: Schedule): RundownItem[] {
+export function plannedSpill(
+  previous: DayRundown,
+  schedule: Schedule,
+): RundownItem[] {
   const day = weekdayOfKey(previous.date);
   const out: RundownItem[] = [];
   for (const item of previous.items) {
-    if (item.overnight || item.status === "done" || item.status === "skipped") continue;
+    if (item.overnight || item.status === "done" || item.status === "skipped")
+      continue;
     const block = schedule.blocks.find((entry) => entry.id === item.blockId);
     if (!block?.days.includes(day)) continue;
     if (blockLeftoverSec(block, day, previous.items) <= 0) continue;
@@ -186,10 +236,17 @@ export function plannedSpill(previous: DayRundown, schedule: Schedule): RundownI
 }
 
 // Recalculate start and end times for every item in a block.
-export function recomputeBlockTimes(rundown: DayRundown, block: ScheduleBlock): void {
+export function recomputeBlockTimes(
+  rundown: DayRundown,
+  block: ScheduleBlock,
+): void {
   const day = weekdayOfKey(rundown.date);
-  const overnight = rundown.items.filter((item) => item.blockId === block.id && item.overnight);
-  const todayItems = rundown.items.filter((item) => item.blockId === block.id && !item.overnight);
+  const overnight = rundown.items.filter(
+    (item) => item.blockId === block.id && item.overnight,
+  );
+  const todayItems = rundown.items.filter(
+    (item) => item.blockId === block.id && !item.overnight,
+  );
   if (overnight.length) {
     let cursor = parseHm(windowOn(block, prevDay(day)).start);
     for (const item of overnight) {
@@ -214,6 +271,9 @@ export function tightestSlotSec(block: ScheduleBlock): number {
 }
 
 // Schedule block with the given id.
-export function findBlock(schedule: Schedule, blockId: string): ScheduleBlock | undefined {
+export function findBlock(
+  schedule: Schedule,
+  blockId: string,
+): ScheduleBlock | undefined {
   return schedule.blocks.find((b) => b.id === blockId);
 }

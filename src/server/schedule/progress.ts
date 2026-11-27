@@ -1,7 +1,15 @@
 // Episodes finished and movies recently played.
 import path from "node:path";
-import type { Progress, RecentPlays, ScheduleBlock } from "../../shared/types.ts";
-import { canonicalPlaylistUrl, isYoutubeUrl, youtubeLabel } from "../../shared/youtube.ts";
+import type {
+  Progress,
+  RecentPlays,
+  ScheduleBlock,
+} from "../../shared/types.ts";
+import {
+  canonicalPlaylistUrl,
+  isYoutubeUrl,
+  youtubeLabel,
+} from "../../shared/youtube.ts";
 import { foldersOf } from "./schedule.ts";
 import { titleFromPath, listVideos } from "../files/files.ts";
 import { progressPath } from "../data/paths.ts";
@@ -25,7 +33,10 @@ export async function saveProgress(progress: Progress): Promise<void> {
 }
 
 // Remember the last finished episode in a folder.
-export async function markEpisodeDone(folder: string, filePath: string): Promise<void> {
+export async function markEpisodeDone(
+  folder: string,
+  filePath: string,
+): Promise<void> {
   const progress = await loadProgress();
   progress.lastCompleted[folder] = filePath;
   await saveProgress(progress);
@@ -62,11 +73,20 @@ export function noteRandom(recent: string[], file: string): string[] {
 }
 
 // Remember a play. A finished pass keeps every file, and the next play opens a new pass.
-export function rememberRandom(recent: string[], file: string, files: readonly string[]): string[] {
+export function rememberRandom(
+  recent: string[],
+  file: string,
+  files: readonly string[],
+): string[] {
   const live = new Set(files);
-  const previous = new Set(recent.filter((entry) => live.size === 0 || live.has(entry)));
-  if (live.size > 0 && files.every((entry) => previous.has(entry))) return [file];
-  const kept = recent.filter((entry) => entry !== file && (live.size === 0 || live.has(entry)));
+  const previous = new Set(
+    recent.filter((entry) => live.size === 0 || live.has(entry)),
+  );
+  if (live.size > 0 && files.every((entry) => previous.has(entry)))
+    return [file];
+  const kept = recent.filter(
+    (entry) => entry !== file && (live.size === 0 || live.has(entry)),
+  );
   return [file, ...kept];
 }
 
@@ -84,7 +104,10 @@ async function filesForProgress(folder: string): Promise<string[]> {
 }
 
 // Record a random play through the whole folder before anything in it repeats.
-export async function markRandomPlayed(folder: string, filePath: string): Promise<void> {
+export async function markRandomPlayed(
+  folder: string,
+  filePath: string,
+): Promise<void> {
   const progress = await loadProgress();
   const files = await filesForProgress(folder);
   const prev = progress.recentRandom[folder] ?? [];
@@ -96,13 +119,16 @@ export async function markRandomPlayed(folder: string, filePath: string): Promis
 
 // Playlist title, or the last part of a local folder path.
 function recentFolderName(folder: string): string {
-  if (canonicalPlaylistUrl(folder)) return cachedYoutubeTitle(folder) ?? youtubeLabel(folder);
+  if (canonicalPlaylistUrl(folder))
+    return cachedYoutubeTitle(folder) ?? youtubeLabel(folder);
   return path.basename(folder) || folder;
 }
 
 // Shape the saved skip lists for the options window.
 function presentRecent(progress: Progress): RecentPlays {
-  const entries = Object.entries(progress.recentRandom).filter(([, files]) => files.length > 0);
+  const entries = Object.entries(progress.recentRandom).filter(
+    ([, files]) => files.length > 0,
+  );
   const names = entries.map(([folder]) => recentFolderName(folder));
   const folders = entries
     .map(([folder, files], index) => {
@@ -128,7 +154,12 @@ function presentRecent(progress: Progress): RecentPlays {
         }),
       };
     })
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
+    .sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      }),
+    );
   return { folders };
 }
 
@@ -153,7 +184,10 @@ export async function forgetRandomPath(filePath: string): Promise<RecentPlays> {
 }
 
 // Drop one file from a folder's recent list so a random slot can pick it again.
-export async function forgetRandomPlayed(folder: string, filePath: string): Promise<RecentPlays> {
+export async function forgetRandomPlayed(
+  folder: string,
+  filePath: string,
+): Promise<RecentPlays> {
   const progress = await loadProgress();
   const prev = progress.recentRandom[folder];
   if (prev?.includes(filePath)) {

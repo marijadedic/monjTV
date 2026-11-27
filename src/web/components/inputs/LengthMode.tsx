@@ -24,8 +24,18 @@ export function LengthMode({
     <fieldset class="source">
       <legend class="k">{legend}</legend>
       <div class="source-grid" role="radiogroup" aria-label={legend}>
-        <ModeOption pressed={fixedOn} title={t.fixedLength} hint={t.standardSlot} onPick={onFixed} />
-        <ModeOption pressed={longestOn} title={t.longestFile} hint={longestHint} onPick={onLongest} />
+        <ModeOption
+          pressed={fixedOn}
+          title={t.fixedLength}
+          hint={t.standardSlot}
+          onPick={onFixed}
+        />
+        <ModeOption
+          pressed={longestOn}
+          title={t.longestFile}
+          hint={longestHint}
+          onPick={onLongest}
+        />
         {info}
       </div>
     </fieldset>

@@ -1,3 +1,4 @@
-.day-start .when-row, .day-start .when-note {
+.day-start .when-row,
+.day-start .when-note {
   grid-column: 1 / -1;
 }

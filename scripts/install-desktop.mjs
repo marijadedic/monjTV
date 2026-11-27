@@ -2,7 +2,14 @@
 // Detect the OS and install a desktop icon that starts this checkout.
 
 import { execFileSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { mkdtempSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -38,11 +45,41 @@ export function renderIconPng(size, { fullBleed = false } = {}) {
   const body = fullBleed
     ? { x: 0, y: 0, w: s, h: s, r: s * 0.225 }
     : { x: s * 0.08, y: s * 0.08, w: s * 0.84, h: s * 0.84, r: s * 0.2 };
-  const bezel = { x: s * 0.18, y: s * 0.16, w: s * 0.64, h: s * 0.5, r: s * 0.07 };
-  const screen = { x: s * 0.22, y: s * 0.2, w: s * 0.56, h: s * 0.42, r: s * 0.05 };
-  const bar = { x: s * 0.3, y: s * 0.48, w: s * 0.4, h: Math.max(2, s * 0.035), r: s * 0.02 };
-  const neck = { x: s * 0.42, y: s * 0.7, w: s * 0.16, h: s * 0.08, r: s * 0.02 };
-  const foot = { x: s * 0.3, y: s * 0.76, w: s * 0.4, h: Math.max(3, s * 0.045), r: s * 0.022 };
+  const bezel = {
+    x: s * 0.18,
+    y: s * 0.16,
+    w: s * 0.64,
+    h: s * 0.5,
+    r: s * 0.07,
+  };
+  const screen = {
+    x: s * 0.22,
+    y: s * 0.2,
+    w: s * 0.56,
+    h: s * 0.42,
+    r: s * 0.05,
+  };
+  const bar = {
+    x: s * 0.3,
+    y: s * 0.48,
+    w: s * 0.4,
+    h: Math.max(2, s * 0.035),
+    r: s * 0.02,
+  };
+  const neck = {
+    x: s * 0.42,
+    y: s * 0.7,
+    w: s * 0.16,
+    h: s * 0.08,
+    r: s * 0.02,
+  };
+  const foot = {
+    x: s * 0.3,
+    y: s * 0.76,
+    w: s * 0.4,
+    h: Math.max(3, s * 0.045),
+    r: s * 0.022,
+  };
   const sunX = s * 0.36;
   const sunY = s * 0.33;
   const sunR = s * 0.055;
@@ -57,7 +94,12 @@ export function renderIconPng(size, { fullBleed = false } = {}) {
       put(x, y, CREAM, cover(sdRoundBox(px, py, foot)));
       put(x, y, CREAM, cover(sdRoundBox(px, py, bezel)));
       put(x, y, INK, screenCover);
-      put(x, y, GOLD, Math.min(cover(Math.hypot(px - sunX, py - sunY) - sunR), screenCover));
+      put(
+        x,
+        y,
+        GOLD,
+        Math.min(cover(Math.hypot(px - sunX, py - sunY) - sunR), screenCover),
+      );
       put(x, y, GOLD, Math.min(cover(sdRoundBox(px, py, bar)), screenCover));
     }
   }
@@ -82,7 +124,9 @@ export function installLinux(png, home = os.homedir()) {
     writeFileSync(desktopPath, entry);
     chmodSync(desktopPath, 0o755);
     try {
-      execFileSync("gio", ["set", desktopPath, "metadata::trusted", "true"], { stdio: "ignore" });
+      execFileSync("gio", ["set", desktopPath, "metadata::trusted", "true"], {
+        stdio: "ignore",
+      });
     } catch {
       // Raspberry Pi OS trusts an executable .desktop file without gio.
     }
@@ -96,7 +140,10 @@ export function installLinux(png, home = os.homedir()) {
 }
 
 // macOS gets an app bundle on the Desktop. The Dock does not read .desktop files.
-export function installDarwin(masterPng, desktopDir = path.join(os.homedir(), "Desktop")) {
+export function installDarwin(
+  masterPng,
+  desktopDir = path.join(os.homedir(), "Desktop"),
+) {
   mkdirSync(desktopDir, { recursive: true });
   const appPath = path.join(desktopDir, "monjTV.app");
   rmSync(appPath, { recursive: true, force: true });
@@ -110,14 +157,21 @@ export function installDarwin(masterPng, desktopDir = path.join(os.homedir(), "D
     iconFile = "monjtv";
   } catch (err) {
     const detail = err instanceof Error ? err.message.split("\n")[0] : "";
-    console.error(`The app uses the generic icon.${detail ? ` ${detail}` : ""}`);
+    console.error(
+      `The app uses the generic icon.${detail ? ` ${detail}` : ""}`,
+    );
   }
-  writeFileSync(path.join(appPath, "Contents", "Info.plist"), infoPlist(iconFile));
+  writeFileSync(
+    path.join(appPath, "Contents", "Info.plist"),
+    infoPlist(iconFile),
+  );
   const exe = path.join(macOsDir, "monjtv");
   writeFileSync(exe, macLauncher());
   chmodSync(exe, 0o755);
   try {
-    execFileSync("codesign", ["--force", "--sign", "-", appPath], { stdio: "ignore" });
+    execFileSync("codesign", ["--force", "--sign", "-", appPath], {
+      stdio: "ignore",
+    });
   } catch {
     // A local bundle can launch without an ad-hoc signature.
   }
@@ -135,7 +189,9 @@ const ok = $.NSWorkspace.sharedWorkspace.setIconForFileOptions(image, ${JSON.str
 if (!ok) throw new Error("setIcon");
 `;
   try {
-    execFileSync("osascript", ["-l", "JavaScript", "-e", source], { stdio: "pipe" });
+    execFileSync("osascript", ["-l", "JavaScript", "-e", source], {
+      stdio: "pipe",
+    });
   } catch (err) {
     const detail = err instanceof Error ? err.message.split("\n")[0] : "";
     console.error(`Finder kept the plain icon.${detail ? ` ${detail}` : ""}`);
@@ -143,7 +199,11 @@ if (!ok) throw new Error("setIcon");
 }
 
 // Windows gets a shortcut whose icon is stored beside the launcher script it runs.
-export function installWindows(png, desktopDir, localAppData = process.env.LOCALAPPDATA) {
+export function installWindows(
+  png,
+  desktopDir,
+  localAppData = process.env.LOCALAPPDATA,
+) {
   const dir = path.join(localAppData, "monjTV");
   mkdirSync(dir, { recursive: true });
   mkdirSync(desktopDir, { recursive: true });
@@ -171,13 +231,23 @@ export function installWindows(png, desktopDir, localAppData = process.env.LOCAL
   ]
     .map(winArg)
     .join(" ");
-  const script = shortcutScript(lnkPath, powershell, args, root, `${icoPath},0`);
+  const script = shortcutScript(
+    lnkPath,
+    powershell,
+    args,
+    root,
+    `${icoPath},0`,
+  );
   const file = path.join(os.tmpdir(), `monjtv-shortcut-${process.pid}.ps1`);
   writeFileSync(file, script);
   try {
-    execFileSync(powershell, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", file], {
-      stdio: "inherit",
-    });
+    execFileSync(
+      powershell,
+      ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", file],
+      {
+        stdio: "inherit",
+      },
+    );
   } finally {
     rmSync(file, { force: true });
   }
@@ -252,7 +322,9 @@ function isWsl() {
 function osLabel() {
   if (process.platform !== "linux") return process.platform;
   try {
-    const model = readFileSync("/proc/device-tree/model", "utf8").replaceAll("\0", "").trim();
+    const model = readFileSync("/proc/device-tree/model", "utf8")
+      .replaceAll("\0", "")
+      .trim();
     if (/raspberry pi/i.test(model)) return model;
   } catch {
     // Desktops other than the Pi have no device-tree model.
@@ -266,7 +338,9 @@ function linuxDesktopDir(home) {
     const text = readFileSync(config, "utf8");
     const match = text.match(/^XDG_DESKTOP_DIR="([^"]*)"/m);
     if (match) {
-      const dir = match[1].replaceAll("${HOME}", home).replaceAll("$HOME", home);
+      const dir = match[1]
+        .replaceAll("${HOME}", home)
+        .replaceAll("$HOME", home);
       if (existsSync(dir)) return dir;
     }
   } catch {
@@ -293,7 +367,9 @@ function windowsDesktop() {
 
 function desktopEntry(iconPath) {
   const pathValue = unixPathDirs().join(":");
-  const exec = ["/usr/bin/env", `PATH=${pathValue}`, "/bin/bash", startSh].map(quoteExec).join(" ");
+  const exec = ["/usr/bin/env", `PATH=${pathValue}`, "/bin/bash", startSh]
+    .map(quoteExec)
+    .join(" ");
   return `[Desktop Entry]
 Version=1.0
 Type=Application
@@ -433,7 +509,11 @@ function sdRoundBox(px, py, box) {
   const r = Math.min(box.r, hx, hy);
   const qx = Math.abs(px - cx) - hx + r;
   const qy = Math.abs(py - cy) - hy + r;
-  return Math.min(Math.max(qx, qy), 0) + Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) - r;
+  return (
+    Math.min(Math.max(qx, qy), 0) +
+    Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) -
+    r
+  );
 }
 
 function cover(dist) {
@@ -490,9 +570,12 @@ function psSingle(value) {
 }
 
 function winArg(value) {
-  if (value.length === 0 || /[\s"]/.test(value)) return `"${value.replaceAll('"', '\\"')}"`;
+  if (value.length === 0 || /[\s"]/.test(value))
+    return `"${value.replaceAll('"', '\\"')}"`;
   return value;
 }
 
-const invoked = process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
+const invoked =
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
 if (invoked) main();

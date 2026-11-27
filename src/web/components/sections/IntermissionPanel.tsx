@@ -1,6 +1,10 @@
 import "./styles/IntermissionPanel.css";
 import type { Ref } from "preact";
-import type { IntermissionItem, IntermissionKind, Schedule } from "../../../shared/types.ts";
+import type {
+  IntermissionItem,
+  IntermissionKind,
+  Schedule,
+} from "../../../shared/types.ts";
 import { useI18n } from "../../i18n.tsx";
 import { intermissionLabel } from "@utils/source/intermissionLabel.ts";
 import { CloseButton } from "../buttons/CloseButton.tsx";
@@ -50,13 +54,20 @@ export function IntermissionPanel({
   onAdd: () => void;
 }) {
   const { t } = useI18n();
-  const selectedItem = schedule.intermissions.find((item) => item.id === schedule.activeIntermission) ?? null;
+  const selectedItem =
+    schedule.intermissions.find(
+      (item) => item.id === schedule.activeIntermission,
+    ) ?? null;
   return (
     <div class="intermission-open" ref={panelRef}>
       <span>{t.ifEmpty}</span>
       <button
         type="button"
-        class={schedule.intermissionRandomStart ? "intermission-random on" : "intermission-random"}
+        class={
+          schedule.intermissionRandomStart
+            ? "intermission-random on"
+            : "intermission-random"
+        }
         role="switch"
         aria-checked={schedule.intermissionRandomStart}
         title={t.intermissionRandomHint}
@@ -69,7 +80,11 @@ export function IntermissionPanel({
       {schedule.intermissions.length === 0 ? (
         <p class="intermission-empty">{t.intermissionEmpty}</p>
       ) : (
-        <ul class="intermission-list" role="radiogroup" aria-label={t.intermissionPick}>
+        <ul
+          class="intermission-list"
+          role="radiogroup"
+          aria-label={t.intermissionPick}
+        >
           <li class={!selectedItem ? "on" : ""}>
             <button
               type="button"
@@ -97,7 +112,11 @@ export function IntermissionPanel({
         </ul>
       )}
       <span class="k">{t.add}</span>
-      <div class="seg intermission-kind" role="radiogroup" aria-label={t.intermissionFrom}>
+      <div
+        class="seg intermission-kind"
+        role="radiogroup"
+        aria-label={t.intermissionFrom}
+      >
         {(["folder", "video", "youtube"] as const).map((kind) => (
           <button
             key={kind}
@@ -107,7 +126,11 @@ export function IntermissionPanel({
             class={addKind === kind ? "on" : ""}
             onClick={() => onKind(kind)}
           >
-            {kind === "folder" ? t.folder : kind === "video" ? t.video : t.youtube}
+            {kind === "folder"
+              ? t.folder
+              : kind === "video"
+                ? t.video
+                : t.youtube}
           </button>
         ))}
       </div>
@@ -123,7 +146,9 @@ export function IntermissionPanel({
         <FolderPath
           kind={addKind === "video" ? "video" : "folder"}
           value={addDraft}
-          placeholder={addKind === "video" ? t.videoPlaceholder : t.folderPlaceholder}
+          placeholder={
+            addKind === "video" ? t.videoPlaceholder : t.folderPlaceholder
+          }
           invalid={pathInvalid}
           actionLabel={picking ? t.choosing : t.browse}
           actionBusy={picking}
@@ -136,11 +161,20 @@ export function IntermissionPanel({
       {preview && <p class="folder-name">{preview}</p>}
       {errorText && <FieldNote>{errorText}</FieldNote>}
       <span>
-        {addKind === "youtube" ? t.youtubeIntermission : addKind === "video" ? t.oneHint : t.nextHint}{" "}
+        {addKind === "youtube"
+          ? t.youtubeIntermission
+          : addKind === "video"
+            ? t.oneHint
+            : t.nextHint}{" "}
         {t.intermissionCut}
       </span>
       <div class="intermission-actions">
-        <button type="button" class="primary" disabled={!canAdd || saving} onClick={onAdd}>
+        <button
+          type="button"
+          class="primary"
+          disabled={!canAdd || saving}
+          onClick={onAdd}
+        >
           {t.add}
         </button>
       </div>
@@ -177,9 +211,20 @@ function IntermissionRow({
       >
         <i />
         <b>{intermissionLabel(item, titles)}</b>
-        <span>{item.kind === "folder" ? t.folder : item.kind === "video" ? t.video : t.youtube}</span>
+        <span>
+          {item.kind === "folder"
+            ? t.folder
+            : item.kind === "video"
+              ? t.video
+              : t.youtube}
+        </span>
       </button>
-      <CloseButton label={t.remove} title={t.remove} disabled={saving} onClick={onRemove} />
+      <CloseButton
+        label={t.remove}
+        title={t.remove}
+        disabled={saving}
+        onClick={onRemove}
+      />
     </li>
   );
 }

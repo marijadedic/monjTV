@@ -1,6 +1,9 @@
 import type { ScheduleBlock } from "../../../shared/types.ts";
 
-export function changedBlockIds(before: ScheduleBlock[], after: ScheduleBlock[]): string[] {
+export function changedBlockIds(
+  before: ScheduleBlock[],
+  after: ScheduleBlock[],
+): string[] {
   return after
     .filter((block) => {
       const old = before.find((item) => item.id === block.id);

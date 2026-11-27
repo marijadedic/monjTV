@@ -62,7 +62,12 @@ export function RecentWindow({ onClose }: { onClose: () => void }) {
   return (
     <>
       <div class="app-scrim" onClick={onClose} />
-      <div class="recent-window" role="dialog" aria-modal="true" aria-labelledby="recent-title">
+      <div
+        class="recent-window"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="recent-title"
+      >
         <header>
           <div>
             <b id="recent-title">{t.recentPlayed}</b>
@@ -87,7 +92,9 @@ export function RecentWindow({ onClose }: { onClose: () => void }) {
                         <span class="n">{index + 1}</span>
                         <span class="name" title={video.path}>
                           <b>{video.title}</b>
-                          {video.place && <span class="place">{video.place}</span>}
+                          {video.place && (
+                            <span class="place">{video.place}</span>
+                          )}
                         </span>
                         <CloseButton
                           label={t.remove}

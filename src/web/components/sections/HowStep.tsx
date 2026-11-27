@@ -6,7 +6,13 @@ import { blockHint } from "@utils/label/blockHint.ts";
 import { blockLabel } from "@utils/label/blockLabel.ts";
 import { ModeList } from "../inputs/ModeList.tsx";
 
-export function HowStep({ mode, onPick }: { mode: BlockMode; onPick: (mode: BlockMode) => void }) {
+export function HowStep({
+  mode,
+  onPick,
+}: {
+  mode: BlockMode;
+  onPick: (mode: BlockMode) => void;
+}) {
   const { t } = useI18n();
   return (
     <div class="pick-mode">

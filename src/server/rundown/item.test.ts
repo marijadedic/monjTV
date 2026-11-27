@@ -119,7 +119,10 @@ describe("the part after midnight stays the same slot", () => {
       end: "01:00",
       durationSec: 3 * 3600,
     });
-    assert.deepEqual(leftoverCarry([started], week([late]), "mon", 60 * 60), []);
+    assert.deepEqual(
+      leftoverCarry([started], week([late]), "mon", 60 * 60),
+      [],
+    );
   });
 
   it("does not carry a film that finished before midnight", () => {
@@ -254,7 +257,14 @@ describe("a rundown row is one planned file", () => {
       mode: "playlist",
       name: "Evening",
       folder: "",
-      items: [{ id: "v1", mode: "specific-file", folder: "/films", file: "/films/A.mkv" }],
+      items: [
+        {
+          id: "v1",
+          mode: "specific-file",
+          folder: "/films",
+          file: "/films/A.mkv",
+        },
+      ],
     });
     const item = makeItem(slot, "/films/A.mkv", 18 * 3600, 30 * 60, {
       mode: "specific-file",
@@ -309,7 +319,12 @@ describe("playlist times follow the files", () => {
           end: "00:00",
           durationSec: 45 * 60,
         }),
-        row({ blockId: "other", path: "/shows/x.mkv", start: "12:00", end: "13:00" }),
+        row({
+          blockId: "other",
+          path: "/shows/x.mkv",
+          start: "12:00",
+          end: "13:00",
+        }),
       ],
     };
     recomputeBlockTimes(day, slot);
@@ -376,7 +391,12 @@ describe("the previous day spills only what is still on", () => {
       items: [
         row({ ...crossing, status: "done" }),
         row({ ...crossing, path: "/films/skipped.mkv", status: "skipped" }),
-        row({ ...crossing, path: "/films/early.mkv", end: "22:30", durationSec: 30 * 60 }),
+        row({
+          ...crossing,
+          path: "/films/early.mkv",
+          end: "22:30",
+          durationSec: 30 * 60,
+        }),
         row({ ...crossing, path: "/films/carry.mkv", overnight: true }),
       ],
     };
@@ -395,10 +415,22 @@ describe("a slot keeps its own rows", () => {
       folder: "/shows/serial",
     });
     assert.equal(seriesFolder(episode, schedule), "/shows/serial");
-    assert.equal(seriesFolder({ ...episode, folder: undefined }, schedule), "/shows/serial");
-    assert.equal(seriesFolder(row({ blockId: "serial", path: "/films/a.mkv", mode: "random-file" }), schedule), undefined);
+    assert.equal(
+      seriesFolder({ ...episode, folder: undefined }, schedule),
+      "/shows/serial",
+    );
+    assert.equal(
+      seriesFolder(
+        row({ blockId: "serial", path: "/films/a.mkv", mode: "random-file" }),
+        schedule,
+      ),
+      undefined,
+    );
     assert.equal(sourceFolder(episode, show), "/shows/serial");
-    assert.equal(sourceFolder({ ...episode, folder: "" }, show), "/shows/serial");
+    assert.equal(
+      sourceFolder({ ...episode, folder: "" }, show),
+      "/shows/serial",
+    );
   });
 
   it("keeps this day's rows for the slot and drops yesterday's leftover", () => {
@@ -406,7 +438,12 @@ describe("a slot keeps its own rows", () => {
       {
         date: "2026-11-24",
         items: [
-          row({ blockId: "late", path: "/films/night.mkv", start: "22:00", overnight: true }),
+          row({
+            blockId: "late",
+            path: "/films/night.mkv",
+            start: "22:00",
+            overnight: true,
+          }),
           row({ blockId: "late", path: "/films/today.mkv", start: "21:00" }),
           row({ blockId: "other", path: "/shows/x.mkv", start: "12:00" }),
         ],
@@ -440,7 +477,11 @@ describe("a slot keeps its own rows", () => {
     assert.equal(blockLeftoverSec(late, "mon", []), 60 * 60);
     assert.equal(tightestSlotSec(late), 180 * 60);
     assert.equal(
-      blockLeftoverSec(block({ id: "prime", start: "18:00", end: "19:00", lengthMin: 60 }), "mon", []),
+      blockLeftoverSec(
+        block({ id: "prime", start: "18:00", end: "19:00", lengthMin: 60 }),
+        "mon",
+        [],
+      ),
       0,
     );
 
@@ -455,8 +496,20 @@ describe("a slot keeps its own rows", () => {
       lengthMin: 180,
     });
     const files = [
-      row({ blockId: "pl", path: "/films/a.mkv", start: "22:00", durationSec: 30 * 60, end: "22:30" }),
-      row({ blockId: "pl", path: "/films/b.mkv", start: "23:00", durationSec: 90 * 60, end: "00:30" }),
+      row({
+        blockId: "pl",
+        path: "/films/a.mkv",
+        start: "22:00",
+        durationSec: 30 * 60,
+        end: "22:30",
+      }),
+      row({
+        blockId: "pl",
+        path: "/films/b.mkv",
+        start: "23:00",
+        durationSec: 90 * 60,
+        end: "00:30",
+      }),
     ];
     assert.equal(blockLeftoverSec(playlist, "mon", files), 30 * 60);
     const carriedOnly = [

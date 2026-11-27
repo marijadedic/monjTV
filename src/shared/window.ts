@@ -3,7 +3,10 @@ import { DAYS, type Day, type ScheduleBlock } from "./types.ts";
 export const DAY_MINUTES = 24 * 60;
 export const DAY_SECONDS = 24 * 3600;
 
-export type BlockClock = Pick<ScheduleBlock, "start" | "end" | "starts" | "lengthMin">;
+export type BlockClock = Pick<
+  ScheduleBlock,
+  "start" | "end" | "starts" | "lengthMin"
+>;
 
 export type DayWindow = {
   start: string;
@@ -20,7 +23,15 @@ export function minutesOf(hm: string): number {
   const [hRaw, mRaw] = hm.split(":");
   const h = Number(hRaw);
   const m = Number(mRaw);
-  if (!Number.isInteger(h) || !Number.isInteger(m) || h < 0 || h > 23 || m < 0 || m > 59) return 0;
+  if (
+    !Number.isInteger(h) ||
+    !Number.isInteger(m) ||
+    h < 0 ||
+    h > 23 ||
+    m < 0 ||
+    m > 59
+  )
+    return 0;
   return h * 60 + m;
 }
 
@@ -31,7 +42,8 @@ export function secondsOf(hm: string): number {
 
 // HH:mm for a minute of the day, wrapping past 24:00.
 export function clockOf(mins: number): string {
-  const wrapped = ((Math.floor(mins) % DAY_MINUTES) + DAY_MINUTES) % DAY_MINUTES;
+  const wrapped =
+    ((Math.floor(mins) % DAY_MINUTES) + DAY_MINUTES) % DAY_MINUTES;
   const h = Math.floor(wrapped / 60);
   const m = wrapped % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
@@ -72,7 +84,11 @@ export function segmentsOf(block: ScheduleBlock): DaySegment[] {
   const out: DaySegment[] = [];
   for (const day of block.days) {
     const placed = windowOn(block, day);
-    out.push({ day, start: placed.startMin, end: Math.min(placed.endMin, DAY_MINUTES) });
+    out.push({
+      day,
+      start: placed.startMin,
+      end: Math.min(placed.endMin, DAY_MINUTES),
+    });
     const leftover = leftoverMin(placed);
     if (leftover > 0) out.push({ day: nextDay(day), start: 0, end: leftover });
   }
@@ -95,7 +111,12 @@ export function itemCoversNow(
 
 // A planned slot whose start is still ahead. An overnight file that began yesterday is not ahead.
 export function itemStartsLater(
-  item: { start: string; durationSec: number; overnight?: boolean; status?: string },
+  item: {
+    start: string;
+    durationSec: number;
+    overnight?: boolean;
+    status?: string;
+  },
   now: number,
 ): boolean {
   if (item.status && item.status !== "planned") return false;
@@ -106,7 +127,12 @@ export function itemStartsLater(
 
 // Done, skipped, or a window that has already ended. The file on screen is not passed.
 export function itemHasPassed(
-  item: { start: string; durationSec: number; overnight?: boolean; status?: string },
+  item: {
+    start: string;
+    durationSec: number;
+    overnight?: boolean;
+    status?: string;
+  },
   now: number,
 ): boolean {
   if (item.status === "playing") return false;

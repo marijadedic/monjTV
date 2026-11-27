@@ -1,5 +1,8 @@
 import type { IntermissionKind } from "../../../shared/types.ts";
-import { canonicalYoutubeIntermission, isYoutubeLink } from "../../../shared/youtube.ts";
+import {
+  canonicalYoutubeIntermission,
+  isYoutubeLink,
+} from "../../../shared/youtube.ts";
 
 export function pendingSource(
   kind: IntermissionKind,
@@ -12,6 +15,7 @@ export function pendingSource(
     if (!parsed) return { source: trimmed, error: "youtube" };
     return { source: parsed, error: null };
   }
-  if (isYoutubeLink(trimmed)) return { source: trimmed, error: "youtube-in-path" };
+  if (isYoutubeLink(trimmed))
+    return { source: trimmed, error: "youtube-in-path" };
   return { source: trimmed, error: null };
 }

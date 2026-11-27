@@ -18,10 +18,16 @@ export function playlistRowsOn(
   board: TvBoard | null,
 ): RundownItem[] {
   if (block.mode !== "playlist" || !board) return [];
-  const matches = board.days.filter((entry) => weekdayOfKey(entry.date) === day);
-  const upcoming = matches.find((entry) => entry.date >= board.today) ?? matches[matches.length - 1];
+  const matches = board.days.filter(
+    (entry) => weekdayOfKey(entry.date) === day,
+  );
+  const upcoming =
+    matches.find((entry) => entry.date >= board.today) ??
+    matches[matches.length - 1];
   if (!upcoming) return [];
-  return upcoming.items.filter((item) => item.blockId === block.id && !item.overnight);
+  return upcoming.items.filter(
+    (item) => item.blockId === block.id && !item.overnight,
+  );
 }
 
 // Minutes those files occupy. Null when the board has not built this slot yet.
@@ -45,20 +51,36 @@ export function playlistMinutesOn(
 }
 
 // Start from the week, height from the TV schedule for a playlist.
-export function placedOn(block: ScheduleBlock, day: Day, board: TvBoard | null): DayWindow {
+export function placedOn(
+  block: ScheduleBlock,
+  day: Day,
+  board: TvBoard | null,
+): DayWindow {
   const placed = windowOn(block, day);
   const mins = playlistMinutesOn(block, day, board);
   if (mins == null) return placed;
   const endMin = placed.startMin + mins;
-  return { start: placed.start, end: clockOf(endMin), startMin: placed.startMin, endMin };
+  return {
+    start: placed.start,
+    end: clockOf(endMin),
+    startMin: placed.startMin,
+    endMin,
+  };
 }
 
 // Clock pieces including leftover past midnight, using placed height.
-export function segmentsPlaced(block: ScheduleBlock, board: TvBoard | null): DaySegment[] {
+export function segmentsPlaced(
+  block: ScheduleBlock,
+  board: TvBoard | null,
+): DaySegment[] {
   const out: DaySegment[] = [];
   for (const day of block.days) {
     const placed = placedOn(block, day, board);
-    out.push({ day, start: placed.startMin, end: Math.min(placed.endMin, DAY_MINUTES) });
+    out.push({
+      day,
+      start: placed.startMin,
+      end: Math.min(placed.endMin, DAY_MINUTES),
+    });
     const leftover = leftoverMin(placed);
     if (leftover > 0) out.push({ day: nextDay(day), start: 0, end: leftover });
   }

@@ -60,7 +60,8 @@ function startArgOf(start: number | string): string {
 function sessionEnv(): NodeJS.ProcessEnv {
   const env = { ...process.env };
   const uid = typeof process.getuid === "function" ? process.getuid() : null;
-  if (!env.XDG_RUNTIME_DIR && uid != null) env.XDG_RUNTIME_DIR = `/run/user/${uid}`;
+  if (!env.XDG_RUNTIME_DIR && uid != null)
+    env.XDG_RUNTIME_DIR = `/run/user/${uid}`;
   const runtime = env.XDG_RUNTIME_DIR;
   if (runtime && !env.WAYLAND_DISPLAY && existsSync(`${runtime}/wayland-0`)) {
     env.WAYLAND_DISPLAY = "wayland-0";
@@ -73,7 +74,10 @@ function sessionEnv(): NodeJS.ProcessEnv {
 function isRaspberryPi(): boolean {
   if (process.platform !== "linux") return false;
   try {
-    const model = readFileSync("/proc/device-tree/model", "utf8").replaceAll("\0", "");
+    const model = readFileSync("/proc/device-tree/model", "utf8").replaceAll(
+      "\0",
+      "",
+    );
     return /raspberry pi/i.test(model);
   } catch {
     return false;
@@ -163,7 +167,10 @@ export class Mpv {
     if (!isYoutubeUrl(filePath)) {
       this.sourcePath = null;
       if (startArg) {
-        await this.command(["loadfile", filePath, "replace", -1, { start: startArg }], 8_000);
+        await this.command(
+          ["loadfile", filePath, "replace", -1, { start: startArg }],
+          8_000,
+        );
         return;
       }
       await this.command(["loadfile", filePath, "replace"], 8_000);
@@ -183,28 +190,44 @@ export class Mpv {
     this.sourcePath = filePath;
     const title = cachedYoutubeTitle(filePath);
     if (title) {
-      await this.command(["set_property", "force-media-title", title]).catch(() => undefined);
+      await this.command(["set_property", "force-media-title", title]).catch(
+        () => undefined,
+      );
     }
     this.watchNewFile();
     await this.command(["loadfile", streams.videoUrl, "replace"], 15_000);
     if (!(await this.waitForPlayback(20_000))) {
       this.sourcePath = null;
-      console.error("youtube playback did not start", this.lastEndReason ?? "timeout");
+      console.error(
+        "youtube playback did not start",
+        this.lastEndReason ?? "timeout",
+      );
       throw new Error("Could not play this YouTube video");
     }
     if (title) {
-      await this.command(["set_property", "force-media-title", title]).catch(() => undefined);
+      await this.command(["set_property", "force-media-title", title]).catch(
+        () => undefined,
+      );
     }
     if (streams.audioUrl) {
-      await this.command(["audio-add", streams.audioUrl, "select"], 15_000).catch(() => undefined);
+      await this.command(
+        ["audio-add", streams.audioUrl, "select"],
+        15_000,
+      ).catch(() => undefined);
     }
     if (!startArg) return;
     if (typeof start === "string" && start.trim().endsWith("%")) {
-      await this.command(["seek", Number.parseFloat(start), "absolute-percent"]).catch(() => undefined);
+      await this.command([
+        "seek",
+        Number.parseFloat(start),
+        "absolute-percent",
+      ]).catch(() => undefined);
       return;
     }
     const extra = (Date.now() - began) / 1000;
-    await this.command(["seek", Number(startArg) + extra, "absolute"]).catch(() => undefined);
+    await this.command(["seek", Number(startArg) + extra, "absolute"]).catch(
+      () => undefined,
+    );
   }
 
   // Ignore the file being replaced. Its end arrives before the new file starts.
@@ -216,9 +239,14 @@ export class Mpv {
   // True when mpv has a file on screen and a clock.
   private async isPlaying(): Promise<boolean> {
     try {
-      const idle = (await this.command(["get_property", "idle-active"], 1500)) as { data?: unknown };
+      const idle = (await this.command(
+        ["get_property", "idle-active"],
+        1500,
+      )) as { data?: unknown };
       if (idle.data === true) return false;
-      const pos = (await this.command(["get_property", "time-pos"], 1500)) as { data?: unknown };
+      const pos = (await this.command(["get_property", "time-pos"], 1500)) as {
+        data?: unknown;
+      };
       return typeof pos.data === "number" && Number.isFinite(pos.data);
     } catch {
       return false;
@@ -230,7 +258,8 @@ export class Mpv {
     const began = Date.now();
     while (Date.now() - began < timeoutMs) {
       const failed =
-        this.fileStarted && (this.lastEndReason === "error" || this.lastEndReason === "unknown");
+        this.fileStarted &&
+        (this.lastEndReason === "error" || this.lastEndReason === "unknown");
       if (failed) return false;
       if (await this.isPlaying()) return true;
       await new Promise((resolve) => setTimeout(resolve, 200));
@@ -242,7 +271,9 @@ export class Mpv {
   async currentPath(): Promise<string | null> {
     if (!this.running || !this.sock) return null;
     try {
-      const msg = (await this.command(["get_property", "path"])) as { data?: unknown };
+      const msg = (await this.command(["get_property", "path"])) as {
+        data?: unknown;
+      };
       const actual = typeof msg.data === "string" ? msg.data : null;
       if (!actual) {
         this.sourcePath = null;

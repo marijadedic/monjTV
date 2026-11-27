@@ -95,7 +95,10 @@ type PosterQuery = {
 };
 
 function cachePath(file: string): string {
-  const name = createHash("sha256").update(`poster:${file}`).digest("hex").slice(0, 24);
+  const name = createHash("sha256")
+    .update(`poster:${file}`)
+    .digest("hex")
+    .slice(0, 24);
   return path.join(stillDir, `${name}.jpg`);
 }
 
@@ -107,7 +110,10 @@ function stampOf(seconds: number): string {
 }
 
 function fold(value: string): string {
-  return value.normalize("NFD").replace(/\p{M}+/gu, "").toLowerCase();
+  return value
+    .normalize("NFD")
+    .replace(/\p{M}+/gu, "")
+    .toLowerCase();
 }
 
 function tokens(value: string, min = 2): string[] {
@@ -217,7 +223,13 @@ function filterWords(text: string): string {
   const words = text
     .split(" ")
     .map((word) => word.replace(/^[-–—]+|[-–—]+$/g, ""))
-    .filter((word) => word && word !== "-" && !JUNK.has(word.toLowerCase()) && !/^0+$/.test(word));
+    .filter(
+      (word) =>
+        word &&
+        word !== "-" &&
+        !JUNK.has(word.toLowerCase()) &&
+        !/^0+$/.test(word),
+    );
   while (words.length > 1) {
     const last = words[words.length - 1] ?? "";
     if (/^com$/i.test(last)) {
@@ -246,14 +258,17 @@ function filterWords(text: string): string {
 function episodeOf(base: string): string {
   const flat = base.replace(/[._]/g, " ");
   const season = flat.match(/\bS\s*(\d{1,2})\s*E\s*(\d{1,3})\b/i);
-  if (season) return `S${season[1].padStart(2, "0")}E${season[2].padStart(2, "0")}`;
+  if (season)
+    return `S${season[1].padStart(2, "0")}E${season[2].padStart(2, "0")}`;
   const episode = flat.match(/\b(?:Episode|EP|E)\s*(\d{1,3})\b/i);
   if (episode) return `episode ${Number(episode[1])}`;
   if (/\b(?:19|20)\d{2}\b/.test(flat)) return "";
   const lead = flat.match(/^\s*(\d{1,3})\b/);
-  if (lead && Number(lead[1]) > 0 && Number(lead[1]) < 100) return `episode ${Number(lead[1])}`;
+  if (lead && Number(lead[1]) > 0 && Number(lead[1]) < 100)
+    return `episode ${Number(lead[1])}`;
   const tail = flat.match(/\s(\d{1,3})\s*$/);
-  if (tail && Number(tail[1]) > 0 && Number(tail[1]) < 100) return `episode ${Number(tail[1])}`;
+  if (tail && Number(tail[1]) > 0 && Number(tail[1]) < 100)
+    return `episode ${Number(tail[1])}`;
   const paren = base.match(/\((\d{1,2})\)\s*$/);
   if (paren) return `episode ${Number(paren[1])}`;
   return "";
@@ -268,14 +283,19 @@ function preferSide(cleaned: string, year: string): string {
   if (parts.length < 2) return cleaned;
   const rest = parts.slice(1).join(" ");
   const first = parts[0] ?? cleaned;
-  if (/[čćžšđČĆŽŠĐ]/.test(rest) || (year && nameTokens(first).length >= 1 && nameTokens(rest).length >= 1)) {
+  if (
+    /[čćžšđČĆŽŠĐ]/.test(rest) ||
+    (year && nameTokens(first).length >= 1 && nameTokens(rest).length >= 1)
+  ) {
     return first;
   }
   return parts.join(" ");
 }
 
 function skipFolder(name: string): boolean {
-  const cleaned = cleanRelease(name.replace(/^\+/, "")).replace(/\s+-\s+/g, " ").toLowerCase();
+  const cleaned = cleanRelease(name.replace(/^\+/, ""))
+    .replace(/\s+-\s+/g, " ")
+    .toLowerCase();
   if (!cleaned) return true;
   if (GENERIC_DIR.has(cleaned)) return true;
   if (/\d+\s*min\b/.test(cleaned)) return true;
@@ -311,12 +331,15 @@ export function posterQuery(file: string): PosterQuery {
   const year = base.match(/\b((?:19|20)\d{2})\b/)?.[1] ?? "";
   const episode = episodeOf(base);
   const cleaned = filterWords(preferSide(cleanRelease(base), year));
-  const marker = /\bS\s*\d{1,2}\s*E\s*\d{1,3}\b|\b(?:Episode|EP|E)\s*\d{1,3}\b|^\s*\d{1,3}\b/i;
+  const marker =
+    /\bS\s*\d{1,2}\s*E\s*\d{1,3}\b|\b(?:Episode|EP|E)\s*\d{1,3}\b|^\s*\d{1,3}\b/i;
   const before = episode ? (cleaned.split(marker)[0] ?? "") : cleaned;
   const folder = showFolder(file);
   const own = nameTokens(before);
   const borrowed = own.length === 0;
-  const rest = borrowed ? cleaned.replace(marker, " ").replace(/\s+/g, " ").trim() : "";
+  const rest = borrowed
+    ? cleaned.replace(marker, " ").replace(/\s+/g, " ").trim()
+    : "";
   const after = episode ? cleaned.split(marker).slice(1).join(" ") : "";
   const showTokens = borrowed
     ? unique([...nameTokens(folder), ...nameTokens(rest)])
@@ -324,7 +347,12 @@ export function posterQuery(file: string): PosterQuery {
   let phrase = cleaned;
   if (borrowed) phrase = [folder, rest, episode].filter(Boolean).join(" ");
   else if (episode) phrase = `${before.trim()} ${episode}`;
-  if (episode && !fold(phrase).includes(fold(episode)) && !/s\d{2}e\d{2}/i.test(phrase)) phrase = `${phrase} ${episode}`;
+  if (
+    episode &&
+    !fold(phrase).includes(fold(episode)) &&
+    !/s\d{2}e\d{2}/i.test(phrase)
+  )
+    phrase = `${phrase} ${episode}`;
   if (year && !phrase.includes(year)) phrase = `${phrase} ${year}`;
   phrase = phrase.replace(/\s+/g, " ").trim();
   return {
@@ -341,11 +369,20 @@ function scoreTitle(spec: PosterQuery, title: string): number {
   const folded = fold(title);
   const words = new Set(tokens(title));
   const hit = spec.anchors.filter(
-    (anchor) => words.has(anchor) || (anchor.length >= 5 && folded.includes(anchor)),
+    (anchor) =>
+      words.has(anchor) || (anchor.length >= 5 && folded.includes(anchor)),
   );
-  const need = spec.anchors.length <= 3 ? spec.anchors.length : Math.ceil(spec.anchors.length * 0.75);
+  const need =
+    spec.anchors.length <= 3
+      ? spec.anchors.length
+      : Math.ceil(spec.anchors.length * 0.75);
   if (hit.length < need) return -1;
-  if (spec.year && /\b(?:19|20)\d{2}\b/.test(title) && !title.includes(spec.year)) return -1;
+  if (
+    spec.year &&
+    /\b(?:19|20)\d{2}\b/.test(title) &&
+    !title.includes(spec.year)
+  )
+    return -1;
   let score = hit.length * 10;
   if (spec.year && title.includes(spec.year)) score += 12;
   const season = spec.episode.match(/^S(\d+)E(\d+)$/i);
@@ -362,17 +399,25 @@ function scoreTitle(spec: PosterQuery, title: string): number {
     if (episodeHit) score += 18;
   } else if (spec.episode) {
     const n = Number(spec.episode.match(/(\d+)$/)?.[1] ?? "");
-    if (n && new RegExp(`\\b(episode|ep|e|epizoda|dio)\\s*0*${n}\\b`, "i").test(title)) {
+    if (
+      n &&
+      new RegExp(`\\b(episode|ep|e|epizoda|dio)\\s*0*${n}\\b`, "i").test(title)
+    ) {
       episodeHit = true;
       score += 10;
     }
   }
   if (spec.episode && !episodeHit) return -1;
   if (/\b(reaction|reacts|abridged)\b/i.test(title)) return -1;
-  if (/\b(review|explained|gameplay|lyrics|karaoke|music video|official audio|theme song|dubbed|tagalog|recap|commentary)\b/i.test(title)) {
+  if (
+    /\b(review|explained|gameplay|lyrics|karaoke|music video|official audio|theme song|dubbed|tagalog|recap|commentary)\b/i.test(
+      title,
+    )
+  ) {
     score -= 40;
   }
-  if (!spec.anchors.includes("holmes") && /\bholmes\b/i.test(title)) score -= 40;
+  if (!spec.anchors.includes("holmes") && /\bholmes\b/i.test(title))
+    score -= 40;
   const anchorAt = spec.anchors
     .map((anchor) => folded.indexOf(anchor))
     .filter((index) => index >= 0);
@@ -418,7 +463,9 @@ async function youtubeMatch(spec: PosterQuery): Promise<string | null> {
   }
 }
 
-async function imageSize(file: string): Promise<{ width: number; height: number } | null> {
+async function imageSize(
+  file: string,
+): Promise<{ width: number; height: number } | null> {
   try {
     const { stdout } = await execFileAsync(
       "ffprobe",
@@ -455,7 +502,17 @@ async function trimBars(dest: string): Promise<void> {
   try {
     const { stdout } = await execFileAsync(
       "ffmpeg",
-      ["-v", "error", "-i", dest, "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"],
+      [
+        "-v",
+        "error",
+        "-i",
+        dest,
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        "pipe:1",
+      ],
       { timeout: 20_000, encoding: "buffer", maxBuffer: 20_000_000 },
     );
     raw = stdout;
@@ -509,14 +566,26 @@ async function trimBars(dest: string): Promise<void> {
 
 async function writeFrame(file: string, dest: string): Promise<string | null> {
   const duration = await probeDuration(file);
-  const scene = duration > 20 * 60 ? 18 * 60 + 40 : Math.max(8, Math.floor(duration * 0.2));
+  const scene =
+    duration > 20 * 60 ? 18 * 60 + 40 : Math.max(8, Math.floor(duration * 0.2));
   const stamps = [stampOf(scene), "0:00:08"];
   await mkdir(stillDir, { recursive: true });
   for (const stamp of stamps) {
     try {
       await execFileAsync(
         "ffmpeg",
-        ["-y", "-ss", stamp, "-i", file, "-frames:v", "1", "-vf", "scale=720:-1", dest],
+        [
+          "-y",
+          "-ss",
+          stamp,
+          "-i",
+          file,
+          "-frames:v",
+          "1",
+          "-vf",
+          "scale=720:-1",
+          dest,
+        ],
         { timeout: 20_000 },
       );
       const info = await stat(dest);
@@ -530,7 +599,10 @@ async function writeFrame(file: string, dest: string): Promise<string | null> {
 }
 
 // Official YouTube poster for this watch URL. Not a frame from the stream.
-async function writeYoutubeThumb(file: string, dest: string): Promise<string | null> {
+async function writeYoutubeThumb(
+  file: string,
+  dest: string,
+): Promise<string | null> {
   const id = youtubeId(file);
   if (!id) return null;
   await mkdir(stillDir, { recursive: true });
@@ -544,7 +616,8 @@ async function writeYoutubeThumb(file: string, dest: string): Promise<string | n
       const type = res.headers.get("content-type") ?? "";
       if (type && !type.startsWith("image/")) continue;
       const bytes = Buffer.from(await res.arrayBuffer());
-      if (bytes.length < 2000 || bytes[0] !== 0xff || bytes[1] !== 0xd8) continue;
+      if (bytes.length < 2000 || bytes[0] !== 0xff || bytes[1] !== 0xd8)
+        continue;
       const size = jpegSize(bytes);
       const last = name === YOUTUBE_POSTERS[YOUTUBE_POSTERS.length - 1];
       if (size && size.width < 480 && size.height < 480 && !last) continue;
@@ -560,11 +633,17 @@ async function writeYoutubeThumb(file: string, dest: string): Promise<string | n
 }
 
 // Matching YouTube poster, then a frame from the file.
-async function writeLocalStill(file: string, dest: string): Promise<string | null> {
+async function writeLocalStill(
+  file: string,
+  dest: string,
+): Promise<string | null> {
   const spec = posterQuery(file);
   const id = await exclusiveSearch(() => youtubeMatch(spec));
   if (id) {
-    const poster = await writeYoutubeThumb(`https://www.youtube.com/watch?v=${id}`, dest);
+    const poster = await writeYoutubeThumb(
+      `https://www.youtube.com/watch?v=${id}`,
+      dest,
+    );
     if (poster) return poster;
   }
   return writeFrame(file, dest);
@@ -587,7 +666,10 @@ export async function refreshFrame(file: string): Promise<string | null> {
   const spec = posterQuery(file);
   const id = await exclusiveSearch(() => youtubeMatch(spec));
   if (id) {
-    const poster = await writeYoutubeThumb(`https://www.youtube.com/watch?v=${id}`, tmp);
+    const poster = await writeYoutubeThumb(
+      `https://www.youtube.com/watch?v=${id}`,
+      tmp,
+    );
     if (poster) {
       await rename(tmp, dest);
       return dest;
@@ -612,7 +694,10 @@ export async function refreshFrame(file: string): Promise<string | null> {
 // Use the cached still when it is there. Otherwise make one, and try once more if that fails.
 async function loadFrame(file: string): Promise<string | null> {
   const dest = cachePath(file);
-  const make = () => (youtubeId(file) ? writeYoutubeThumb(file, dest) : writeLocalStill(file, dest));
+  const make = () =>
+    youtubeId(file)
+      ? writeYoutubeThumb(file, dest)
+      : writeLocalStill(file, dest);
   try {
     try {
       const info = await stat(dest);

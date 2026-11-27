@@ -10,7 +10,8 @@ export function measureKey(draft: Draft): string {
     return `video:${file.trim()}`;
   }
   const playlist = canonicalPlaylistUrl(folder);
-  if ((mode === "next-episode" || mode === "random-file") && playlist) return `${mode}:${playlist}`;
+  if ((mode === "next-episode" || mode === "random-file") && playlist)
+    return `${mode}:${playlist}`;
   const cap = addMeasureCap(draft);
   return cap ? `${mode}:${folder.trim()}:${cap}` : `${mode}:${folder.trim()}`;
 }

@@ -1,4 +1,7 @@
-import { canonicalPlaylistUrl, parseYoutubeUrl } from "../../../../../shared/youtube.ts";
+import {
+  canonicalPlaylistUrl,
+  parseYoutubeUrl,
+} from "../../../../../shared/youtube.ts";
 import type { ItemMode } from "../../../../../shared/types.ts";
 import type { Draft } from "../../../../types/Draft.ts";
 import type { PlaySource } from "../../../../types/PlaySource.ts";
@@ -25,9 +28,18 @@ function needsMeasure(draft: Draft): boolean {
   return draft.lengthChoice === "longest";
 }
 
-function sourceEmpty(mode: ItemMode, source: PlaySource, file: string, folder: string): boolean {
-  if (mode === "specific-file" && source === "youtube") return !parseYoutubeUrl(file);
-  if ((mode === "next-episode" || mode === "random-file") && source === "youtube") {
+function sourceEmpty(
+  mode: ItemMode,
+  source: PlaySource,
+  file: string,
+  folder: string,
+): boolean {
+  if (mode === "specific-file" && source === "youtube")
+    return !parseYoutubeUrl(file);
+  if (
+    (mode === "next-episode" || mode === "random-file") &&
+    source === "youtube"
+  ) {
     return !canonicalPlaylistUrl(folder);
   }
   if (mode === "specific-file") return !file.trim();

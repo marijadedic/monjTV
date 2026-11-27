@@ -25,7 +25,9 @@
   margin-right: auto;
   margin-left: auto;
 }
-.shell.wide main, .shell.wide main > section, .shell.wide .week-wrap {
+.shell.wide main,
+.shell.wide main > section,
+.shell.wide .week-wrap {
   display: flex;
   flex-direction: column;
 }
@@ -39,7 +41,8 @@
   letter-spacing: 0.04em;
   color: var(--text);
 }
-.seg, .themes {
+.seg,
+.themes {
   display: flex;
   flex-wrap: wrap;
   background: var(--panel);
@@ -47,7 +50,8 @@
   border-radius: 999px;
   padding: 3px;
 }
-.seg a, .seg button {
+.seg a,
+.seg button {
   color: var(--muted);
   background: transparent;
   border: 0;
@@ -56,7 +60,8 @@
   font-size: 0.92rem;
   line-height: 1.45;
 }
-.seg a.on, .seg button.on {
+.seg a.on,
+.seg button.on {
   background: var(--primary);
   color: var(--on-primary);
 }
@@ -103,7 +108,9 @@ h1 {
   font-family: system-ui, sans-serif;
   font-size: 0.95rem;
 }
-button, input, select {
+button,
+input,
+select {
   font: inherit;
   color: var(--text);
   background: var(--panel);
@@ -139,7 +146,9 @@ button:disabled {
   border: 0;
   border-radius: 999px;
   padding: 4px 10px;
-  font: 0.92rem/1.45 system-ui, sans-serif;
+  font:
+    0.92rem/1.45 system-ui,
+    sans-serif;
 }
 .themes button.on {
   color: var(--on-primary);

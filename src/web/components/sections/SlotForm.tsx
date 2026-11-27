@@ -20,7 +20,11 @@ import { nextItemMinute } from "@utils/playlist/nextItemMinute.ts";
 import { saveBlocked } from "@utils/length/saveBlocked.ts";
 import { stackSeconds } from "@utils/length/stackSeconds.ts";
 import { pathChosen } from "@utils/source/pathChosen.ts";
-import { summaryEnd, summaryLength, summaryMinutes } from "@utils/week/summarySpan.ts";
+import {
+  summaryEnd,
+  summaryLength,
+  summaryMinutes,
+} from "@utils/week/summarySpan.ts";
 import { PlaylistNameField } from "../inputs/PlaylistNameField.tsx";
 import { FieldNote } from "../parts/FieldNote.tsx";
 import { StepTabs } from "../parts/StepTabs.tsx";
@@ -119,16 +123,30 @@ export function SlotForm({
   const lengthMins = length ? Math.ceil(length.durationSec / 60) : 0;
   const pathReady = pathChosen(draft);
   const stackSec = draft.mode === "playlist" ? stackSeconds(draft.items) : null;
-  const addSec = draft.mode === "playlist" && pathReady ? addSeconds(draft, matched) : null;
-  const addStartMin = draft.mode === "playlist" && addSec != null ? nextItemMinute(draft.start, draft.items) : null;
-  const addPreviewStart = addStartMin != null ? minuteFace(addStartMin) : undefined;
-  const addEndMin = addStartMin != null && addSec != null ? addStartMin + Math.max(1, Math.ceil(addSec / 60)) : null;
+  const addSec =
+    draft.mode === "playlist" && pathReady ? addSeconds(draft, matched) : null;
+  const addStartMin =
+    draft.mode === "playlist" && addSec != null
+      ? nextItemMinute(draft.start, draft.items)
+      : null;
+  const addPreviewStart =
+    addStartMin != null ? minuteFace(addStartMin) : undefined;
+  const addEndMin =
+    addStartMin != null && addSec != null
+      ? addStartMin + Math.max(1, Math.ceil(addSec / 60))
+      : null;
   const addPreviewEnd = addEndMin != null ? minuteFace(addEndMin) : undefined;
   const addPreviewSpill = addEndMin != null && addEndMin > DAY_MINUTES;
   const activeSec = chosenSeconds(draft, matched) ?? 0;
-  const fixedMin = draft.lengthChoice !== "longest" ? fixedMinutes(draft) : null;
-  const clashes = activeSec ? dayClashes(draft, schedule.blocks, activeSec, titles, board) : [];
-  const lengthLabels = [...PRESETS.map((mins) => t.minutes(mins)), t.customLength];
+  const fixedMin =
+    draft.lengthChoice !== "longest" ? fixedMinutes(draft) : null;
+  const clashes = activeSec
+    ? dayClashes(draft, schedule.blocks, activeSec, titles, board)
+    : [];
+  const lengthLabels = [
+    ...PRESETS.map((mins) => t.minutes(mins)),
+    t.customLength,
+  ];
   const lengthCh = Math.max(...lengthLabels.map((label) => label.length));
   const addDisabled = saveBlocked(draft, measured, measuring, sourceMissing);
   const formStep = draft.formStep;
@@ -140,12 +158,20 @@ export function SlotForm({
   const showAddKind = formStep === "what" && addPhase === "kind";
   const showAddSource = formStep === "what" && addPhase === "source";
   const showSummary = formStep === "summary";
-  const showBack = addPhase !== "list" || formStep === "when" || formStep === "what" || (editingPart && !showSummary);
-  const savedBlock = draft.id ? schedule.blocks.find((block) => block.id === draft.id) : undefined;
+  const showBack =
+    addPhase !== "list" ||
+    formStep === "when" ||
+    formStep === "what" ||
+    (editingPart && !showSummary);
+  const savedBlock = draft.id
+    ? schedule.blocks.find((block) => block.id === draft.id)
+    : undefined;
   const painted = savedBlock ? placedOn(savedBlock, draft.origin, board) : null;
   const endLabel = summaryEnd(draft, stackSec, activeSec, painted);
   const summaryMin = summaryMinutes(draft, stackSec, activeSec, fixedMin);
-  const summaryLen = summaryLength(draft, summaryMin, endLabel, (mins) => t.slotDurationOf(mins));
+  const summaryLen = summaryLength(draft, summaryMin, endLabel, (mins) =>
+    t.slotDurationOf(mins),
+  );
 
   return (
     <form
@@ -158,13 +184,19 @@ export function SlotForm({
       }}
     >
       <SlotFormHeader
-        title={draft.id ? t.editSlot(t.dayName[draft.origin]) : t.newSlot(t.dayName[draft.origin])}
+        title={
+          draft.id
+            ? t.editSlot(t.dayName[draft.origin])
+            : t.newSlot(t.dayName[draft.origin])
+        }
         mode={draft.mode}
         showModeEdit={showSummary && draft.mode !== "playlist"}
         onEditMode={() => onEditPart("how")}
         onDelete={draft.id ? () => setConfirmRemove(true) : undefined}
       />
-      {!showSummary && !editingPart && <StepTabs step={formStep} onJump={onJump} />}
+      {!showSummary && !editingPart && (
+        <StepTabs step={formStep} onJump={onJump} />
+      )}
       <div key={slideKey} class={slide ? `step-body ${slide}` : "step-body"}>
         {showSummary && (
           <SlotSummary
@@ -172,7 +204,9 @@ export function SlotForm({
             titles={titles}
             end={endLabel}
             lengthLabel={summaryLen}
-            onEditTitle={() => onEditPart(draft.mode === "playlist" ? "name" : "what")}
+            onEditTitle={() =>
+              onEditPart(draft.mode === "playlist" ? "name" : "what")
+            }
             onEditWhen={() => onEditPart("when")}
             onEditVideos={() => onEditPart("what")}
           />
@@ -188,7 +222,9 @@ export function SlotForm({
           />
         )}
         {showHow && <HowStep mode={draft.mode} onPick={onPickMode} />}
-        {(showWhat || ((showAddKind || showAddSource) && draft.mode === "playlist")) && draft.mode === "playlist" ? (
+        {(showWhat ||
+          ((showAddKind || showAddSource) && draft.mode === "playlist")) &&
+        draft.mode === "playlist" ? (
           <PlaylistStep
             draft={draft}
             editingPart={editingPart}
@@ -206,7 +242,9 @@ export function SlotForm({
             addPreviewSpill={addPreviewSpill}
             addSec={addSec}
             matchedError={matched?.error ?? null}
-            noVideo={Boolean(pathReady && !measuring && matched && !length && !matched.error)}
+            noVideo={Boolean(
+              pathReady && !measuring && matched && !length && !matched.error,
+            )}
             lengthCh={lengthCh}
             stackSec={stackSec}
             titles={titles}
@@ -265,7 +303,9 @@ export function SlotForm({
             !length &&
             !matched?.error
           }
-          probeError={draft.mode !== "playlist" && matched?.error ? matched.error : null}
+          probeError={
+            draft.mode !== "playlist" && matched?.error ? matched.error : null
+          }
           timeError={fieldError.time}
         />
       </div>

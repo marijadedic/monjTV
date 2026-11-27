@@ -13,6 +13,7 @@ export function chosenSeconds(
     const mins = fixedMinutes(draft);
     return mins ? mins * 60 : null;
   }
-  if (!measured || measured.key !== measureKey(draft) || !measured.length) return null;
+  if (!measured || measured.key !== measureKey(draft) || !measured.length)
+    return null;
   return measured.length.durationSec;
 }

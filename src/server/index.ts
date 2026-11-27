@@ -4,12 +4,37 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { Hono } from "hono";
-import { isItemMode, type PlaylistEntry, type ScheduleBlock } from "../shared/types.ts";
+import {
+  isItemMode,
+  type PlaylistEntry,
+  type ScheduleBlock,
+} from "../shared/types.ts";
 import { PORT } from "../shared/constants.ts";
-import { assertVideo, browse, isDir, isVideoFile, pickFile, pickFolder, suggestPaths } from "./files/files.ts";
+import {
+  assertVideo,
+  browse,
+  isDir,
+  isVideoFile,
+  pickFile,
+  pickFolder,
+  suggestPaths,
+} from "./files/files.ts";
 import { clientDir } from "./data/paths.ts";
-import { getStatus, intermissionStillAllowed, joinRundown, replayItem, shutdownPlayer, startPlayer, syncIntermission } from "./play/player.ts";
-import { forgetRandomPlayed, forgetUnusedFolders, loadProgress, recentPlays } from "./schedule/progress.ts";
+import {
+  getStatus,
+  intermissionStillAllowed,
+  joinRundown,
+  replayItem,
+  shutdownPlayer,
+  startPlayer,
+  syncIntermission,
+} from "./play/player.ts";
+import {
+  forgetRandomPlayed,
+  forgetUnusedFolders,
+  loadProgress,
+  recentPlays,
+} from "./schedule/progress.ts";
 import {
   ensureBoard,
   findRundownItem,
@@ -26,10 +51,25 @@ import {
   stepEpisode,
   videoCount,
 } from "./rundown/index.ts";
-import { assertFolder, changedBlocks, loadSchedule, sameBlocks, saveSchedule, sourceChanged } from "./schedule/schedule.ts";
-import { canonicalPlaylistUrl, isYoutubeLink, parseYoutubeUrl } from "../shared/youtube.ts";
+import {
+  assertFolder,
+  changedBlocks,
+  loadSchedule,
+  sameBlocks,
+  saveSchedule,
+  sourceChanged,
+} from "./schedule/schedule.ts";
+import {
+  canonicalPlaylistUrl,
+  isYoutubeLink,
+  parseYoutubeUrl,
+} from "../shared/youtube.ts";
 import { frameOf } from "./files/still.ts";
-import { assertYoutubePlaylist, assertYoutubeVideo, youtubeTitles } from "./youtube/youtube.ts";
+import {
+  assertYoutubePlaylist,
+  assertYoutubeVideo,
+  youtubeTitles,
+} from "./youtube/youtube.ts";
 import { closeAppTabs, portsFrom } from "./tabs/tabs.ts";
 
 const app = new Hono();
@@ -38,7 +78,9 @@ let stopping = false;
 let closePorts = [PORT];
 
 // The request body, or null when it is not JSON.
-async function readJson(c: { req: { text: () => Promise<string> } }): Promise<unknown> {
+async function readJson(c: {
+  req: { text: () => Promise<string> };
+}): Promise<unknown> {
   try {
     return JSON.parse(await c.req.text()) as unknown;
   } catch {
@@ -90,7 +132,11 @@ async function keepIntermission(): Promise<void> {
 }
 
 // A local path must exist. A YouTube video or playlist must be readable.
-async function assertPlaySource(mode: ScheduleBlock["mode"], folder: string, file?: string): Promise<void> {
+async function assertPlaySource(
+  mode: ScheduleBlock["mode"],
+  folder: string,
+  file?: string,
+): Promise<void> {
   if (mode === "playlist") return;
   if (mode === "specific-file") {
     const youtube = parseYoutubeUrl(file ?? "");
@@ -102,7 +148,10 @@ async function assertPlaySource(mode: ScheduleBlock["mode"], folder: string, fil
     await assertVideo(file ?? "");
     return;
   }
-  if ((mode === "next-episode" || mode === "random-file") && canonicalPlaylistUrl(folder)) {
+  if (
+    (mode === "next-episode" || mode === "random-file") &&
+    canonicalPlaylistUrl(folder)
+  ) {
     await assertYoutubePlaylist(folder);
     return;
   }
@@ -153,7 +202,10 @@ app.put("/api/schedule", async (c) => {
     void rebuildSavedWeek(changed.map((block) => block.id));
     return c.json({ schedule: saved, today: await savedToday(), misses: [] });
   } catch (err) {
-    return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+    return c.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      400,
+    );
   }
 });
 
@@ -162,7 +214,9 @@ app.post("/api/youtube/titles", async (c) => {
   const body = await readJson(c);
   const listed = jsonField(body, "urls");
   const urls = Array.isArray(listed)
-    ? listed.filter((url): url is string => typeof url === "string").slice(0, 40)
+    ? listed
+        .filter((url): url is string => typeof url === "string")
+        .slice(0, 40)
     : [];
   return c.json({ titles: await youtubeTitles(urls) });
 });
@@ -190,7 +244,8 @@ app.get("/api/slot-length", async (c) => {
   }
   try {
     const maxMinRaw = Number(c.req.query("maxMin") ?? "");
-    const maxMin = Number.isInteger(maxMinRaw) && maxMinRaw > 0 ? maxMinRaw : undefined;
+    const maxMin =
+      Number.isInteger(maxMinRaw) && maxMinRaw > 0 ? maxMinRaw : undefined;
     const length = await slotLength({
       mode,
       folder: c.req.query("folder") ?? "",
@@ -199,7 +254,10 @@ app.get("/api/slot-length", async (c) => {
     });
     return c.json({ length });
   } catch (err) {
-    return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+    return c.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      400,
+    );
   }
 });
 
@@ -242,7 +300,10 @@ app.post("/api/tv/:date/items/:id/shuffle", async (c) => {
     await replayItem(itemId);
     return c.json(board);
   } catch (err) {
-    return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+    return c.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      400,
+    );
   }
 });
 
@@ -254,16 +315,24 @@ app.post("/api/tv/:date/items/:id/done", async (c) => {
     await replayItem(itemId);
     return c.json(board);
   } catch (err) {
-    return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+    return c.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      400,
+    );
   }
 });
 
 // A done episode is skipped again, or a movie leaves recently played.
 app.post("/api/tv/:date/items/:id/skipped", async (c) => {
   try {
-    return c.json(await markItemSkipped(c.req.param("date"), c.req.param("id")));
+    return c.json(
+      await markItemSkipped(c.req.param("date"), c.req.param("id")),
+    );
   } catch (err) {
-    return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+    return c.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      400,
+    );
   }
 });
 
@@ -274,7 +343,8 @@ app.post("/api/tv/:date/items/:id/episode", async (c) => {
   let direction: -1 | 0 | 1 = 0;
   if (asked === "prev") direction = -1;
   else if (asked === "next") direction = 1;
-  if (!direction) return c.json({ error: "direction must be prev or next" }, 400);
+  if (!direction)
+    return c.json({ error: "direction must be prev or next" }, 400);
   try {
     const date = c.req.param("date");
     const itemId = c.req.param("id");
@@ -282,7 +352,10 @@ app.post("/api/tv/:date/items/:id/episode", async (c) => {
     await replayItem(itemId);
     return c.json(board);
   } catch (err) {
-    return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+    return c.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      400,
+    );
   }
 });
 
@@ -291,7 +364,10 @@ app.post("/api/browse/pick-file", async (c) => {
   try {
     return c.json({ path: await pickFile() });
   } catch (err) {
-    return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+    return c.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      400,
+    );
   }
 });
 
@@ -300,7 +376,10 @@ app.post("/api/browse/pick", async (c) => {
   try {
     return c.json({ path: await pickFolder() });
   } catch (err) {
-    return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+    return c.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      400,
+    );
   }
 });
 
@@ -310,7 +389,10 @@ app.get("/api/browse/suggest", async (c) => {
   try {
     return c.json(await suggestPaths(c.req.query("path") ?? "", kind));
   } catch (err) {
-    return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+    return c.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      400,
+    );
   }
 });
 
@@ -319,7 +401,10 @@ app.get("/api/browse", async (c) => {
   try {
     return c.json(await browse(c.req.query("path")));
   } catch (err) {
-    return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+    return c.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      400,
+    );
   }
 });
 
@@ -333,7 +418,12 @@ app.post("/api/recent/remove", async (c) => {
   const body = await readJson(c);
   const folder = jsonField(body, "folder");
   const filePath = jsonField(body, "path");
-  if (typeof folder !== "string" || typeof filePath !== "string" || !folder || !filePath) {
+  if (
+    typeof folder !== "string" ||
+    typeof filePath !== "string" ||
+    !folder ||
+    !filePath
+  ) {
     return c.json({ error: "folder and path are required" }, 400);
   }
   return c.json(await forgetRandomPlayed(folder, filePath));
@@ -344,7 +434,10 @@ app.post("/api/player/start", async (c) => {
   try {
     return c.json(await startPlayer());
   } catch (err) {
-    return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    return c.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      500,
+    );
   }
 });
 
@@ -367,7 +460,9 @@ async function finishShutdown(): Promise<void> {
 app.post("/api/shutdown", async (c) => {
   if (!stopping) {
     stopping = true;
-    closePorts = portsFrom(c.req.header("origin") ?? c.req.header("referer") ?? "");
+    closePorts = portsFrom(
+      c.req.header("origin") ?? c.req.header("referer") ?? "",
+    );
     // Close while this request is still open. A page cannot close its own tab,
     // and trying to leaves about:blank before a later close can see the URL.
     await closeAppTabs(closePorts);
@@ -382,7 +477,8 @@ const clientIndex = path.join(clientDir, "index.html");
 if (existsSync(clientIndex)) {
   app.use("*", async (c, next) => {
     await next();
-    if (c.req.path.startsWith("/api") || c.req.path.startsWith("/assets/")) return;
+    if (c.req.path.startsWith("/api") || c.req.path.startsWith("/assets/"))
+      return;
     // The TV schedule is always "/", so a cached copy of that document hides a new build.
     // Admin is a different address and was loading the new files.
     c.res.headers.set("Cache-Control", "no-store");
@@ -414,13 +510,16 @@ async function main(): Promise<void> {
   await loadSchedule();
   await loadProgress();
 
-  httpServer = serve({ fetch: app.fetch, port: PORT, hostname: "0.0.0.0" }, (info) => {
-    console.log(`monjTV on http://0.0.0.0:${info.port}`);
-    if (!existsSync(clientIndex)) {
-      console.log("UI dev server: http://127.0.0.1:5173 (npm run dev)");
-    }
-    void openToday();
-  });
+  httpServer = serve(
+    { fetch: app.fetch, port: PORT, hostname: "0.0.0.0" },
+    (info) => {
+      console.log(`monjTV on http://0.0.0.0:${info.port}`);
+      if (!existsSync(clientIndex)) {
+        console.log("UI dev server: http://127.0.0.1:5173 (npm run dev)");
+      }
+      void openToday();
+    },
+  );
 }
 
 void main();

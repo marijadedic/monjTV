@@ -1,7 +1,10 @@
 import { itemStartsLater, secondsOf } from "../../../shared/window.ts";
 import type { RundownItem } from "../../../shared/types.ts";
 
-export function nextPlanned(items: RundownItem[], sec: number): RundownItem | null {
+export function nextPlanned(
+  items: RundownItem[],
+  sec: number,
+): RundownItem | null {
   let chosen: RundownItem | null = null;
   let chosenStart = Infinity;
   for (const item of items) {

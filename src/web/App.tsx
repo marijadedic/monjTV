@@ -19,7 +19,8 @@ function readTheme(): Theme {
   try {
     const stored = localStorage.getItem(THEME_STORAGE_KEY);
     const name = stored === "dusk" ? "meadow" : stored;
-    if (name && (THEMES as readonly string[]).includes(name)) return name as Theme;
+    if (name && (THEMES as readonly string[]).includes(name))
+      return name as Theme;
   } catch {
     /* private mode */
   }
@@ -170,21 +171,42 @@ export function App() {
               >
                 {t.recentPlayed}
               </button>
-              <button type="button" class="prefs-quit" disabled={off} onClick={() => void shutDown()}>
+              <button
+                type="button"
+                class="prefs-quit"
+                disabled={off}
+                onClick={() => void shutDown()}
+              >
                 {t.shutDown}
               </button>
             </div>
           </details>
         </header>
         <nav class="folders" aria-label={t.sections}>
-          <a href={pageHref("/")} class={admin ? "" : "on"} aria-current={admin ? undefined : "page"}>
+          <a
+            href={pageHref("/")}
+            class={admin ? "" : "on"}
+            aria-current={admin ? undefined : "page"}
+          >
             {t.tv}
           </a>
-          <a href={pageHref("/admin")} class={admin ? "on" : ""} aria-current={admin ? "page" : undefined}>
+          <a
+            href={pageHref("/admin")}
+            class={admin ? "on" : ""}
+            aria-current={admin ? "page" : undefined}
+          >
             {t.admin}
           </a>
         </nav>
-        <main>{off ? <p class="empty">{t.off}</p> : admin ? <Admin /> : <TvSchedule />}</main>
+        <main>
+          {off ? (
+            <p class="empty">{t.off}</p>
+          ) : admin ? (
+            <Admin />
+          ) : (
+            <TvSchedule />
+          )}
+        </main>
       </div>
       {recentOpen && <RecentWindow onClose={() => setRecentOpen(false)} />}
     </>

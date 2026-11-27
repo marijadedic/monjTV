@@ -3,7 +3,13 @@ import "./styles/WhenEditor.row.css";
 import "./styles/WhenEditor.fields.css";
 import "./styles/WhenEditor.times.css";
 import type { StateUpdater } from "preact/hooks";
-import { DAYS, type Day, type ScheduleBlock, type SlotLength, type TvBoard } from "../../../shared/types.ts";
+import {
+  DAYS,
+  type Day,
+  type ScheduleBlock,
+  type SlotLength,
+  type TvBoard,
+} from "../../../shared/types.ts";
 import { placedOn } from "../../../shared/placed.ts";
 import { nextDay, windowOn } from "../../../shared/window.ts";
 import { useI18n } from "../../i18n.tsx";
@@ -46,7 +52,11 @@ export function WhenEditor({
       if (current.days.includes(day)) {
         const starts = { ...current.starts };
         delete starts[day];
-        return { ...current, days: current.days.filter((item) => item !== day), starts };
+        return {
+          ...current,
+          days: current.days.filter((item) => item !== day),
+          starts,
+        };
       }
       return {
         ...current,
@@ -93,12 +103,18 @@ export function WhenEditor({
           const start = startOnDraft(draft, day);
           const spills = Boolean(activeSec && spillsPastDay(start, activeSec));
           const clash = clashes
-            .filter((item) => item.day === day || (spills && item.day === nextDay(day)))
+            .filter(
+              (item) =>
+                item.day === day || (spills && item.day === nextDay(day)),
+            )
             .sort((a, b) => toMin(a.start) - toMin(b.start))[0];
           const prev = prevOnDay(day, start, blocks, draft.id);
           const next = nextOnDay(day, start, blocks, draft.id);
           const end = activeSec ? endFace(start, activeSec) : undefined;
-          const endLabel = draft.mode === "playlist" && draft.items.length === 0 ? "/" : (end ?? "/");
+          const endLabel =
+            draft.mode === "playlist" && draft.items.length === 0
+              ? "/"
+              : (end ?? "/");
           const neighbors = [
             ...(prev ? [`${t.prevAt} ${placedOn(prev, day, board).end}`] : []),
             ...(next ? [`${t.laterAt} ${windowOn(next, day).start}`] : []),
@@ -112,7 +128,9 @@ export function WhenEditor({
                   type="time"
                   value={start}
                   aria-label={`${t.dayName[day]} ${t.startTime}`}
-                  onInput={(event) => changeStart(day, (event.target as HTMLInputElement).value)}
+                  onInput={(event) =>
+                    changeStart(day, (event.target as HTMLInputElement).value)
+                  }
                 />
                 <span class="when-end">
                   - {endLabel}

@@ -7,7 +7,10 @@ export function readLang(): "en" | "hr" {
   } catch {
     /* private mode */
   }
-  if (typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("hr")) {
+  if (
+    typeof navigator !== "undefined" &&
+    navigator.language.toLowerCase().startsWith("hr")
+  ) {
     return "hr";
   }
   return "en";

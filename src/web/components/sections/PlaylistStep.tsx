@@ -1,7 +1,12 @@
 import type { StateUpdater } from "preact/hooks";
 import type { ItemMode, SlotLength } from "../../../shared/types.ts";
 import { nextDay } from "../../../shared/window.ts";
-import { canonicalPlaylistUrl, isYoutubeLink, isYoutubeUrl, parseYoutubeUrl } from "../../../shared/youtube.ts";
+import {
+  canonicalPlaylistUrl,
+  isYoutubeLink,
+  isYoutubeUrl,
+  parseYoutubeUrl,
+} from "../../../shared/youtube.ts";
 import { ADD_MODES } from "../../constants/addModes.ts";
 import { useI18n } from "../../i18n.tsx";
 import type { Draft } from "../../types/Draft.ts";
@@ -100,7 +105,9 @@ export function PlaylistStep({
 
   function beginAdd() {
     slideTo("slide-next");
-    setDraft((current) => (current ? { ...current, addPhase: "kind" } : current));
+    setDraft((current) =>
+      current ? { ...current, addPhase: "kind" } : current,
+    );
   }
 
   function moveItem(id: string, dir: -1 | 1) {
@@ -119,17 +126,31 @@ export function PlaylistStep({
   function clearDrag() {
     draggingId.current = null;
     formRef.current
-      ?.querySelectorAll(".playlist-item.dragging, .playlist-item.over-before, .playlist-item.over-after, .playlist-gap.over")
-      .forEach((el) => el.classList.remove("dragging", "over-before", "over-after", "over"));
+      ?.querySelectorAll(
+        ".playlist-item.dragging, .playlist-item.over-before, .playlist-item.over-after, .playlist-gap.over",
+      )
+      .forEach((el) =>
+        el.classList.remove("dragging", "over-before", "over-after", "over"),
+      );
   }
 
   function markDrop(target: HTMLElement, after: boolean) {
     const root = formRef.current;
     if (!root) return;
-    root.querySelectorAll(".playlist-item.over-before, .playlist-item.over-after, .playlist-gap.over").forEach((el) => {
-      el.classList.remove("over-before", "over-after", "over");
-    });
-    target.classList.add(target.classList.contains("playlist-gap") ? "over" : after ? "over-after" : "over-before");
+    root
+      .querySelectorAll(
+        ".playlist-item.over-before, .playlist-item.over-after, .playlist-gap.over",
+      )
+      .forEach((el) => {
+        el.classList.remove("over-before", "over-after", "over");
+      });
+    target.classList.add(
+      target.classList.contains("playlist-gap")
+        ? "over"
+        : after
+          ? "over-after"
+          : "over-before",
+    );
   }
 
   function dropItem(targetId: string, after: boolean) {
@@ -151,19 +172,31 @@ export function PlaylistStep({
   }
 
   function removeItem(id: string) {
-    setDraft((current) => (current ? { ...current, items: current.items.filter((item) => item.id !== id) } : current));
+    setDraft((current) =>
+      current
+        ? { ...current, items: current.items.filter((item) => item.id !== id) }
+        : current,
+    );
   }
 
   function pickMode(mode: ItemMode) {
     if (mode === "random-file") stopMeasuring();
     slideTo("slide-next");
-    const keepList = mode !== "specific-file" && draft.addMode !== "specific-file";
+    const keepList =
+      mode !== "specific-file" && draft.addMode !== "specific-file";
     setDraft({
       ...draft,
       addMode: mode,
       addSource: keepList ? draft.addSource : "path",
-      addFolder: mode === "specific-file" || (!keepList && isYoutubeLink(draft.addFolder)) ? "" : draft.addFolder,
-      addFile: mode === "specific-file" && !isYoutubeUrl(draft.addFile) ? draft.addFile : "",
+      addFolder:
+        mode === "specific-file" ||
+        (!keepList && isYoutubeLink(draft.addFolder))
+          ? ""
+          : draft.addFolder,
+      addFile:
+        mode === "specific-file" && !isYoutubeUrl(draft.addFile)
+          ? draft.addFile
+          : "",
       addLengthChoice: mode === "random-file" ? 60 : "longest",
       addPhase: "source",
     });
@@ -192,7 +225,9 @@ export function PlaylistStep({
     setDraft((current) => {
       if (!current) return current;
       if (source === "longest") {
-        return current.addLengthChoice === "longest" ? current : { ...current, addLengthChoice: "longest" };
+        return current.addLengthChoice === "longest"
+          ? current
+          : { ...current, addLengthChoice: "longest" };
       }
       if (current.addLengthChoice !== "longest") return current;
       return { ...current, addLengthChoice: 60 };
@@ -202,7 +237,10 @@ export function PlaylistStep({
   function openGap(item: DraftItem) {
     dismissTip();
     setGapError(null);
-    setGapEdit({ itemId: item.id, minutes: gapOf(item) ? String(gapOf(item)) : "" });
+    setGapEdit({
+      itemId: item.id,
+      minutes: gapOf(item) ? String(gapOf(item)) : "",
+    });
   }
 
   if (draft.mode !== "playlist") return null;
@@ -212,7 +250,11 @@ export function PlaylistStep({
       {showWhat && (
         <>
           {!editingPart && (
-            <PlaylistNameField value={draft.name} invalid={nameInvalid} onInput={changeName} />
+            <PlaylistNameField
+              value={draft.name}
+              invalid={nameInvalid}
+              onInput={changeName}
+            />
           )}
           <PlaylistStack
             items={draft.items}
@@ -252,17 +294,25 @@ export function PlaylistStep({
           )}
           {showAddSource && (
             <>
-              <SourcePick mode={draft.addMode} source={draft.addSource} onPick={onPickSource} />
+              <SourcePick
+                mode={draft.addMode}
+                source={draft.addSource}
+                onPick={onPickSource}
+              />
               {draft.addSource === "youtube" && (
-                <p class="mode-note">
-                  {youtubeAddNote(draft.addMode, t)}
-                </p>
+                <p class="mode-note">{youtubeAddNote(draft.addMode, t)}</p>
               )}
               {draft.addSource === "youtube" ? (
                 <YoutubeField
-                  value={draft.addMode === "specific-file" ? draft.addFile : draft.addFolder}
+                  value={
+                    draft.addMode === "specific-file"
+                      ? draft.addFile
+                      : draft.addFolder
+                  }
                   placeholder={
-                    draft.addMode === "specific-file" ? t.youtubePlaceholder : t.youtubePlaylistPlaceholder
+                    draft.addMode === "specific-file"
+                      ? t.youtubePlaceholder
+                      : t.youtubePlaylistPlaceholder
                   }
                   invalid={Boolean(folderError)}
                   onChange={changeYoutube}
@@ -271,12 +321,22 @@ export function PlaylistStep({
                 <FolderPath
                   key={draft.addMode}
                   kind={draft.addMode === "specific-file" ? "video" : "folder"}
-                  value={draft.addMode === "specific-file" ? draft.addFile : draft.addFolder}
-                  placeholder={draft.addMode === "specific-file" ? t.videoPlaceholder : t.folderPlaceholder}
+                  value={
+                    draft.addMode === "specific-file"
+                      ? draft.addFile
+                      : draft.addFolder
+                  }
+                  placeholder={
+                    draft.addMode === "specific-file"
+                      ? t.videoPlaceholder
+                      : t.folderPlaceholder
+                  }
                   invalid={Boolean(folderError)}
                   actionLabel={picking ? t.choosing : t.browse}
                   actionBusy={picking}
-                  listLabel={draft.addMode === "specific-file" ? t.video : t.folder}
+                  listLabel={
+                    draft.addMode === "specific-file" ? t.video : t.folder
+                  }
                   onChange={changePath}
                   onAction={onBrowse}
                 />
@@ -293,20 +353,33 @@ export function PlaylistStep({
                 !canonicalPlaylistUrl(draft.addFolder) && (
                   <FieldNote>{t.error("Not a YouTube playlist URL")}</FieldNote>
                 )}
-              {measuring && pathChosen && !(draft.addMode === "random-file" && draft.addLengthChoice !== "longest") ? (
-                <MeasureWait label={<span class="measure-label">{t.measuringVideos}</span>} />
+              {measuring &&
+              pathChosen &&
+              !(
+                draft.addMode === "random-file" &&
+                draft.addLengthChoice !== "longest"
+              ) ? (
+                <MeasureWait
+                  label={<span class="measure-label">{t.measuringVideos}</span>}
+                />
               ) : addPreviewEnd ? (
                 <div class="picked">
                   <div>
                     <span class="k">{t.videoDuration}</span>
                     <span class="value">
-                      {length && (draft.addSource === "youtube" || draft.addMode === "random-file") && length.title
+                      {length &&
+                      (draft.addSource === "youtube" ||
+                        draft.addMode === "random-file") &&
+                      length.title
                         ? `${length.title} · ${t.slotDurationOf(lengthMins)}`
-                        : t.slotDurationOf(Math.max(1, Math.ceil((addSec ?? 0) / 60)))}
+                        : t.slotDurationOf(
+                            Math.max(1, Math.ceil((addSec ?? 0) / 60)),
+                          )}
                     </span>
                   </div>
                   <p class="when-note">
-                    {t.startsMark} · {addPreviewStart} · {t.endsMark} · {addPreviewEnd}
+                    {t.startsMark} · {addPreviewStart} · {t.endsMark} ·{" "}
+                    {addPreviewEnd}
                     {addPreviewSpill ? ` ${t.day[nextDay(draft.origin)]}` : ""}
                   </p>
                 </div>
@@ -322,33 +395,51 @@ export function PlaylistStep({
                   onLongest={() => chooseCap("longest")}
                   info={
                     draft.addLengthChoice === "longest" ? (
-                      <InfoButton label={t.playlistRandomCap} tip={t.playlistLongestHint} />
+                      <InfoButton
+                        label={t.playlistRandomCap}
+                        tip={t.playlistLongestHint}
+                      />
                     ) : undefined
                   }
                 />
               )}
-              {pathChosen && draft.addMode === "random-file" && draft.addLengthChoice !== "longest" && (
-                <div class="fixed">
-                  <span class="k">{t.playlistRandomCap}</span>
-                  <DurationPick
-                    lengthChoice={draft.addLengthChoice}
-                    customMin={draft.addCustomMin}
-                    lengthCh={lengthCh}
-                    tip={t.playlistRandomHint}
-                    onChoice={(value) =>
-                      setDraft((current) => (current ? { ...current, addLengthChoice: value } : current))
-                    }
-                    onCustom={(value) =>
-                      setDraft((current) => (current ? { ...current, addCustomMin: value } : current))
-                    }
-                  />
-                  {draft.addLengthChoice === "custom" &&
-                    draft.addCustomMin.trim() !== "" &&
-                    addFixedMinutes(draft) === null && <FieldNote>{t.needMinutes}</FieldNote>}
-                </div>
-              )}
+              {pathChosen &&
+                draft.addMode === "random-file" &&
+                draft.addLengthChoice !== "longest" && (
+                  <div class="fixed">
+                    <span class="k">{t.playlistRandomCap}</span>
+                    <DurationPick
+                      lengthChoice={draft.addLengthChoice}
+                      customMin={draft.addCustomMin}
+                      lengthCh={lengthCh}
+                      tip={t.playlistRandomHint}
+                      onChoice={(value) =>
+                        setDraft((current) =>
+                          current
+                            ? { ...current, addLengthChoice: value }
+                            : current,
+                        )
+                      }
+                      onCustom={(value) =>
+                        setDraft((current) =>
+                          current
+                            ? { ...current, addCustomMin: value }
+                            : current,
+                        )
+                      }
+                    />
+                    {draft.addLengthChoice === "custom" &&
+                      draft.addCustomMin.trim() !== "" &&
+                      addFixedMinutes(draft) === null && (
+                        <FieldNote>{t.needMinutes}</FieldNote>
+                      )}
+                  </div>
+                )}
               {draft.addMode === "next-episode" && pathChosen && (
-                <InfoButton label={t.playlistNextHint} tip={t.playlistNextHint} />
+                <InfoButton
+                  label={t.playlistNextHint}
+                  tip={t.playlistNextHint}
+                />
               )}
               {folderError && <FieldNote>{t.error(folderError)}</FieldNote>}
             </>

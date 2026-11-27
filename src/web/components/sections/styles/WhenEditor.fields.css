@@ -1,4 +1,7 @@
-.add-form label, .folder-block, .pick-mode, .also {
+.add-form label,
+.folder-block,
+.pick-mode,
+.also {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -64,7 +67,8 @@
   border-color: var(--primary-line);
   background: color-mix(in srgb, var(--primary) 28%, var(--panel));
 }
-.add-form .fixed, .add-form .wait {
+.add-form .fixed,
+.add-form .wait {
   display: grid;
   gap: 8px;
   margin-top: 12px;
@@ -94,7 +98,8 @@
   color: var(--muted);
   flex: 0 0 auto;
 }
-.add-form .info:hover, .add-form .info:focus-visible {
+.add-form .info:hover,
+.add-form .info:focus-visible {
   color: var(--text);
   border-color: var(--accent);
 }
@@ -103,7 +108,8 @@
   display: inline-flex;
   min-width: 0;
 }
-.add-form .cloud, .cloud.lifted {
+.add-form .cloud,
+.cloud.lifted {
   position: absolute;
   z-index: 40;
   width: max-content;
@@ -126,7 +132,10 @@
 .cloud.lifted {
   position: fixed;
 }
-.add-form .cloud::after, .add-form .cloud::before, .cloud.lifted::after, .cloud.lifted::before {
+.add-form .cloud::after,
+.add-form .cloud::before,
+.cloud.lifted::after,
+.cloud.lifted::before {
   content: "";
   position: absolute;
   top: 100%;
@@ -135,17 +144,20 @@
   border-style: solid;
   border-color: transparent;
 }
-.add-form .cloud::after, .cloud.lifted::after {
+.add-form .cloud::after,
+.cloud.lifted::after {
   border-width: 7px 6px 0;
   border-top-color: var(--line);
 }
-.add-form .cloud::before, .cloud.lifted::before {
+.add-form .cloud::before,
+.cloud.lifted::before {
   border-width: 6px 5px 0;
   border-top-color: var(--panel);
   margin-top: -3px;
   z-index: 1;
 }
-.cloud.lifted.below::after, .cloud.lifted.below::before {
+.cloud.lifted.below::after,
+.cloud.lifted.below::before {
   top: auto;
   bottom: 100%;
 }

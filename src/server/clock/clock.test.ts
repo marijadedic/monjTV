@@ -1,7 +1,15 @@
 // Wall-clock arithmetic. The numbers are the clock contract, not a reading of the function.
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { dateKey, formatHm, isHm, msUntil, nowSec, parseHm, weekday } from "./clock.ts";
+import {
+  dateKey,
+  formatHm,
+  isHm,
+  msUntil,
+  nowSec,
+  parseHm,
+  weekday,
+} from "./clock.ts";
 
 describe("wall clock", () => {
   it("reads 17:12 as twelve minutes past five in the evening", () => {

@@ -4,7 +4,12 @@ import { emptyStack } from "@utils/playlist/emptyStack.ts";
 import { endFromDuration } from "@utils/clock/endFromDuration.ts";
 import { inputTime } from "@utils/clock/inputTime.ts";
 
-export function gapDraft(day: Day, startMin: number, endMin: number, at: number): Draft {
+export function gapDraft(
+  day: Day,
+  startMin: number,
+  endMin: number,
+  at: number,
+): Draft {
   let start = startMin + Math.round((at - startMin) / 30) * 30;
   start = Math.min(Math.max(start, startMin), endMin);
   if (endMin - start < 30) start = startMin;

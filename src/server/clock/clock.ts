@@ -1,15 +1,7 @@
 // The wall clock: today, the weekday, and times.
 import type { Day } from "../../shared/types.ts";
 
-const JS_DAY_TO_DAY: Day[] = [
-  "sun",
-  "mon",
-  "tue",
-  "wed",
-  "thu",
-  "fri",
-  "sat",
-];
+const JS_DAY_TO_DAY: Day[] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
 // Weekday key for a date.
 export function weekday(d = new Date()): Day {
@@ -29,7 +21,14 @@ export function parseHm(hm: string): number {
   const [hRaw, mRaw] = hm.split(":");
   const h = Number(hRaw);
   const m = Number(mRaw);
-  if (!Number.isInteger(h) || !Number.isInteger(m) || h < 0 || h > 23 || m < 0 || m > 59) {
+  if (
+    !Number.isInteger(h) ||
+    !Number.isInteger(m) ||
+    h < 0 ||
+    h > 23 ||
+    m < 0 ||
+    m > 59
+  ) {
     throw new Error(`Invalid time: ${hm}`);
   }
   return h * 3600 + m * 60;

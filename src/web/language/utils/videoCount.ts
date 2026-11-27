@@ -11,7 +11,11 @@ function countForm(count: number, lang: "en" | "hr"): keyof CountParts {
   return "many";
 }
 
-export function videoCount(count: number, forms: CountParts, lang: "en" | "hr"): string {
+export function videoCount(
+  count: number,
+  forms: CountParts,
+  lang: "en" | "hr",
+): string {
   const form = countForm(count, lang);
   return fill(forms[form], { count });
 }

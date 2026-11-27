@@ -30,7 +30,13 @@ describe("the week on the TV schedule", () => {
   it("shows the spinner and the latest fit warning", () => {
     markBuilding(["evening"]);
     noteSaveMisses([
-      { blockId: "film", kind: "video", title: "Night", durationSec: 3 * 3600, limitSec: 3600 },
+      {
+        blockId: "film",
+        kind: "video",
+        title: "Night",
+        durationSec: 3 * 3600,
+        limitSec: 3600,
+      },
     ]);
     const shown = presentBoard({ carriedInto: dateKey(), days: [] });
     assert.deepEqual(shown.building, ["evening"]);

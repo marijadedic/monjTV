@@ -26,7 +26,9 @@ async function walk(dir: string, depth: number, out: string[]): Promise<void> {
   } catch {
     return;
   }
-  entries.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  entries.sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true }),
+  );
   for (const entry of entries) {
     if (entry.name.startsWith(".")) continue;
     const full = path.join(dir, entry.name);
@@ -43,13 +45,17 @@ async function walk(dir: string, depth: number, out: string[]): Promise<void> {
 export async function listVideos(folder: string): Promise<string[]> {
   const out: string[] = [];
   await walk(folder, 0, out);
-  out.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+  out.sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
+  );
   return out;
 }
 
 // Folders and videos in one directory, for the folder picker.
 export async function browse(rawPath?: string): Promise<BrowseResult> {
-  const resolved = path.resolve(rawPath && rawPath.length > 0 ? rawPath : os.homedir());
+  const resolved = path.resolve(
+    rawPath && rawPath.length > 0 ? rawPath : os.homedir(),
+  );
   let entries;
   try {
     entries = await readdir(resolved, { withFileTypes: true });
@@ -68,8 +74,12 @@ export async function browse(rawPath?: string): Promise<BrowseResult> {
       videos.push({ name: entry.name, path: full });
     }
   }
-  dirs.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-  videos.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  dirs.sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true }),
+  );
+  videos.sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true }),
+  );
 
   const parent = path.dirname(resolved);
   return {
@@ -109,7 +119,9 @@ async function childDirs(dir: string): Promise<PathHit[]> {
     if (entry.name.startsWith(".") || !entry.isDirectory()) continue;
     dirs.push({ name: entry.name, path: path.join(dir, entry.name) });
   }
-  dirs.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  dirs.sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true }),
+  );
   return dirs;
 }
 
@@ -120,9 +132,13 @@ export async function suggestFolders(raw: string): Promise<PathHit[]> {
   const { dir, prefix } = splitTypedPath(typed);
   const dirs = await childDirs(dir);
   const needle = prefix.toLowerCase();
-  let matches = needle ? dirs.filter((dir) => dir.name.toLowerCase().startsWith(needle)) : dirs;
+  let matches = needle
+    ? dirs.filter((dir) => dir.name.toLowerCase().startsWith(needle))
+    : dirs;
   const exact =
-    matches.length === 1 && matches[0].name.toLowerCase() === needle && !/[\\/]$/.test(typed);
+    matches.length === 1 &&
+    matches[0].name.toLowerCase() === needle &&
+    !/[\\/]$/.test(typed);
   if (exact) {
     const nested = await childDirs(matches[0].path);
     if (nested.length > 0) matches = nested;
@@ -145,7 +161,9 @@ async function childVideos(dir: string): Promise<PathHit[]> {
     if (!VIDEO_EXT.has(path.extname(entry.name).toLowerCase())) continue;
     videos.push({ name: entry.name, path: path.join(dir, entry.name) });
   }
-  videos.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  videos.sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true }),
+  );
   return videos;
 }
 
@@ -156,7 +174,9 @@ function filterPrefix(hits: PathHit[], needle: string): PathHit[] {
 }
 
 // Videos and folders that continue a path being typed.
-async function suggestVideos(raw: string): Promise<{ dirs: PathHit[]; videos: PathHit[] }> {
+async function suggestVideos(
+  raw: string,
+): Promise<{ dirs: PathHit[]; videos: PathHit[] }> {
   const typed = raw.trim();
   if (!typed) return { dirs: [], videos: [] };
   const { dir, prefix } = splitTypedPath(typed);
@@ -179,7 +199,9 @@ async function suggestVideos(raw: string): Promise<{ dirs: PathHit[]; videos: Pa
   const current = typed.replace(/[\\/]+$/, "");
   return {
     dirs: dirs.filter((dir) => dir.path !== current).slice(0, SUGGEST_LIMIT),
-    videos: videos.filter((file) => file.path !== current).slice(0, SUGGEST_LIMIT),
+    videos: videos
+      .filter((file) => file.path !== current)
+      .slice(0, SUGGEST_LIMIT),
   };
 }
 
@@ -214,7 +236,9 @@ export async function isDir(p: string): Promise<boolean> {
 // Cancel, a missing binary, or a real failure.
 function classifyPickerError(err: unknown): PickerFailure {
   const record =
-    err && typeof err === "object" ? (err as { code?: unknown; stderr?: unknown }) : {};
+    err && typeof err === "object"
+      ? (err as { code?: unknown; stderr?: unknown })
+      : {};
   if (record.code === "ENOENT") return "missing";
   const stderr = typeof record.stderr === "string" ? record.stderr : "";
   const message = err instanceof Error ? err.message : String(err);
@@ -240,7 +264,11 @@ function cleanPicked(stdout: string): string {
 }
 
 // Run one picker. Null when the user cancels or the result is the wrong kind.
-async function runPicker(bin: string, args: string[], kind: "dir" | "video"): Promise<string | null> {
+async function runPicker(
+  bin: string,
+  args: string[],
+  kind: "dir" | "video",
+): Promise<string | null> {
   try {
     const { stdout } = await execFileAsync(bin, args);
     const picked = cleanPicked(stdout);
@@ -269,26 +297,79 @@ async function onPath(bin: string): Promise<boolean> {
 }
 
 // Folder or video dialogs. First match on PATH wins.
-function linuxPickers(kind: "dir" | "video"): { bin: string; args: string[] }[] {
+function linuxPickers(
+  kind: "dir" | "video",
+): { bin: string; args: string[] }[] {
   const start = os.homedir();
   const filename = start.endsWith("/") ? start : `${start}/`;
   if (kind === "dir") {
     const title = "Choose a folder for this block";
     return [
-      { bin: "zenity", args: ["--file-selection", "--directory", `--title=${title}`, `--filename=${filename}`] },
+      {
+        bin: "zenity",
+        args: [
+          "--file-selection",
+          "--directory",
+          `--title=${title}`,
+          `--filename=${filename}`,
+        ],
+      },
       { bin: "kdialog", args: ["--getexistingdirectory", start, title] },
-      { bin: "qarma", args: ["--file-selection", "--directory", `--title=${title}`, `--filename=${filename}`] },
-      { bin: "yad", args: ["--file", "--directory", `--title=${title}`, `--filename=${filename}`] },
+      {
+        bin: "qarma",
+        args: [
+          "--file-selection",
+          "--directory",
+          `--title=${title}`,
+          `--filename=${filename}`,
+        ],
+      },
+      {
+        bin: "yad",
+        args: [
+          "--file",
+          "--directory",
+          `--title=${title}`,
+          `--filename=${filename}`,
+        ],
+      },
     ];
   }
   const title = "Choose a video for this block";
   const pattern = [...VIDEO_EXT].map((ext) => `*${ext}`).join(" ");
   const filter = `Videos | ${pattern}`;
   return [
-    { bin: "zenity", args: ["--file-selection", `--title=${title}`, `--filename=${filename}`, `--file-filter=${filter}`] },
-    { bin: "kdialog", args: ["--getopenfilename", start, `${pattern}|Videos`, "--title", title] },
-    { bin: "qarma", args: ["--file-selection", `--title=${title}`, `--filename=${filename}`, `--file-filter=${filter}`] },
-    { bin: "yad", args: ["--file", `--title=${title}`, `--filename=${filename}`, `--file-filter=${filter}`] },
+    {
+      bin: "zenity",
+      args: [
+        "--file-selection",
+        `--title=${title}`,
+        `--filename=${filename}`,
+        `--file-filter=${filter}`,
+      ],
+    },
+    {
+      bin: "kdialog",
+      args: ["--getopenfilename", start, `${pattern}|Videos`, "--title", title],
+    },
+    {
+      bin: "qarma",
+      args: [
+        "--file-selection",
+        `--title=${title}`,
+        `--filename=${filename}`,
+        `--file-filter=${filter}`,
+      ],
+    },
+    {
+      bin: "yad",
+      args: [
+        "--file",
+        `--title=${title}`,
+        `--filename=${filename}`,
+        `--file-filter=${filter}`,
+      ],
+    },
   ];
 }
 
@@ -307,7 +388,8 @@ async function pickOnLinux(kind: "dir" | "video"): Promise<string | null> {
       lastError = error;
     }
   }
-  const typed = kind === "video" ? "Type the video path." : "Type the folder path.";
+  const typed =
+    kind === "video" ? "Type the video path." : "Type the folder path.";
   if (!sawPicker) throw new Error(typed);
   const which = kind === "video" ? "file" : "folder";
   throw new Error(
@@ -320,7 +402,10 @@ export async function pickFolder(): Promise<string | null> {
   if (process.platform === "darwin") {
     return runPicker(
       "osascript",
-      ["-e", 'POSIX path of (choose folder with prompt "Choose a folder for this block")'],
+      [
+        "-e",
+        'POSIX path of (choose folder with prompt "Choose a folder for this block")',
+      ],
       "dir",
     );
   }
@@ -352,9 +437,11 @@ export async function assertVideo(file: string): Promise<void> {
   if (await isVideoFile(trimmed)) return;
   try {
     const info = await stat(trimmed);
-    if (info.isFile() || info.isDirectory()) throw new Error(`Not a video file: ${trimmed}`);
+    if (info.isFile() || info.isDirectory())
+      throw new Error(`Not a video file: ${trimmed}`);
   } catch (err) {
-    if (err instanceof Error && err.message.startsWith("Not a video file")) throw err;
+    if (err instanceof Error && err.message.startsWith("Not a video file"))
+      throw err;
   }
   throw new Error(`Video does not exist: ${trimmed}`);
 }

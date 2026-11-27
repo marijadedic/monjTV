@@ -13,7 +13,8 @@ let ensuring: Promise<string> | null = null;
 
 // Distro yt-dlp is often too old for YouTube. Prefer a current binary in tools/.
 function assetName(): string {
-  if (process.platform === "linux" && process.arch === "arm64") return "yt-dlp_linux_aarch64";
+  if (process.platform === "linux" && process.arch === "arm64")
+    return "yt-dlp_linux_aarch64";
   if (process.platform === "linux") return "yt-dlp_linux";
   if (process.platform === "darwin") return "yt-dlp_macos";
   return "yt-dlp";

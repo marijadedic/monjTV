@@ -43,7 +43,8 @@ export function TvSchedule() {
       setError(null);
     }
     if (statusResult.status === "fulfilled") setStatus(statusResult.value);
-    if (recentResult.status === "fulfilled") setPlayed(playedPaths(recentResult.value));
+    if (recentResult.status === "fulfilled")
+      setPlayed(playedPaths(recentResult.value));
     if (boardResult.status === "rejected") throw boardResult.reason;
   }
 
@@ -177,15 +178,25 @@ export function TvSchedule() {
   }
 
   const items = day?.items ?? [];
-  const current = live ? (items.find((item) => item.id === status?.currentItemId) ?? null) : null;
+  const current = live
+    ? (items.find((item) => item.id === status?.currentItemId) ?? null)
+    : null;
   const sec = nowSec(now);
   const next = live ? nextPlanned(items, sec) : null;
-  const due = live && !current && !status?.fallbackTitle ? onNowPlanned(items, sec) : null;
+  const due =
+    live && !current && !status?.fallbackTitle
+      ? onNowPlanned(items, sec)
+      : null;
   const held = live && !current ? heldItem(items, sec) : null;
-  const liveFiller = live && !current && status?.fallbackTitle ? status.fallbackTitle : null;
-  const namedLive = liveFiller && !liveFiller.startsWith("YouTube · ") ? liveFiller : null;
-  const fillerName = live ? watchTitle || status?.intermissionTitle || null : null;
-  const gapTitle = namedLive || (!current && !due ? fillerName : null) || liveFiller;
+  const liveFiller =
+    live && !current && status?.fallbackTitle ? status.fallbackTitle : null;
+  const namedLive =
+    liveFiller && !liveFiller.startsWith("YouTube · ") ? liveFiller : null;
+  const fillerName = live
+    ? watchTitle || status?.intermissionTitle || null
+    : null;
+  const gapTitle =
+    namedLive || (!current && !due ? fillerName : null) || liveFiller;
   const gapFile = gapStillFile(gapTitle, status);
   const air = current ?? due;
 
@@ -245,7 +256,14 @@ export function TvSchedule() {
   }
 
   const rail =
-    day && items.length > 0 ? <Rail carried={carried} ownItems={ownItems} fromDay={fromDay} card={card} /> : null;
+    day && items.length > 0 ? (
+      <Rail
+        carried={carried}
+        ownItems={ownItems}
+        fromDay={fromDay}
+        card={card}
+      />
+    ) : null;
 
   return (
     <section class={`tv${past ? " is-past" : ""}`}>
@@ -284,7 +302,11 @@ export function TvSchedule() {
         </div>
       )}
       {!live && rail && (
-        <div id="tv-day" role="tabpanel" aria-labelledby={day ? `day-${day.date}` : undefined}>
+        <div
+          id="tv-day"
+          role="tabpanel"
+          aria-labelledby={day ? `day-${day.date}` : undefined}
+        >
           {rail}
         </div>
       )}

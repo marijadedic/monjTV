@@ -36,12 +36,19 @@ export async function readBoard(): Promise<BoardFile> {
   const saved = await readJsonFile(tvPath);
   const legacy = await readJsonFile(todayPath);
   const legacyDay = isDay(legacy) && legacy.date ? legacy : null;
-  if (saved && typeof saved === "object" && Array.isArray((saved as BoardFile).days)) {
+  if (
+    saved &&
+    typeof saved === "object" &&
+    Array.isArray((saved as BoardFile).days)
+  ) {
     const file = saved as BoardFile;
-    const days = file.days.filter(isDay).map((day) => ({ ...day, items: day.items.map(migrateItem) }));
+    const days = file.days
+      .filter(isDay)
+      .map((day) => ({ ...day, items: day.items.map(migrateItem) }));
     if (days.length > 0 || !legacyDay) {
       return {
-        carriedInto: typeof file.carriedInto === "string" ? file.carriedInto : undefined,
+        carriedInto:
+          typeof file.carriedInto === "string" ? file.carriedInto : undefined,
         days,
       };
     }

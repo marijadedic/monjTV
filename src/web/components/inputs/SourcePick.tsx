@@ -15,12 +15,19 @@ export function SourcePick({
   const { t } = useI18n();
   const choices: { id: PlaySource; label: string }[] = [
     { id: "path", label: mode === "specific-file" ? t.video : t.folder },
-    { id: "youtube", label: mode === "specific-file" ? t.youtube : t.youtubePlaylist },
+    {
+      id: "youtube",
+      label: mode === "specific-file" ? t.youtube : t.youtubePlaylist,
+    },
   ];
   return (
     <fieldset class="source">
       <legend class="k">{t.intermissionFrom}</legend>
-      <div class="source-grid" role="radiogroup" aria-label={t.intermissionFrom}>
+      <div
+        class="source-grid"
+        role="radiogroup"
+        aria-label={t.intermissionFrom}
+      >
         {choices.map((choice) => (
           <ModeOption
             key={choice.id}

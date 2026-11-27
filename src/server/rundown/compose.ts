@@ -1,7 +1,17 @@
 // Build one day's rows from the weekly grid.
 import { weekdayOfKey } from "../../shared/dates.ts";
-import type { DayRundown, Progress, RundownItem, TodayRundown } from "../../shared/types.ts";
-import { DAY_MINUTES, lengthMinutes, prevDay, windowOn } from "../../shared/window.ts";
+import type {
+  DayRundown,
+  Progress,
+  RundownItem,
+  TodayRundown,
+} from "../../shared/types.ts";
+import {
+  DAY_MINUTES,
+  lengthMinutes,
+  prevDay,
+  windowOn,
+} from "../../shared/window.ts";
 import { dateKey, nowSec, parseHm, weekday } from "../clock/clock.ts";
 import { loadProgress, noteRandom } from "../schedule/progress.ts";
 import { blocksForDay, loadSchedule } from "../schedule/schedule.ts";
@@ -47,7 +57,8 @@ export async function buildOwnItems(
     for (const item of built) {
       const folder = sourceFolder(item, block);
       if (!folder) continue;
-      if (item.mode === "next-episode") shadow.lastCompleted[folder] = item.path;
+      if (item.mode === "next-episode")
+        shadow.lastCompleted[folder] = item.path;
       else if (item.mode === "random-file") {
         const prev = shadow.recentRandom[folder] ?? [];
         shadow.recentRandom[folder] = noteRandom(prev, item.path);
@@ -89,7 +100,8 @@ export async function buildRundown(
     for (const item of built) {
       const folder = sourceFolder(item, block);
       if (!folder) continue;
-      if (item.mode === "next-episode") progress.lastCompleted[folder] = item.path;
+      if (item.mode === "next-episode")
+        progress.lastCompleted[folder] = item.path;
       else if (item.mode === "random-file") {
         const prev = progress.recentRandom[folder] ?? [];
         progress.recentRandom[folder] = noteRandom(prev, item.path);
@@ -104,11 +116,18 @@ export async function buildRundown(
     if (block.mode !== "playlist" && placed.endMin <= DAY_MINUTES) continue;
 
     if (changedIds && existing && !changedIds.has(block.id)) {
-      items.push(...existing.items.filter((item) => item.blockId === block.id && item.overnight));
+      items.push(
+        ...existing.items.filter(
+          (item) => item.blockId === block.id && item.overnight,
+        ),
+      );
       continue;
     }
 
-    const existingOvernight = existing?.items.filter((item) => item.blockId === block.id && item.overnight) ?? [];
+    const existingOvernight =
+      existing?.items.filter(
+        (item) => item.blockId === block.id && item.overnight,
+      ) ?? [];
     if (existingOvernight.length) {
       items.push(...existingOvernight);
       continue;
@@ -127,7 +146,8 @@ export async function buildRundown(
 
     for (const item of built) {
       const leftover = { ...item, overnight: true };
-      if (leftoverStillActive(leftover, now, leftoverEndSec)) items.push(leftover);
+      if (leftoverStillActive(leftover, now, leftoverEndSec))
+        items.push(leftover);
     }
   }
 
@@ -154,23 +174,42 @@ export async function rebuildLiveDay(
 
   const merged: RundownItem[] = [];
   const schedule = await loadSchedule();
-  const overnightLocked = current.items.filter((item) => item.overnight && item.status !== "planned");
+  const overnightLocked = current.items.filter(
+    (item) => item.overnight && item.status !== "planned",
+  );
   merged.push(...overnightLocked);
-  const overnightLockedBlocks = new Set(overnightLocked.map((item) => item.blockId));
+  const overnightLockedBlocks = new Set(
+    overnightLocked.map((item) => item.blockId),
+  );
   for (const block of blocksForDay(schedule, weekday())) {
-    const locked = (lockedByBlock.get(block.id) ?? []).filter((item) => !item.overnight);
+    const locked = (lockedByBlock.get(block.id) ?? []).filter(
+      (item) => !item.overnight,
+    );
     if (!locked.length) {
-      merged.push(...built.items.filter((item) => item.blockId === block.id && !item.overnight));
+      merged.push(
+        ...built.items.filter(
+          (item) => item.blockId === block.id && !item.overnight,
+        ),
+      );
       continue;
     }
     merged.push(...locked);
     if (locked.some((item) => item.status === "playing")) continue;
     const lockedPaths = new Set(locked.map((item) => item.path));
     merged.push(
-      ...built.items.filter((item) => item.blockId === block.id && !item.overnight && !lockedPaths.has(item.path)),
+      ...built.items.filter(
+        (item) =>
+          item.blockId === block.id &&
+          !item.overnight &&
+          !lockedPaths.has(item.path),
+      ),
     );
   }
-  merged.push(...built.items.filter((item) => item.overnight && !overnightLockedBlocks.has(item.blockId)));
+  merged.push(
+    ...built.items.filter(
+      (item) => item.overnight && !overnightLockedBlocks.has(item.blockId),
+    ),
+  );
 
   return { date: today, items: sortRundown(merged) };
 }

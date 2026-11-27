@@ -48,9 +48,12 @@ export function copyOf(messages: Messages, lang: "en" | "hr"): Copy {
     playlistGapLine: (mins) => fill(playlistGapLine, { mins }),
     videoCount: (count) => videoCount(count, videoForms, lang),
     runLength: (sec) => runLength(sec, runUnits),
-    wontFitVideo: (title, length, limit) => fill(wontFitVideo, { title, length, limit }),
-    wontFitEpisode: (title, length, limit) => fill(wontFitEpisode, { title, length, limit }),
-    wontFitFolder: (title, length, limit) => fill(wontFitFolder, { title, length, limit }),
+    wontFitVideo: (title, length, limit) =>
+      fill(wontFitVideo, { title, length, limit }),
+    wontFitEpisode: (title, length, limit) =>
+      fill(wontFitEpisode, { title, length, limit }),
+    wontFitFolder: (title, length, limit) =>
+      fill(wontFitFolder, { title, length, limit }),
     until: (time) => fill(until, { time }),
     sliceUntil: (time) => fill(sliceUntil, { time }),
     sliceContinues: (day) => fill(sliceContinues, { day }),

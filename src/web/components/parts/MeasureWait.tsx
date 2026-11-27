@@ -1,7 +1,13 @@
 import type { ComponentChildren } from "preact";
 import { Spinner } from "./Spinner.tsx";
 
-export function MeasureWait({ label, note }: { label: ComponentChildren; note?: string }) {
+export function MeasureWait({
+  label,
+  note,
+}: {
+  label: ComponentChildren;
+  note?: string;
+}) {
   return (
     <div class="wait">
       <div class="wait-line">

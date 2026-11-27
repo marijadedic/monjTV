@@ -1,4 +1,7 @@
-import { canonicalPlaylistUrl, parseYoutubeUrl } from "../../../shared/youtube.ts";
+import {
+  canonicalPlaylistUrl,
+  parseYoutubeUrl,
+} from "../../../shared/youtube.ts";
 import type { Draft } from "../../types/Draft.ts";
 
 export function pathChosen(draft: Draft): boolean {

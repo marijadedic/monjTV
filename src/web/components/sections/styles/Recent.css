@@ -32,7 +32,9 @@
 .recent-window header b {
   font-size: 1.05rem;
 }
-.recent-window header p, .recent-order, .recent-empty {
+.recent-window header p,
+.recent-order,
+.recent-empty {
   margin: 2px 0 0;
   color: var(--muted);
   font-size: 0.85rem;

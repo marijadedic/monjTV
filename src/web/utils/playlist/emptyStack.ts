@@ -2,7 +2,14 @@ import type { Draft } from "../../types/Draft.ts";
 
 export function emptyStack(): Pick<
   Draft,
-  "name" | "items" | "addMode" | "addSource" | "addFolder" | "addFile" | "addLengthChoice" | "addCustomMin"
+  | "name"
+  | "items"
+  | "addMode"
+  | "addSource"
+  | "addFolder"
+  | "addFile"
+  | "addLengthChoice"
+  | "addCustomMin"
 > {
   return {
     name: "",

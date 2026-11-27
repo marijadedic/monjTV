@@ -32,7 +32,9 @@ export function FolderPath({
   const [dirs, setDirs] = useState<FolderHit[]>([]);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
-  const listId = useRef(`folders-${Math.random().toString(36).slice(2)}`).current;
+  const listId = useRef(
+    `folders-${Math.random().toString(36).slice(2)}`,
+  ).current;
 
   useEffect(() => {
     if (!open || !value.trim() || isYoutubeLink(value)) {
@@ -46,7 +48,9 @@ export function FolderPath({
         .suggestPaths(value, kind)
         .then((next) => {
           if (cancel) return;
-          setDirs(kind === "video" ? [...next.videos, ...next.dirs] : next.dirs);
+          setDirs(
+            kind === "video" ? [...next.videos, ...next.dirs] : next.dirs,
+          );
           setActive(-1);
         })
         .catch(() => {
@@ -97,7 +101,9 @@ export function FolderPath({
           aria-controls={listId}
           aria-autocomplete="list"
           aria-invalid={invalid ? "true" : undefined}
-          aria-activedescendant={shown && active >= 0 ? `${listId}-${active}` : undefined}
+          aria-activedescendant={
+            shown && active >= 0 ? `${listId}-${active}` : undefined
+          }
           onFocus={() => setOpen(true)}
           onInput={(event) => {
             setOpen(true);
@@ -114,7 +120,12 @@ export function FolderPath({
         </button>
       </div>
       {shown && (
-        <ul class="path-suggest" id={listId} role="listbox" aria-label={listLabel}>
+        <ul
+          class="path-suggest"
+          id={listId}
+          role="listbox"
+          aria-label={listLabel}
+        >
           {dirs.map((dir, index) => (
             <li key={dir.path} role="presentation">
               <button

@@ -33,7 +33,9 @@ describe("the TV schedule window", () => {
 
   it("is not ready when one of those dates is missing", () => {
     const board = span(-1, 6);
-    board.days = board.days.filter((day) => day.date !== shiftDateKey(today, 6));
+    board.days = board.days.filter(
+      (day) => day.date !== shiftDateKey(today, 6),
+    );
     assert.equal(windowReady(board, today, true), false);
   });
 
@@ -44,7 +46,14 @@ describe("the TV schedule window", () => {
   });
 
   it("is ready for today alone when later days are not being filled", () => {
-    assert.equal(windowReady({ carriedInto: today, days: [{ date: today, items: [] }] }, today, false), true);
+    assert.equal(
+      windowReady(
+        { carriedInto: today, days: [{ date: today, items: [] }] },
+        today,
+        false,
+      ),
+      true,
+    );
   });
 
   it("is not ready when the saved week was built for another day", () => {

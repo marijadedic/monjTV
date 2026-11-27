@@ -106,7 +106,8 @@ export function parseYoutubePlaylist(raw: string): YoutubePlaylistRef | null {
   if (!id || !PLAYLIST_ID.test(id)) return null;
   const indexRaw = url.searchParams.get("index");
   const indexNum = indexRaw == null || indexRaw === "" ? NaN : Number(indexRaw);
-  const startIndex = Number.isInteger(indexNum) && indexNum > 1 ? indexNum - 1 : 0;
+  const startIndex =
+    Number.isInteger(indexNum) && indexNum > 1 ? indexNum - 1 : 0;
   return {
     id,
     url: `https://www.youtube.com/playlist?list=${id}`,
@@ -123,7 +124,8 @@ export function canonicalPlaylistUrl(raw: string): string | null {
 export function formatPlaylistSource(playlist: YoutubePlaylistRef): string {
   if (playlist.id.startsWith("video_ids:")) return playlist.url;
   if (playlist.startVideoId) {
-    const index = playlist.startIndex > 0 ? `&index=${playlist.startIndex + 1}` : "";
+    const index =
+      playlist.startIndex > 0 ? `&index=${playlist.startIndex + 1}` : "";
     return `https://www.youtube.com/watch?v=${playlist.startVideoId}&list=${playlist.id}${index}`;
   }
   if (playlist.startIndex > 0) {
@@ -144,12 +146,16 @@ export function isYoutubeLink(raw: string): boolean {
 }
 
 // Where playback of this playlist begins. The video id wins over a stale index.
-export function playlistStartIndex(videoIds: readonly string[], ref: YoutubePlaylistRef): number {
+export function playlistStartIndex(
+  videoIds: readonly string[],
+  ref: YoutubePlaylistRef,
+): number {
   if (ref.startVideoId) {
     const at = videoIds.indexOf(ref.startVideoId);
     if (at >= 0) return at;
   }
-  if (ref.startIndex > 0 && ref.startIndex < videoIds.length) return ref.startIndex;
+  if (ref.startIndex > 0 && ref.startIndex < videoIds.length)
+    return ref.startIndex;
   return 0;
 }
 
