@@ -209,9 +209,6 @@ export function TvSchedule() {
   }
 
   const showColumn = Boolean(day && (items.length > 0 || gapTitle));
-  let episodeItem: RundownItem | null = null;
-  if (current?.mode === "next-episode") episodeItem = current;
-  else if (due?.mode === "next-episode") episodeItem = due;
 
   const fromDay = day ? t.dayName[prevDay(weekdayOfKey(day.date))] : "";
   const carried = past ? [] : carryGroups(items);
@@ -275,7 +272,7 @@ export function TvSchedule() {
             next={next}
             waitingUntil={status?.waitingUntil || null}
             running={Boolean(status?.running)}
-            onStart={start}
+            onStart={() => void start()}
             {...actions}
           />
           {rail && (

@@ -104,10 +104,10 @@ export function mergeOvernight(built: RundownItem[], carry: RundownItem[]): Rund
 // Next file after the last completed one, wrapping to the start.
 export function nextFrom(files: string[], lastCompleted?: string): string | null {
   if (files.length === 0) return null;
-  if (!lastCompleted) return files[0]!;
+  if (!lastCompleted) return files[0];
   const idx = files.indexOf(lastCompleted);
-  if (idx === -1) return files[0]!;
-  return files[(idx + 1) % files.length]!;
+  if (idx === -1) return files[0];
+  return files[(idx + 1) % files.length];
 }
 
 // A planned rundown row for one file.

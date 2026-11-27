@@ -9,12 +9,18 @@
     "start:server": "tsx src/server/index.ts",
     "start": "npm run build && npm run start:server",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "desktop": "node scripts/install-desktop.mjs"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^26.6.5",
-    "concurrently": "^10.0.6"
+    "concurrently": "^10.0.6",
+    "eslint": "^10.15.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.74.0"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",

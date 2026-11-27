@@ -21,10 +21,10 @@ export async function episodePaths(folder: string): Promise<string[]> {
 // File after the last completed one, wrapping to the start.
 export function nextEpisode(files: string[], lastCompleted?: string): string | null {
   if (files.length === 0) return null;
-  if (!lastCompleted) return files[0]!;
+  if (!lastCompleted) return files[0];
   const idx = files.indexOf(lastCompleted);
-  if (idx === -1) return files[0]!;
-  return files[(idx + 1) % files.length]!;
+  if (idx === -1) return files[0];
+  return files[(idx + 1) % files.length];
 }
 
 // Plays remembered under other folders, so the same file is not chosen from two places.
@@ -51,7 +51,7 @@ export function takeRandom(
   const blocked = new Set(opts?.block ?? []);
   const open = (file: string) => !blocked.has(file);
   const picked = (pool: string[]) => {
-    const path = pool[randomInt(pool.length)]!;
+    const path = pool[randomInt(pool.length)];
     return { path, recent: rememberRandom(liveRecent, path, universe) };
   };
 

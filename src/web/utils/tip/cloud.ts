@@ -26,7 +26,7 @@ export function placeCloud(event: { currentTarget: EventTarget | null }) {
   sync();
   tipWatch = new MutationObserver(sync);
   tipWatch.observe(source, { subtree: true, characterData: true, childList: true });
-  const frame = host.closest(".add-form") as HTMLElement | null;
+  const frame = host.closest<HTMLElement>(".add-form");
   if (tipFrame !== frame) {
     tipFrame?.removeEventListener("scroll", onTipScroll);
     tipFrame = frame;

@@ -23,9 +23,9 @@ describe("a save times its slots without dropping another write", () => {
       await gate;
       return "first";
     });
-    const second = exclusive(async () => {
+    const second = exclusive(() => {
       order.push("second");
-      return "second";
+      return Promise.resolve("second");
     });
     await Promise.resolve();
     assert.deepEqual(order, ["first"]);
@@ -36,10 +36,8 @@ describe("a save times its slots without dropping another write", () => {
   });
 
   it("still runs the next write when the previous one failed", async () => {
-    const failed = exclusive(async () => {
-      throw new Error("disk");
-    });
-    const next = exclusive(async () => "kept");
+    const failed = exclusive(() => Promise.reject(new Error("disk")));
+    const next = exclusive(() => Promise.resolve("kept"));
     await assert.rejects(failed);
     assert.equal(await next, "kept");
   });

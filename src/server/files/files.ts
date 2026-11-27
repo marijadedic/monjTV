@@ -122,9 +122,9 @@ export async function suggestFolders(raw: string): Promise<PathHit[]> {
   const needle = prefix.toLowerCase();
   let matches = needle ? dirs.filter((dir) => dir.name.toLowerCase().startsWith(needle)) : dirs;
   const exact =
-    matches.length === 1 && matches[0]!.name.toLowerCase() === needle && !/[\\/]$/.test(typed);
+    matches.length === 1 && matches[0].name.toLowerCase() === needle && !/[\\/]$/.test(typed);
   if (exact) {
-    const nested = await childDirs(matches[0]!.path);
+    const nested = await childDirs(matches[0].path);
     if (nested.length > 0) matches = nested;
   }
   const current = typed.replace(/[\\/]+$/, "");
@@ -166,11 +166,11 @@ async function suggestVideos(raw: string): Promise<{ dirs: PathHit[]; videos: Pa
   const exact =
     dirs.length === 1 &&
     videos.length === 0 &&
-    dirs[0]!.name.toLowerCase() === needle &&
+    dirs[0].name.toLowerCase() === needle &&
     !/[\\/]$/.test(typed);
   if (exact) {
-    const nestedDirs = await childDirs(dirs[0]!.path);
-    const nestedVideos = await childVideos(dirs[0]!.path);
+    const nestedDirs = await childDirs(dirs[0].path);
+    const nestedVideos = await childVideos(dirs[0].path);
     if (nestedDirs.length > 0 || nestedVideos.length > 0) {
       dirs = nestedDirs;
       videos = nestedVideos;

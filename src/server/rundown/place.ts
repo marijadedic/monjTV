@@ -159,7 +159,7 @@ async function itemsForPlaylist(
   for (const entry of block.items ?? []) {
     const used = usedByFolder.get(entry.folder) ?? [];
     const prev = takeKeptEntry(unused, entry);
-    let picked: { path: string; durationSec: number; title: string } | null = null;
+    let picked: { path: string; durationSec: number; title: string } | null;
 
     if (entry.mode === "random-file" && prev && (await randomPickStillValid(entry, prev, used))) {
       picked = { path: prev.path, durationSec: prev.durationSec, title: prev.title };
@@ -183,7 +183,7 @@ async function itemsForPlaylist(
 
   let cursor = cursorStart;
   for (let i = 0; i < pickedList.length; i++) {
-    const { entry, prev, picked } = pickedList[i]!;
+    const { entry, prev, picked } = pickedList[i];
     items.push(placePlaylistItem(block, entry, prev, picked, cursor));
     cursor += picked.durationSec;
 
@@ -246,8 +246,8 @@ export async function itemsForWindow(
     const remaining = blockEnd - cursor;
     if (remaining <= 0) break;
 
-    let picked: string | null = null;
-    let durationSec = 0;
+    let picked: string | null;
+    let durationSec: number;
     if (block.mode === "next-episode") {
       const file = nextFrom(files, lastCompleted);
       if (!file) break;

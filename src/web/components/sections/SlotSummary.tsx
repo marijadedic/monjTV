@@ -57,7 +57,7 @@ export function SlotSummary({
           ) : (
             <ol class="playlist summary">
               {draft.items.map((item, index) => {
-                const clock = clocks[index]!;
+                const clock = clocks[index];
                 return (
                   <li key={item.id} class="playlist-item">
                     <PlaylistWhen start={clock.start} end={clock.end} />

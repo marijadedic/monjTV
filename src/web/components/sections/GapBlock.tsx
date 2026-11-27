@@ -26,7 +26,7 @@ export function GapBlock({
       style={rowStyle(span)}
       title={long && fallbackName ? fallbackName : undefined}
       onClick={(event) => {
-        const rect = (event.currentTarget as HTMLButtonElement).getBoundingClientRect();
+        const rect = event.currentTarget.getBoundingClientRect();
         const ratio = rect.height ? Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)) : 0;
         onOpen(start + ratio * (end - start));
       }}

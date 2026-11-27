@@ -83,6 +83,7 @@ type YoutubePrint = {
   duration?: number | null;
   is_live?: boolean;
   live_status?: string;
+  entries?: unknown;
 };
 
 function parseYoutubePrint(stdout: string): YoutubePrint | null {
@@ -118,8 +119,8 @@ export async function probeYoutube(
     return hit;
   }
 
-  let stdout = "";
-  let stderr = "";
+  let stdout: string;
+  let stderr: string;
   try {
     const ytdlp = await ensureYtdlp();
     const result = await execFileAsync(
@@ -148,7 +149,7 @@ export async function probeYoutube(
     stdout = record.stdout ?? "";
     stderr = `${record.stderr ?? ""}\n${record.message ?? ""}`;
     if (/ENOENT|not found/i.test(stderr)) {
-      throw new Error("yt-dlp is not installed or not on PATH");
+      throw new Error("yt-dlp is not installed or not on PATH", { cause: err });
     }
   }
 
@@ -179,8 +180,8 @@ export async function probeYoutube(
 export async function youtubeStreamUrls(raw: string): Promise<YoutubeStream> {
   const url = parseYoutubeUrl(raw);
   if (!url) throw new Error("Not a YouTube video URL");
-  let stdout = "";
-  let stderr = "";
+  let stdout: string;
+  let stderr: string;
   try {
     const ytdlp = await ensureYtdlp();
     const result = await execFileAsync(
@@ -208,7 +209,7 @@ export async function youtubeStreamUrls(raw: string): Promise<YoutubeStream> {
     stdout = record.stdout ?? "";
     stderr = `${record.stderr ?? ""}\n${record.message ?? ""}`;
     if (/ENOENT|not found/i.test(stderr)) {
-      throw new Error("yt-dlp is not installed or not on PATH");
+      throw new Error("yt-dlp is not installed or not on PATH", { cause: err });
     }
   }
   const lines = stdout
@@ -238,8 +239,8 @@ async function runYtdlp(
   timeout: number,
   maxBuffer = 2_000_000,
 ): Promise<{ stdout: string; stderr: string }> {
-  let stdout = "";
-  let stderr = "";
+  let stdout: string;
+  let stderr: string;
   try {
     const ytdlp = await ensureYtdlp();
     const result = await execFileAsync(
@@ -349,8 +350,8 @@ function listedDurationSec(row: {
   const parts = raw.split(":").map((part) => Number(part));
   if (parts.length < 2 || parts.length > 3 || parts.some((part) => !Number.isFinite(part))) return 0;
   const [first, second, third] = parts;
-  if (third != null) return Math.round(first! * 3600 + second! * 60 + third);
-  return Math.round(first! * 60 + second!);
+  if (third != null) return Math.round(first * 3600 + second * 60 + third);
+  return Math.round(first * 60 + second);
 }
 
 function playlistVideos(entries: unknown): YoutubePlaylistVideo[] {
@@ -439,8 +440,8 @@ function videosFromIdList(ref: YoutubePlaylistRef): YoutubePlaylistVideo[] {
 
 async function readPlaylist(ref: YoutubePlaylistRef): Promise<YoutubePlaylist> {
   const fallback = videosFromIdList(ref);
-  let stdout = "";
-  let stderr = "";
+  let stdout: string;
+  let stderr: string;
   try {
     const result = await runYtdlp(
       [
@@ -460,7 +461,7 @@ async function readPlaylist(ref: YoutubePlaylistRef): Promise<YoutubePlaylist> {
     if (fallback.length) return storePlaylist(ref, fallback, "");
     throw err;
   }
-  const dump = parseYoutubePrint(stdout) as { title?: string; entries?: unknown } | null;
+  const dump = parseYoutubePrint(stdout);
   const videos = playlistVideos(dump?.entries);
   const queued = videos.length > 0 ? videos : fallback;
   if (!queued.length) {

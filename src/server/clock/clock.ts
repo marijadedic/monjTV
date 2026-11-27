@@ -13,7 +13,7 @@ const JS_DAY_TO_DAY: Day[] = [
 
 // Weekday key for a date.
 export function weekday(d = new Date()): Day {
-  return JS_DAY_TO_DAY[d.getDay()]!;
+  return JS_DAY_TO_DAY[d.getDay()];
 }
 
 // Calendar date as YYYY-MM-DD.
@@ -64,5 +64,5 @@ export function msUntil(secFromMidnight: number, d = new Date()): number {
 export function isHm(value: string): boolean {
   if (!/^\d{2}:\d{2}$/.test(value)) return false;
   const [h, m] = value.split(":").map(Number);
-  return h! <= 23 && m! <= 59;
+  return h <= 23 && m <= 59;
 }

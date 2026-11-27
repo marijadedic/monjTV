@@ -316,7 +316,7 @@ async function playYoutubePlaylist(
     return;
   }
   index %= videos.length;
-  const url = videos[index]!;
+  const url = videos[index];
   if (fallbackPlay?.folder === source && fallbackPlay.path === url && !fallbackPlay.queued) return;
 
   const epoch = ++playEpoch;
@@ -595,7 +595,7 @@ export async function startPlayer(): Promise<PlayerStatus> {
     lastError = /ENOENT|not found/i.test(message)
       ? "mpv is not installed or not on PATH"
       : message;
-    throw new Error(lastError);
+    throw new Error(lastError, { cause: err });
   }
   await playNow();
   return getStatus();

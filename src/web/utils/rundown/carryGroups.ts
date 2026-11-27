@@ -16,7 +16,7 @@ export function carryGroups(items: RundownItem[]): { id: string; until: string; 
   }
   return order.map((id) => {
     const rows = map.get(id)!;
-    let until = rows[0]!.end;
+    let until = rows[0].end;
     let untilSec = secondsOf(until);
     for (const row of rows) {
       const sec = secondsOf(row.end);

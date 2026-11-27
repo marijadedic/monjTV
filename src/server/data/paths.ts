@@ -6,7 +6,9 @@ export const rootDir = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../../..",
 );
-export const dataDir = path.join(rootDir, "data");
+// Saved JSON. A rundown test sets MONJTV_DATA to a temporary directory.
+const dataOverride = process.env.MONJTV_DATA?.trim();
+export const dataDir = dataOverride ? path.resolve(dataOverride) : path.join(rootDir, "data");
 export const clientDir = path.join(rootDir, "dist/client");
 export const schedulePath = path.join(dataDir, "schedule.json");
 export const progressPath = path.join(dataDir, "progress.json");

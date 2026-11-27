@@ -246,7 +246,7 @@ function filterWords(text: string): string {
 function episodeOf(base: string): string {
   const flat = base.replace(/[._]/g, " ");
   const season = flat.match(/\bS\s*(\d{1,2})\s*E\s*(\d{1,3})\b/i);
-  if (season) return `S${season[1]!.padStart(2, "0")}E${season[2]!.padStart(2, "0")}`;
+  if (season) return `S${season[1].padStart(2, "0")}E${season[2].padStart(2, "0")}`;
   const episode = flat.match(/\b(?:Episode|EP|E)\s*(\d{1,3})\b/i);
   if (episode) return `episode ${Number(episode[1])}`;
   if (/\b(?:19|20)\d{2}\b/.test(flat)) return "";
@@ -458,14 +458,14 @@ async function trimBars(dest: string): Promise<void> {
       ["-v", "error", "-i", dest, "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"],
       { timeout: 20_000, encoding: "buffer", maxBuffer: 20_000_000 },
     );
-    raw = stdout as unknown as Buffer;
+    raw = stdout;
   } catch {
     return;
   }
   if (raw.length < width * height * 3) return;
   const dark = (x: number, y: number) => {
     const i = (y * width + x) * 3;
-    return raw[i]! < 18 && raw[i + 1]! < 18 && raw[i + 2]! < 18;
+    return raw[i] < 18 && raw[i + 1] < 18 && raw[i + 2] < 18;
   };
   const rowBar = (y: number) => {
     let darkCount = 0;

@@ -40,14 +40,14 @@ export function playlistSliceLines(
   const lines: SliceLine[] = [];
   const entries = block.items ?? [];
   for (let index = 0; index < entries.length; index++) {
-    const entry = entries[index]!;
+    const entry = entries[index];
     const row = takePlaylistRow(unused, entry);
     const item = fromEntry(entry, row?.durationSec ?? null, row?.title ?? "");
     const named = (row?.title ?? "").trim();
     const name = named ? clipLabel(named) : playlistGridName(item, titles);
     const gap = index < entries.length - 1 ? gapOf(entry) : 0;
     let side: SliceSide = "start";
-    let text = name;
+    let text: string;
     if (row && row.durationSec > 0) {
       const startMin = toMin(row.start);
       const beginsNext = startMin < placed.startMin;

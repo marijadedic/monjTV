@@ -38,11 +38,11 @@ export function clockOf(mins: number): string {
 }
 
 export function nextDay(day: Day): Day {
-  return DAYS[(DAYS.indexOf(day) + 1) % DAYS.length]!;
+  return DAYS[(DAYS.indexOf(day) + 1) % DAYS.length];
 }
 
 export function prevDay(day: Day): Day {
-  return DAYS[(DAYS.indexOf(day) + DAYS.length - 1) % DAYS.length]!;
+  return DAYS[(DAYS.indexOf(day) + DAYS.length - 1) % DAYS.length];
 }
 
 // Slot length in minutes. A saved length wins over the origin window.

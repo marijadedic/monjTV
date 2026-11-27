@@ -68,7 +68,7 @@ import { WeekScale } from "../components/sections/WeekScale.tsx";
 
 export function Admin() {
   const { t } = useI18n();
-  const today = WEEKDAY[new Date().getDay()]!;
+  const today = WEEKDAY[new Date().getDay()];
   const [schedule, setSchedule] = useState<Schedule>(emptySchedule);
   const [board, setBoard] = useState<TvBoard | null>(null);
   const [youtubeTitles, setYoutubeTitles] = useState<Record<string, string>>({});
@@ -293,6 +293,8 @@ export function Admin() {
     if (!gapEdit) return;
     gapInputRef.current?.focus();
     gapInputRef.current?.select();
+    // The minutes field updates gapEdit on each keystroke. Focusing then would select that text again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gapEdit?.itemId]);
 
   useEffect(() => {
@@ -318,7 +320,7 @@ export function Admin() {
     return () => {
       cancel = true;
     };
-  }, [draft?.id, draft?.mode, draft?.folder, draft?.file]);
+  }, [draft?.id, draft?.mode, draft?.source, draft?.folder, draft?.file]);
 
   useEffect(() => {
     const plan = measurePlan(draft);
@@ -368,6 +370,8 @@ export function Admin() {
       cancel = true;
       clearTimeout(timer);
     };
+    // measurePlan reads these fields. The rest of the draft changes while the form is edited.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     draft?.mode,
     draft?.folder,
@@ -408,6 +412,8 @@ export function Admin() {
     return () => {
       cancel = true;
     };
+    // Probe when the videos change. A row that already has a length is not measured again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft?.mode, stackKey, panelToken]);
 
   useEffect(() => {

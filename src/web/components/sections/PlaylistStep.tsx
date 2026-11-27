@@ -111,7 +111,7 @@ export function PlaylistStep({
       if (index < 0 || swap < 0 || swap >= current.items.length) return current;
       const items = [...current.items];
       const [row] = items.splice(index, 1);
-      items.splice(swap, 0, row!);
+      items.splice(swap, 0, row);
       return { ...current, items };
     });
   }

@@ -37,6 +37,21 @@ let httpServer: { close: () => void } | undefined;
 let stopping = false;
 let closePorts = [PORT];
 
+// The request body, or null when it is not JSON.
+async function readJson(c: { req: { text: () => Promise<string> } }): Promise<unknown> {
+  try {
+    return JSON.parse(await c.req.text()) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+// One field of a JSON object.
+function jsonField(body: unknown, key: string): unknown {
+  if (!body || typeof body !== "object" || !(key in body)) return undefined;
+  return body[key as keyof typeof body];
+}
+
 // Liveness check.
 app.get("/api/health", (c) => c.json({ ok: true }));
 
@@ -116,7 +131,7 @@ async function assertBlockSource(block: ScheduleBlock): Promise<void> {
 
 // Save the week and answer once it is stored. The rundown rebuild follows that response.
 app.put("/api/schedule", async (c) => {
-  const body = (await c.req.json()) as Parameters<typeof saveSchedule>[0];
+  const body = await c.req.json<Parameters<typeof saveSchedule>[0]>();
   try {
     const previous = await loadSchedule();
     for (const block of body.blocks ?? []) {
@@ -144,9 +159,10 @@ app.put("/api/schedule", async (c) => {
 
 // Titles for the YouTube links on the timetable.
 app.post("/api/youtube/titles", async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const urls = Array.isArray(body?.urls)
-    ? body.urls.filter((url: unknown): url is string => typeof url === "string").slice(0, 40)
+  const body = await readJson(c);
+  const listed = jsonField(body, "urls");
+  const urls = Array.isArray(listed)
+    ? listed.filter((url): url is string => typeof url === "string").slice(0, 40)
     : [];
   return c.json({ titles: await youtubeTitles(urls) });
 });
@@ -253,10 +269,11 @@ app.post("/api/tv/:date/items/:id/skipped", async (c) => {
 
 // Move a next-episode item to the previous or next file in its folder.
 app.post("/api/tv/:date/items/:id/episode", async (c) => {
-  const body = await c.req.json().catch(() => null);
+  const body = await readJson(c);
+  const asked = jsonField(body, "direction");
   let direction: -1 | 0 | 1 = 0;
-  if (body?.direction === "prev") direction = -1;
-  else if (body?.direction === "next") direction = 1;
+  if (asked === "prev") direction = -1;
+  else if (asked === "next") direction = 1;
   if (!direction) return c.json({ error: "direction must be prev or next" }, 400);
   try {
     const date = c.req.param("date");
@@ -313,10 +330,12 @@ app.get("/api/recent", async (c) => {
 
 // Take one file off that list so a random slot can pick it again.
 app.post("/api/recent/remove", async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const folder = typeof body?.folder === "string" ? body.folder : "";
-  const filePath = typeof body?.path === "string" ? body.path : "";
-  if (!folder || !filePath) return c.json({ error: "folder and path are required" }, 400);
+  const body = await readJson(c);
+  const folder = jsonField(body, "folder");
+  const filePath = jsonField(body, "path");
+  if (typeof folder !== "string" || typeof filePath !== "string" || !folder || !filePath) {
+    return c.json({ error: "folder and path are required" }, 400);
+  }
   return c.json(await forgetRandomPlayed(folder, filePath));
 });
 

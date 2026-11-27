@@ -5,7 +5,7 @@ const ORDER: Day[] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 // Local calendar date at noon, so a daylight-saving shift stays on that date.
 export function parseDateKey(key: string): Date {
   const [y, m, d] = key.split("-").map(Number);
-  return new Date(y!, (m ?? 1) - 1, d ?? 1, 12, 0, 0, 0);
+  return new Date(y, (m ?? 1) - 1, d ?? 1, 12, 0, 0, 0);
 }
 
 export function formatDateKey(d: Date): string {
@@ -22,7 +22,7 @@ export function shiftDateKey(key: string, days: number): string {
 }
 
 export function weekdayOfKey(key: string): Day {
-  return ORDER[parseDateKey(key).getDay()]!;
+  return ORDER[parseDateKey(key).getDay()];
 }
 
 // Whole calendar days from `from` to `to`. Negative when `to` is earlier.

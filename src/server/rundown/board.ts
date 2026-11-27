@@ -59,14 +59,13 @@ export async function syncBoard(fillAhead: boolean): Promise<BoardFile> {
   }
 
   const schedule = await loadSchedule();
-  let carriedInto = board.carriedInto;
+  const carriedInto = board.carriedInto;
   const savedYesterday = savedDates.has(yesterday) ? byDate.get(yesterday) : undefined;
   const existingToday = byDate.get(today);
   if (existingToday && carriedInto !== today && savedYesterday) {
     const stripped = existingToday.items.filter((item) => !item.overnight);
     const carry = leftoverCarry(savedYesterday.items, schedule, weekdayOfKey(yesterday), nowSec());
     byDate.set(today, { date: today, items: sortRundown([...carry, ...stripped]) });
-    carriedInto = today;
   }
 
   if (!byDate.has(today)) {
@@ -77,7 +76,6 @@ export async function syncBoard(fillAhead: boolean): Promise<BoardFile> {
     } else {
       byDate.set(today, built);
     }
-    carriedInto = today;
   }
 
   if (fillAhead && !byDate.has(yesterday)) {

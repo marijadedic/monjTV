@@ -72,7 +72,7 @@ export function PlaylistStack({
       ) : (
         <ol class="playlist">
           {items.map((item, index) => {
-            const clock = clocks[index]!;
+            const clock = clocks[index];
             const gap = gapOf(item);
             return (
               <Fragment key={item.id}>
@@ -80,7 +80,7 @@ export function PlaylistStack({
                   class="playlist-item"
                   draggable
                   onDragStart={(event) => {
-                    onDragStart(item.id, event.dataTransfer, event.currentTarget as HTMLElement);
+                    onDragStart(item.id, event.dataTransfer, event.currentTarget);
                   }}
                   onDragEnd={onDragEnd}
                   onDragOver={(event) => {
@@ -88,7 +88,7 @@ export function PlaylistStack({
                     if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
                     if (draggingId.current === item.id) return;
                     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-                    onDragOver(item.id, event.currentTarget as HTMLElement, event.clientY > rect.top + rect.height / 2);
+                    onDragOver(item.id, event.currentTarget, event.clientY > rect.top + rect.height / 2);
                   }}
                   onDrop={(event) => {
                     event.preventDefault();
@@ -130,7 +130,7 @@ export function PlaylistStack({
                       event.preventDefault();
                       if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
                       if (draggingId.current === item.id) return;
-                      onDragOver(item.id, event.currentTarget as HTMLElement, true);
+                      onDragOver(item.id, event.currentTarget, true);
                     }}
                     onDrop={(event) => {
                       event.preventDefault();

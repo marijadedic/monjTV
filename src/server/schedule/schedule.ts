@@ -79,7 +79,7 @@ function sameEntries(a: PlaylistEntry[] | undefined, b: PlaylistEntry[] | undefi
   const right = b ?? [];
   if (left.length !== right.length) return false;
   return left.every((item, index) => {
-    const other = right[index]!;
+    const other = right[index];
     return (
       item.id === other.id &&
       item.mode === other.mode &&
@@ -297,8 +297,8 @@ export function validateSchedule(
       )
       .sort((a, b) => a.start - b.start);
     for (let i = 1; i < ofDay.length; i++) {
-      const prev = ofDay[i - 1]!;
-      const cur = ofDay[i]!;
+      const prev = ofDay[i - 1];
+      const cur = ofDay[i];
       if (cur.start >= prev.end) continue;
       if (touched && !touched.has(prev.id) && !touched.has(cur.id)) continue;
       throw new Error(`Overlapping blocks on ${day}: ${prev.label} and ${cur.label}`);
@@ -378,7 +378,7 @@ function cleanLength(raw: { lengthMin?: number }): number | undefined {
 function normalizeBlock(raw: ScheduleBlock): ScheduleBlock {
   if (!raw || typeof raw !== "object") throw new Error("Invalid block");
   const id = raw.id?.trim() || randomUUID();
-  const days = [...new Set((raw.days ?? []).filter((d): d is Day => DAYS.includes(d as Day)))];
+  const days = [...new Set((raw.days ?? []).filter((d): d is Day => DAYS.includes(d)))];
   if (days.length === 0) throw new Error("Each block needs at least one day");
   if (!isHm(raw.start)) throw new Error("start and end must be HH:mm");
   const lengthMin = cleanLength(raw);

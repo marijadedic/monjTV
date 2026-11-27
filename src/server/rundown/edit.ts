@@ -299,7 +299,7 @@ export function stepEpisode(date: string, itemId: string, direction: -1 | 1): Pr
     const locked = new Set(
       rundown.items.filter((row) => row.blockId === item.blockId && !tailIds.has(row.id)).map((row) => row.path),
     );
-    const startFile = files[startIndex]!;
+    const startFile = files[startIndex];
     if (locked.has(startFile)) {
       throw new Error(direction < 0 ? "No previous episode" : "No next episode");
     }
@@ -307,7 +307,7 @@ export function stepEpisode(date: string, itemId: string, direction: -1 | 1): Pr
     const drop = new Set<string>();
     let cursor = startIndex;
     for (const row of tail) {
-      while (cursor < files.length && locked.has(files[cursor]!)) cursor += 1;
+      while (cursor < files.length && locked.has(files[cursor])) cursor += 1;
       const file = files[cursor];
       if (!file) {
         drop.add(row.id);

@@ -116,8 +116,8 @@ function syncOvernightCopies(
     const targets = sortRundown(day.items).filter((item) => item.overnight && item.mode === "next-episode");
     const count = Math.min(sources.length, targets.length);
     for (let index = 0; index < count; index++) {
-      const source = sources[index]!;
-      const target = targets[index]!;
+      const source = sources[index];
+      const target = targets[index];
       if (target.status === "playing") continue;
       if (target.path !== source.path || target.durationSec !== source.durationSec || target.title !== source.title) {
         target.path = source.path;
@@ -332,6 +332,6 @@ export async function continueShowAfter(
   }
 
   syncOvernightCopies(days, schedule, touched);
-  await mirrorYesterdaySkips(days, schedule, await loadProgress(), async () => files, touched, folder);
+  await mirrorYesterdaySkips(days, schedule, await loadProgress(), () => Promise.resolve(files), touched, folder);
   applyTouched(days, schedule, touched);
 }
