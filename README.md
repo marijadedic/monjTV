@@ -250,6 +250,10 @@ Days are `mon` `tue` `wed` `thu` `fri` `sat` `sun`. Times are `HH:mm`. An interm
 | `npm run start:server`             | Start the API on port 3000 when `dist/client` already exists.                  |
 | `npm run typecheck`                | `tsc --noEmit`.                                                                |
 | `npm run lint`                     | ESLint over `src` and `vite.config.ts`.                                        |
+| `npm run format`                   | Write Prettier across the repo.                                                |
+| `npm run format:check`             | Report files Prettier would change.                                            |
+| `npm test`                         | Run the unit tests.                                                            |
+| `npm run check`                    | Typecheck, lint, Prettier check, and the unit tests.                           |
 | `./scripts/start.sh`               | Build the UI, restart the server, and open the UI. The desktop icon does this. |
 | `node scripts/install-desktop.mjs` | Install a desktop icon for this operating system.                              |
 
